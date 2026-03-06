@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'İletişim | VEDEL Klima',
-  description: 'VEDEL Klima iletişim bilgileri. Kayapa ve Özlüce bayilerimiz. (0224) 413 16 17 - vedel@vedel.com.tr',
+  description: 'VEDEL Klima iletişim bilgileri. Kayapa ve Özlüce bayilerimiz. (0224) 413 23 16 - vedel@vedel.com.tr',
   keywords: ['klima iletişim', 'vedel iletişim', 'bursa klima bayii', 'mhi servis', 'euroform servis'],
   openGraph: {
     type: 'website',
@@ -78,11 +78,11 @@ export default function Iletisim() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8 mt-16">
             <a
-              href="tel:+902244131617"
+              href="tel:+902244132316"
               className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 text-center border border-white/20 hover:bg-white/20 transition-colors"
             >
               <Phone className="w-8 h-8 text-red-300 mx-auto mb-3" />
-              <div className="text-base md:text-xl font-bold text-white mb-1">(0224) 413 16 17</div>
+              <div className="text-base md:text-xl font-bold text-white mb-1">(0224) 413 23 16</div>
               <div className="text-red-200 text-sm">7/24 Teknik Destek</div>
             </a>
             <a
