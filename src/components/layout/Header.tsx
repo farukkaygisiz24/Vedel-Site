@@ -201,16 +201,16 @@ export default function Header() {
         <div className="flex items-center gap-3 lg:gap-4 flex-shrink-0">
           {/* Desktop phone */}
           <a
-            href="tel:+902244131617"
+            href="tel:+902244132316"
             className="hidden lg:flex items-center gap-2 text-red-600 font-bold hover:text-red-700 transition-colors"
           >
             <Phone className="w-5 h-5" />
-            <span className="text-sm">(0224) 413 16 17</span>
+            <span className="text-sm">(0224) 413 23 16</span>
           </a>
 
           {/* Mobile phone icon */}
           <a
-            href="tel:+902244131617"
+            href="tel:+902244132316"
             className="lg:hidden flex items-center justify-center w-10 h-10 text-red-600 hover:bg-red-50 rounded-full transition-colors"
           >
             <Phone className="w-6 h-6" />
@@ -334,12 +334,12 @@ export default function Header() {
         {/* Phone CTA at bottom */}
         <div className="p-5 border-t border-gray-100">
           <a
-            href="tel:+902244131617"
+            href="tel:+902244132316"
             className="flex items-center justify-center gap-3 w-full py-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 active:bg-red-800 transition-colors text-lg"
             onClick={closeMobileMenu}
           >
             <Phone className="w-6 h-6" />
-            <span>(0224) 413 16 17</span>
+            <span>(0224) 413 23 16</span>
           </a>
         </div>
       </div>
