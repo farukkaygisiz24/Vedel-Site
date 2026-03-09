@@ -78,7 +78,7 @@ export default function Hero() {
               </Link>
 
               <a
-                href="tel:+902244131617"
+                href="tel:+902244132316"
                 className="inline-flex items-center gap-3 px-8 py-4 bg-white/10 backdrop-blur-sm text-white font-semibold text-lg rounded-xl hover:bg-white/20 transition-all duration-300"
               >
                 <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
