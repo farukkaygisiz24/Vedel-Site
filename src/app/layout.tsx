@@ -80,6 +80,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr">
+      <head>
+        <!-- Google tag (gtag.js) -->
+        <script async src="https://www.googletagmanager.com/gtag/js?id=AW-999471423">
+        </script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+        
+          gtag('config', 'AW-999471423');
+      </script>
+      </head>
       <body className={`${inter.variable} antialiased`}>
         <Header />
         <main>{children}</main>
