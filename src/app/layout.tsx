@@ -100,12 +100,41 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // İşletme bilgilerini buraya obje olarak tanımlıyoruz
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "VEDEL Klima | Bursa Mitsubishi Heavy Yetkili Bayi",
+    "image": "https://vedel.com.tr/vedel-logo.png",
+    "@id": "https://vedel.com.tr",
+    "url": "https://vedel.com.tr",
+    "telephone": "+902244132316",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Altınşehir Mah. Uğur Mumcu BLV. No:58/E Nilüfer Bursa", // Kral buraya tam adresi yazarsan nokta atışı olur
+      "addressLocality": "Bursa",
+      "addressRegion": "TR",
+      "postalCode": "16130",
+      "addressCountry": "TR"
+    },
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      "opens": "08:30",
+      "closes": "18:30"
+    },
+    "sameAs": [
+      "https://www.instagram.com/vedelklima",
+      "https://www.facebook.com/profile.php?id=61587239653873&locale=tr_TR"
+      ]
+  };
+
   return (
     <html lang="tr">
       <head>
-        {/* Google Tag (gtag.js) - Next.js Script bileşeni ile güvenli yükleme */}
+        {/* Google Ads Scriptleri */}
         <Script
-          src="https://www.googletagmanager.com/gtag/js?id=AW-999471423"
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18020941072"
           strategy="afterInteractive"
         />
         <Script id="google-ads-tag" strategy="afterInteractive">
@@ -116,6 +145,14 @@ export default function RootLayout({
             gtag('config', 'AW-18020941072');
           `}
         </Script>
+
+        {/* --- İŞTE JSON-LD BURAYA GELİYOR --- */}
+        <Script
+          id="json-ld"
+          type="application/ld+json"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <body className={`${inter.variable} antialiased`}>
         <Header />
