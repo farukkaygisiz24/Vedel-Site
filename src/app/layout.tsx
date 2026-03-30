@@ -47,8 +47,8 @@ export const metadata: Metadata = {
              ],
   authors: [{ name: "VEDEL" }],
   icons: {
-    icon: "/vedel-logo.png",
-    apple: "/vedel-logo.png",
+    icon: "/favicon.ico",
+    apple: "/favicon.ico",
   },
   creator: "VEDEL",
   publisher: "VEDEL",
