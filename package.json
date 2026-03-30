@@ -14,13 +14,13 @@
     "gs": "^0.0.2",
     "gsap": "^3.14.2",
     "lucide-react": "^0.574.0",
-    "next": "16.1.6",
+    "next": "^16.2.1",
     "react": "19.2.3",
     "react-bits": "^1.0.5",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
-    "@flydotio/dockerfile": "^0.7.10",
+    "@flydotio/dockerfile": "^0.7.4",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -166,6 +166,7 @@ export default function Iletisim() {
                     loading="lazy"
                     referrerPolicy="no-referrer-when-downgrade"
                     title={branch.name}
+                    sandbox="allow-scripts allow-same-origin allow-popups"
                   />
                 </div>
               </div>
