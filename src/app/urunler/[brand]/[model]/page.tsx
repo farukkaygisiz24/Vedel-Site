@@ -119,8 +119,6 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     notFound()
   }
 
-  const brandData = products[brand]
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="relative bg-gradient-to-r from-red-700 to-red-600 py-12 md:py-16">

@@ -39,7 +39,6 @@ const ENERGY_CLASSES = ['A+++', 'A++', 'A+', 'A']
 
 export default function FilterSidebar({ products, onFilterChange }: FilterSidebarProps) {
   const [prices, setPrices] = useState<Record<string, number>>({})
-  const [loading, setLoading] = useState(true)
   
   const [selectedBtu, setSelectedBtu] = useState<number[]>([])
   const [selectedPriceRange, setSelectedPriceRange] = useState<number>(-1)
@@ -52,9 +51,8 @@ export default function FilterSidebar({ products, onFilterChange }: FilterSideba
       .then(res => res.json())
       .then(data => {
         setPrices(data)
-        setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {})
   }, [])
 
   useEffect(() => {

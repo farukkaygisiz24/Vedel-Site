@@ -22,7 +22,6 @@ const products = productsData as any
 const MIN_BTU = 7000
 const MAX_SPLIT_BTU = 30000
 const MAX_PROFESYONEL_BTU = 85000
-const VRF_THRESHOLD_PERCENT = 130
 
 // ===================== TYPES =====================
 type MekanTipi = 'ev' | 'ofis' | 'dukkan' | 'depo' | null
@@ -530,7 +529,6 @@ function StepSonuc({ btu, matchedProducts }: { btu: number; matchedProducts: Mat
     const minBtu = Math.round(btu / 1000) * 1000
     const maxBtu = Math.ceil(btu * 1.3 / 1000) * 1000
     const needsProfesyonel = btu > MAX_SPLIT_BTU
-    const maxSplitBtuText = MAX_SPLIT_BTU.toLocaleString('tr-TR')
     const maxProfBtuText = MAX_PROFESYONEL_BTU.toLocaleString('tr-TR')
 
     return (
@@ -608,35 +606,35 @@ function StepSonuc({ btu, matchedProducts }: { btu: number; matchedProducts: Mat
                     <h3 className="text-xl font-bold text-gray-900 mb-4">Size Uygun Klimalar</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {matchedProducts.map(product => (
-                            <Link href={product.link} key={product.id}>
-                                <div className="group bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
-                                    <div className="relative h-36 p-3 bg-gray-50">
+                            <Link href={product.link} key={product.id} className="h-full block">
+                                <div className="group h-full flex flex-col bg-white rounded-2xl border border-gray-200 overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
+                                    <div className="relative h-36 p-3 bg-gray-50 flex-shrink-0">
                                         <Image
                                             src={product.image}
                                             alt={product.model}
                                             fill
-                                            className="object-contain group-hover:scale-105 transition-transform"
+                                            className="object-contain p-2 group-hover:scale-105 transition-transform"
                                         />
                                         <span className="absolute top-2 right-2 inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
                                             {product.brand}
                                         </span>
                                     </div>
-                                    <div className="p-4">
+                                    <div className="p-4 flex flex-col flex-1">
                                         <div className="flex items-center gap-2 mb-1">
                                             <span className="text-xs font-bold text-gray-400">{product.type}</span>
                                             <span className="inline-block px-2 py-0.5 bg-green-100 text-green-700 text-xs font-bold rounded-full">
                                                 {product.energyClass}
                                             </span>
                                         </div>
-                                        <h4 className="font-bold text-gray-900">{product.model}</h4>
-                                        <p className="text-sm text-gray-500">{product.name}</p>
-                                        <div className="flex items-center gap-3 mt-2 text-sm">
+                                        <h4 className="font-bold text-gray-900 leading-tight">{product.model}</h4>
+                                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">{product.name}</p>
+                                        <div className="flex items-center gap-3 mt-3 text-sm">
                                             <span className="flex items-center gap-1 text-blue-600">
                                                 <Snowflake className="w-3.5 h-3.5" />
                                                 {product.coolingCapacity}
                                             </span>
                                         </div>
-                                        <div className="mt-3 text-right">
+                                        <div className="mt-auto pt-4 text-right">
                                             <span className="text-sm font-semibold text-blue-600 group-hover:translate-x-1 transition-transform inline-block">
                                                 İncele →
                                             </span>

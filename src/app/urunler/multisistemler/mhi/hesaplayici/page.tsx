@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowLeft, Snowflake, Plus, Minus, Check, Calculator, Warehouse, Wind, ChevronRight, AlertTriangle, Package, ExternalLink } from 'lucide-react'
@@ -51,7 +51,6 @@ const indoorCategories = [
 export default function MultiHesaplayiciPage() {
   const [selectedIndoors, setSelectedIndoors] = useState<SelectedIndoor[]>([])
   const [prices, setPrices] = useState<PriceData>({})
-  const [pricesLoading, setPricesLoading] = useState(true)
   const [showResult, setShowResult] = useState(false)
 
   useEffect(() => {
@@ -63,7 +62,7 @@ export default function MultiHesaplayiciPage() {
       } catch (error) {
         console.error('Fiyatlar yüklenemedi:', error)
       } finally {
-        setPricesLoading(false)
+        // loading state removed
       }
     }
     fetchPrices()
@@ -98,7 +97,7 @@ export default function MultiHesaplayiciPage() {
     return products.mhi_multi?.categories?.outdoor || []
   }, [])
 
-  const getPrice = (model: string): number | null => {
+  const getPrice = useCallback((model: string): number | null => {
     const cleanModel = model.toUpperCase().replace(/-/g, '').replace(/ /g, '')
     if (prices[cleanModel]) return prices[cleanModel]
     for (const [key, value] of Object.entries(prices)) {
@@ -108,7 +107,7 @@ export default function MultiHesaplayiciPage() {
       }
     }
     return null
-  }
+  }, [prices])
 
   const formatPrice = (price: number | null): string => {
     if (price === null) return 'Fiyat için arayınız'
@@ -159,15 +158,14 @@ export default function MultiHesaplayiciPage() {
 
   const totalIndoorPrice = useMemo(() => {
     return selectedIndoors.reduce((sum, item) => {
-      const price = getPrice(item.product.model)
-      return sum + (price !== null ? price * item.quantity : 0)
+      const price = getPrice(item.product.model) || 0
+      return sum + (price * item.quantity)
     }, 0)
-  }, [selectedIndoors, prices])
+  }, [selectedIndoors, getPrice])
 
   const recommendedOutdoor = useMemo(() => {
     if (totalIndoorUnits === 0) return null
 
-    // 1. Filter out outdoor units that cannot support the number of indoor units (Strict Max Indoor check)
     const suitableOutdoors = outdoorProducts.filter((outdoor: OutdoorProduct) => {
       const maxUnits = parseInt(outdoor.maxIndoor.replace(' ünite', ''))
       return totalIndoorUnits <= maxUnits
@@ -175,11 +173,8 @@ export default function MultiHesaplayiciPage() {
 
     if (suitableOutdoors.length === 0) return null
 
-    // 2. Sort by BTU (High to Low) to prioritize LARGER units.
-    // This reduces the capacity usage percentage (IndoorBTU / OutdoorBTU).
     suitableOutdoors.sort((a: OutdoorProduct, b: OutdoorProduct) => b.btu - a.btu)
 
-    // 3. Return the largest suitable unit as the recommendation
     const best = suitableOutdoors[0]
 
     return {
@@ -203,18 +198,18 @@ export default function MultiHesaplayiciPage() {
         product: outdoor,
         capacityPercent: Math.round((totalBTU / outdoor.btu) * 100)
       }))
-      .sort((a: { capacityPercent: number }, b: { capacityPercent: number }) => a.capacityPercent - b.capacityPercent) // Sort by lowest percentage first (largest units)
+      .sort((a: { capacityPercent: number }, b: { capacityPercent: number }) => a.capacityPercent - b.capacityPercent)
   }, [recommendedOutdoor, totalBTU, totalIndoorUnits, outdoorProducts])
 
   const totalSystemPrice = useMemo(() => {
-    if (!recommendedOutdoor) return totalIndoorPrice
+    if (!recommendedOutdoor) return 0
     const outdoorPrice = getPrice(recommendedOutdoor.product.model)
-    return totalIndoorPrice + (outdoorPrice !== null ? outdoorPrice : 0)
-  }, [recommendedOutdoor, totalIndoorPrice, prices])
+    const basePrice = totalIndoorPrice + (outdoorPrice !== null ? outdoorPrice : 0)
+    return basePrice > 0 ? basePrice * 1.25 : 0
+  }, [recommendedOutdoor, totalIndoorPrice, getPrice])
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Hero Section - BLUE THEME */}
       <div className="relative bg-gradient-to-r from-blue-700 to-blue-600 py-16 md:py-24 overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
         <div className="absolute inset-0 opacity-10">
