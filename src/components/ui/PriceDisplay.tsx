@@ -23,15 +23,24 @@ export default function PriceDisplay({ model, className = '' }: PriceDisplayProp
         const prices: Record<string, number> = await response.json()
         
         let foundPrice: number | null = null
+        const originalModelUpper = model.toUpperCase()
         
-        if (prices[cleanModel]) {
-          foundPrice = prices[cleanModel]
+        if (prices[originalModelUpper]) {
+          foundPrice = prices[originalModelUpper]
         } else {
-          for (const [key, value] of Object.entries(prices)) {
-            const cleanKey = key.toUpperCase().replace(/-/g, '').replace(/ /g, '')
-            if (cleanKey.includes(cleanModel) || cleanModel.includes(cleanKey)) {
-              foundPrice = value
-              break
+          const exactCleanMatch = Object.entries(prices).find(
+            ([key]) => key.toUpperCase().replace(/-/g, '').replace(/ /g, '') === cleanModel
+          )
+          
+          if (exactCleanMatch) {
+            foundPrice = exactCleanMatch[1]
+          } else {
+            for (const [key, value] of Object.entries(prices)) {
+              const cleanKey = key.toUpperCase().replace(/-/g, '').replace(/ /g, '')
+              if (cleanKey.includes(cleanModel) || cleanModel.includes(cleanKey)) {
+                foundPrice = value
+                break
+              }
             }
           }
         }
