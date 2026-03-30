@@ -24,27 +24,27 @@ export const metadata: Metadata = {
   },
   description: "Bursa'da Mitusbishi Heavy Industries ve Euroform klima yetkili satış ve servis noktası. Profesyonel montaj hizmeti, VRF Sistem çözümleri. Hemen teklif alın: (0224) 413 23 16",
   keywords: [
-             "klima", 
-             "mitsubishi heavy bursa",
-             "bursa mitsubishi klima yetkili bayi",
-             "vedel klima",
-             "vedel klima bursa",
-             "mitsubishi klima servis",
-             "bursa",
-             "özlüce klima bursa",
-             "salon tipi klima",
-             "kaset tipi klima",
-             "klima bakım",
-             "klima servis bursa",
-             "klima arıza bursa",
-             "kayapa klima",
-             "mitsubishi kayapa",
-             "euroform",
-             "euroform bursa",
-             "mitsubishi klima fiyatları",
-             "ev tipi klima",
-             "vrf sistemleri"
-             ],
+    "klima",
+    "mitsubishi heavy bursa",
+    "bursa mitsubishi klima yetkili bayi",
+    "vedel klima",
+    "vedel klima bursa",
+    "mitsubishi klima servis",
+    "bursa",
+    "özlüce klima bursa",
+    "salon tipi klima",
+    "kaset tipi klima",
+    "klima bakım",
+    "klima servis bursa",
+    "klima arıza bursa",
+    "kayapa klima",
+    "mitsubishi kayapa",
+    "euroform",
+    "euroform bursa",
+    "mitsubishi klima fiyatları",
+    "ev tipi klima",
+    "vrf sistemleri"
+  ],
   authors: [{ name: "VEDEL" }],
   icons: {
     icon: "/favicon.ico",
@@ -126,7 +126,7 @@ export default function RootLayout({
     "sameAs": [
       "https://www.instagram.com/vedelklima",
       "https://www.facebook.com/profile.php?id=61587239653873&locale=tr_TR"
-      ]
+    ]
   };
 
   return (
