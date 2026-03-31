@@ -110,7 +110,7 @@ export default function Header() {
             width={1200}
             height={1200}
             priority
-            className="h-20 lg:h-25 w-auto"
+            className="h-15 lg:h-25 w-auto"
           />
           <Image
             src="/mhi-logo.png"
@@ -118,7 +118,7 @@ export default function Header() {
             width={1653}
             height={237}
             priority
-            className="h-9 lg:h-10 w-auto"
+            className="h-8 lg:h-10 w-auto"
             quality={100}
           />
         </Link>
