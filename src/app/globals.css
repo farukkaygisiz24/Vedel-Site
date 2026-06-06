@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+@keyframes header-dropdown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+  100% { background-position: 0% center; }
+}
+
+.animate-gradient {
+  animation: gradient-shift 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes page-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-fallback {
+    animation: none !important;
+  }
+}
+
+/* Ürün detay — teknik özellikler tablosu (Excel zebra) */
+.product-specs-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.product-specs-table th,
+.product-specs-table td {
+  border: 1px solid var(--spec-border, #fecaca);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  vertical-align: top;
+  color: var(--spec-text, #1f2937);
+}
+
+.product-specs-table thead th {
+  background-color: var(--spec-header-bg, #b91c1c);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.product-specs-table tbody tr:nth-child(odd) td {
+  background-color: var(--spec-row-odd, #ffffff);
+}
+
+.product-specs-table tbody tr:nth-child(even) td {
+  background-color: var(--spec-row-even, #fef2f2);
+}
+
+.product-specs-table tbody tr:nth-child(odd) td:first-child {
+  background-color: var(--spec-label-odd, #fee2e2);
+  font-weight: 600;
+}
+
+.product-specs-table tbody tr:nth-child(even) td:first-child {
+  background-color: var(--spec-label-even, #fca5a5);
+  font-weight: 600;
+}
+
+.product-specs-table td {
+  word-break: break-word;
+}
+
+.filter-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.filter-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.filter-sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.filter-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (min-width: 640px) {
+  .product-specs-table th,
+  .product-specs-table td {
+    padding: 0.875rem 1.25rem;
+    font-size: 0.9375rem;
+  }
+}
