@@ -97,7 +97,7 @@ interface MatchedProduct {
 
 const DEFAULT_PRODUCT_IMAGES: Record<string, string> = {
     MHI: '/MHI/trend.jpg',
-    Euroform: '/euroform/euroformsplit.jpg',
+    Euroform: '/euroform/euroformsplit.webp',
 }
 
 function resolveProductImage(image: string | undefined, brand: string): string {

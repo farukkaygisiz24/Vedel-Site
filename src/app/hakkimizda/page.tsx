@@ -85,7 +85,22 @@ export default function Hakkimizda() {
         <div className="absolute inset-0 bg-gradient-to-br from-red-900 via-red-800 to-red-900" />
         <div className="absolute inset-0 opacity-10">
           <div className="absolute left-4 top-20 h-48 w-48 rounded-full bg-white blur-3xl sm:left-10 sm:h-72 sm:w-72" />
-          <div className="absolute bottom-6 right-4 h-56 w-56 rounded-full bg-red-400 blur-3xl sm:bottom-10 sm:right-20 sm:h-96 sm:w-96" />
+          <div className="absolute bottom-6 right-4 h-56 w-56 rounded-full bg-red-400 blur-3xl sm:bottom-6 sm:right-20 sm:h-96 sm:w-96" />
+        </div>
+
+        <div
+          className="pointer-events-none absolute inset-0 z-[1] flex items-center justify-center"
+          aria-hidden
+        >
+          <Image
+            src="/vedel-logo.png"
+            alt=""
+            width={560}
+            height={560}
+            priority
+            className="h-[min(72vw,28rem)] w-[min(72vw,28rem)] object-contain opacity-[0.14] brightness-0 invert sm:opacity-[0.16]"
+            sizes="(max-width: 768px) 80vw, 448px"
+          />
         </div>
 
         <div className="container relative z-10 mx-auto px-4 sm:px-6">

@@ -2,16 +2,16 @@ import { Building2, Settings, Store } from 'lucide-react'
 
 export const brandCategories = [
   {
-    name: 'MHI Split',
+    name: 'MHI Split Klimalar',
     desc: 'Ev tipi klimalar',
     image: '/MHI/plusbyeni.png',
     href: '/urunler/splitsistemler/mhi',
     logo: '/mhi-logo.png',
   },
   {
-    name: 'Euroform Split',
+    name: 'Euroform Split Klimalar',
     desc: 'Ev tipi klimalar',
-    image: '/euroform/euroformsplityeni.png',
+    image: '/euroform/euroformsplit.webp',
     href: '/urunler/splitsistemler/euroform',
     logo: '/euroform.png',
   },

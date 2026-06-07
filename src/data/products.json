@@ -979,7 +979,7 @@
         "maxPipeLength": "15 m",
         "pipeDiameter": "Likit: φ 6.35 (1/4\") — Gaz: φ 9.52 (3/8\")",
         "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/eub240626rev11_668d33ad8852a.pdf",
-        "image": "/euroform/euroformsplit.jpg"
+        "image": "/euroform/euroformsplit.webp"
       },
       {
         "id": "euroform-split-12",
@@ -1002,7 +1002,7 @@
         "maxPipeLength": "20 m",
         "pipeDiameter": "Likit: φ 6.35 (1/4\") — Gaz: φ 9.52 (3/8\")",
         "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/eub240626rev11_668d33ad8852a.pdf",
-        "image": "/euroform/euroformsplit.jpg"
+        "image": "/euroform/euroformsplit.webp"
       },
       {
         "id": "euroform-split-18",
@@ -1025,7 +1025,7 @@
         "maxPipeLength": "25 m",
         "pipeDiameter": "Likit: φ 6.35 (1/4\") — Gaz: φ 12.7 (1/2\")",
         "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/eub240626rev11_668d33ad8852a.pdf",
-        "image": "/euroform/euroformsplit.jpg"
+        "image": "/euroform/euroformsplit.webp"
       },
       {
         "id": "euroform-split-24",
@@ -1048,7 +1048,7 @@
         "maxPipeLength": "25 m",
         "pipeDiameter": "Likit: φ 6.35 (1/4\") — Gaz: φ 12.7 (1/2\")",
         "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/eub240626rev11_668d33ad8852a.pdf",
-        "image": "/euroform/euroformsplit.jpg"
+        "image": "/euroform/euroformsplit.webp"
       }
     ]
   },
@@ -1165,7 +1165,7 @@
           "sound": "36 / 30 / 22 dB(A)",
           "pipeDiameter": "Likit: φ 6.35 — Gaz: φ 9.52",
           "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/all/ru-multi-split-klimalar.pdf",
-          "image": "/euroform/euroformsplit.jpg"
+          "image": "/euroform/euroformsplit.webp"
         },
         {
           "id": "ef-multi-wall-09",
@@ -1182,7 +1182,7 @@
           "sound": "38 / 32 / 25 dB(A)",
           "pipeDiameter": "Likit: φ 6.35 — Gaz: φ 9.52",
           "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/all/ru-multi-split-klimalar.pdf",
-          "image": "/euroform/euroformsplit.jpg"
+          "image": "/euroform/euroformsplit.webp"
         },
         {
           "id": "ef-multi-wall-12",
@@ -1199,7 +1199,7 @@
           "sound": "41 / 35 / 26 dB(A)",
           "pipeDiameter": "Likit: φ 6.35 — Gaz: φ 9.52",
           "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/all/ru-multi-split-klimalar.pdf",
-          "image": "/euroform/euroformsplit.jpg"
+          "image": "/euroform/euroformsplit.webp"
         },
         {
           "id": "ef-multi-wall-18",
@@ -1216,7 +1216,7 @@
           "sound": "47 / 41 / 30 dB(A)",
           "pipeDiameter": "Likit: φ 6.35 — Gaz: φ 12.7",
           "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/all/ru-multi-split-klimalar.pdf",
-          "image": "/euroform/euroformsplit.jpg"
+          "image": "/euroform/euroformsplit.webp"
         },
         {
           "id": "ef-multi-wall-24",
@@ -1233,7 +1233,7 @@
           "sound": "50 / 42 / 36 dB(A)",
           "pipeDiameter": "Likit: φ 6.35 — Gaz: φ 12.7",
           "catalogUrl": "https://form-mhiklima.com/upload/product_catalog/all/ru-multi-split-klimalar.pdf",
-          "image": "/euroform/euroformsplit.jpg"
+          "image": "/euroform/euroformsplit.webp"
         }
       ],
       "cassette_one_way": [

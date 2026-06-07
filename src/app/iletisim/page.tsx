@@ -40,7 +40,7 @@ import {
 const branches = [
   {
     name: 'Özlüce Bayi',
-    manager: 'Ömer Faruk',
+    manager: 'Ömer Faruk Kaygısız',
     phone: '0554 571 69 84',
     address: 'Altınşehir Mah. Uğur Mumcu BLV. NO:58/E Nilüfer / Bursa',
     mapEmbed: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d24375.88875737446!2d28.877606499362837!3d40.20937226027395!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x14ca11dbd805d031%3A0x53d5fb061d1115ae!2sVedel%20Klima%20-%20Mitsubishi!5e0!3m2!1str!2str!4v1745509265743!5m2!1str!2str'

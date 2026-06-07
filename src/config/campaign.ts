@@ -1,8 +1,8 @@
 /**
  * Kampanya hero anahtarı.
  *
- * Aktif:  CAMPAIGN_HERO_ENABLED = true  (varsayılan)
- * Kapat:  false yapın veya NEXT_PUBLIC_CAMPAIGN=off
+ * Aktif:  varsayılan (açık)
+ * Kapat:  NEXT_PUBLIC_CAMPAIGN=off
  *
  * Video: public/campaign/mhi-yaz-kampanya.mp4
  */
