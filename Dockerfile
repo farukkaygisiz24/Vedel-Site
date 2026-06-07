@@ -46,6 +46,9 @@ COPY --from=build /app/.next/static ./.next/static
 # Copy public assets (not included in standalone output)
 COPY --from=build /app/public ./public
 
+# Campaign video (served via API, not public static)
+COPY --from=build /app/private ./private
+
 # Start the server
 EXPOSE 3000
 ENV HOSTNAME="0.0.0.0"

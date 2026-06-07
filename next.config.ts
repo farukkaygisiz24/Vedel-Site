@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
       { source: '/iletisim.html', destination: '/iletisim', permanent: true },
       { source: '/hizmettalepformu.html', destination: '/iletisim', permanent: true },
       { source: '/gizlilikpolitikasi.html', destination: '/gizlilik-politikasi', permanent: true },
+      { source: '/campaign/mhi-yaz-kampanya.mp4', destination: '/', permanent: true },
       { source: '/split-klimalar.html', destination: '/urunler/splitsistemler/mhi', permanent: true },
       { source: '/multi-split-klimalar.html', destination: '/urunler/multisistemler/mhi', permanent: true },
       { source: '/profesyonel-klimalar.html', destination: '/urunler/profesyonelsistemler/mhi', permanent: true },

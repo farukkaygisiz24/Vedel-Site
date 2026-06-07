@@ -112,8 +112,12 @@ export default function HeroBackground({
           poster={poster}
           preload="metadata"
           aria-hidden
+          disablePictureInPicture
+          controlsList="nodownload noremoteplayback"
+          onContextMenu={(event) => event.preventDefault()}
+          onDragStart={(event) => event.preventDefault()}
           onCanPlay={() => setVideoReady(true)}
-          className={`absolute inset-0 z-[1] h-full w-full transition-opacity duration-700 ${videoReady ? 'opacity-100' : 'opacity-0'} ${resolvedVideoClassName}`}
+          className={`absolute inset-0 z-[1] h-full w-full select-none transition-opacity duration-700 ${videoReady ? 'opacity-100' : 'opacity-0'} ${resolvedVideoClassName}`}
         >
           <source src={videoSrc} type="video/mp4" />
         </video>
