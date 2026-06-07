@@ -1,0 +1,11 @@
+export const GOOGLE_ADS_ID = 'AW-18020941072'
+
+/** Google Ads telefon araması dönüşüm etiketi */
+export const GOOGLE_ADS_PHONE_CONVERSION_LABEL =
+  process.env.NEXT_PUBLIC_GOOGLE_ADS_PHONE_CONVERSION_LABEL ?? '2cp5COq5nYocEJD6hpFD'
+
+/** Sitede izlenen birincil telefon (E.164) */
+export const GOOGLE_ADS_PHONE_CONVERSION_NUMBER =
+  process.env.NEXT_PUBLIC_GOOGLE_ADS_PHONE_CONVERSION_NUMBER ?? '+902244132316'
+
+export const GOOGLE_ADS_PHONE_CONVERSION_SEND_TO = `${GOOGLE_ADS_ID}/${GOOGLE_ADS_PHONE_CONVERSION_LABEL}`

@@ -14,6 +14,9 @@ const QUICK_LINKS = [
   { name: 'Klimanı Seç', href: '/klimani-sec' },
   { name: 'Hakkımızda', href: '/hakkimizda' },
   { name: 'İletişim', href: '/iletisim' },
+  { name: 'Gizlilik Politikası', href: '/gizlilik-politikasi' },
+  { name: 'KVKK Aydınlatma Metni', href: '/kvkk' },
+  { name: 'Çerez Politikası', href: '/cerez-politikasi' },
   { name: 'VRF Bayisi', href: 'https://www.2vklima.com' },
 ] as const
 
@@ -32,11 +35,23 @@ function PhoneLink({ href, label }: { href: string; label: string }) {
   return (
     <a
       href={href}
-      className="flex items-center gap-3 text-gray-700 transition-colors hover:text-gray-900"
+      className="inline-flex items-center gap-1.5 text-gray-700 transition-colors hover:text-gray-900"
     >
-      <Phone className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-      <span className="text-sm tabular-nums sm:text-base">{label}</span>
+      <Phone className="h-4 w-4 shrink-0 text-red-600 sm:h-5 sm:w-5" />
+      <span className="whitespace-nowrap text-sm tabular-nums sm:text-base">{label}</span>
     </a>
+  )
+}
+
+function PhoneNumbersRow() {
+  return (
+    <div className="flex w-full items-center justify-start gap-x-3 tabular-nums sm:gap-x-4">
+      <PhoneLink href={PHONE_NUMBERS[0].href} label={PHONE_NUMBERS[0].label} />
+      <span className="shrink-0 text-gray-300" aria-hidden="true">
+        |
+      </span>
+      <PhoneLink href={PHONE_NUMBERS[1].href} label={PHONE_NUMBERS[1].label} />
+    </div>
   )
 }
 
@@ -109,33 +124,8 @@ export default function Footer() {
           <div className="border-t border-gray-100 pt-8 md:col-span-2 md:border-t md:pt-8 lg:col-span-1 lg:border-t-0 lg:pt-0">
             <h3 className="mb-4 text-lg font-bold text-gray-900 sm:mb-6">İletişim</h3>
             <ul className="space-y-4">
-              <li className="space-y-3 md:hidden">
-                {PHONE_NUMBERS.map((phone) => (
-                  <PhoneLink key={phone.href} href={phone.href} label={phone.label} />
-                ))}
-              </li>
-              <li className="hidden w-full md:block">
-                <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-x-2 text-base tabular-nums lg:gap-x-3">
-                  <a
-                    href={PHONE_NUMBERS[0].href}
-                    className="grid min-w-0 grid-cols-[1.25rem_1fr_1.25rem] items-center gap-x-2 text-gray-700 transition-colors hover:text-gray-900"
-                  >
-                    <Phone className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-                    <span className="whitespace-nowrap text-center">{PHONE_NUMBERS[0].label}</span>
-                    <span className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  </a>
-                  <span className="px-0.5 text-gray-300" aria-hidden="true">
-                    |
-                  </span>
-                  <a
-                    href={PHONE_NUMBERS[1].href}
-                    className="grid min-w-0 grid-cols-[1.25rem_1fr_1.25rem] items-center gap-x-2 text-gray-700 transition-colors hover:text-gray-900"
-                  >
-                    <Phone className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-                    <span className="whitespace-nowrap text-center">{PHONE_NUMBERS[1].label}</span>
-                    <span className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  </a>
-                </div>
+              <li className="w-full">
+                <PhoneNumbersRow />
               </li>
               <li className="flex items-start gap-3">
                 <Mail className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />

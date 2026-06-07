@@ -1,59 +1,61 @@
 import { MetadataRoute } from 'next'
-import productsData from '@/data/products.json'
+import { getAllProductRouteParams, getProductDetailPath } from '@/lib/productRoutes'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const products = productsData as any
+const BASE_URL = 'https://vedel.com.tr'
+
+type SitemapEntry = MetadataRoute.Sitemap[number]
+
+function entry(
+  path: string,
+  options: Pick<SitemapEntry, 'changeFrequency' | 'priority'>
+): SitemapEntry {
+  return {
+    url: `${BASE_URL}${path}`,
+    lastModified: new Date(),
+    ...options,
+  }
+}
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://vedel.com.tr'
-
-  const staticPages = [
-    { url: baseUrl, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 1 },
-    { url: `${baseUrl}/hakkimizda`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.8 },
-    { url: `${baseUrl}/iletisim`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.8 },
-    { url: `${baseUrl}/klimani-sec`, lastModified: new Date(), changeFrequency: 'monthly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/splitsistemler`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/splitsistemler/mhi`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/splitsistemler/euroform`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/multisistemler`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/multisistemler/mhi`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/multisistemler/mhi/hesaplayici`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.8 },
-    { url: `${baseUrl}/urunler/multisistemler/euroform`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/profesyonelsistemler`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/profesyonelsistemler/mhi`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/profesyonelsistemler/euroform`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
-    { url: `${baseUrl}/urunler/vrfsistemler`, lastModified: new Date(), changeFrequency: 'weekly' as const, priority: 0.9 },
+  const staticPages: MetadataRoute.Sitemap = [
+    entry('/', { changeFrequency: 'weekly', priority: 1 }),
+    entry('/hakkimizda', { changeFrequency: 'monthly', priority: 0.8 }),
+    entry('/iletisim', { changeFrequency: 'monthly', priority: 0.8 }),
+    entry('/gizlilik-politikasi', { changeFrequency: 'yearly', priority: 0.4 }),
+    entry('/kvkk', { changeFrequency: 'yearly', priority: 0.4 }),
+    entry('/cerez-politikasi', { changeFrequency: 'yearly', priority: 0.4 }),
+    entry('/klimani-sec', { changeFrequency: 'monthly', priority: 0.9 }),
+    entry('/urunler/splitsistemler', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/splitsistemler/mhi', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/splitsistemler/euroform', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/multisistemler', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/multisistemler/mhi', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/multisistemler/mhi/hesaplayici', { changeFrequency: 'weekly', priority: 0.8 }),
+    entry('/urunler/multisistemler/euroform', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/profesyonelsistemler', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/profesyonelsistemler/mhi', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/profesyonelsistemler/euroform', { changeFrequency: 'weekly', priority: 0.9 }),
+    entry('/urunler/vrfsistemler', { changeFrequency: 'weekly', priority: 0.9 }),
   ]
 
-  const productPages: MetadataRoute.Sitemap = []
+  const seen = new Set(staticPages.map((page) => page.url))
 
-  if (products.mhi?.split) {
-    const series = ['trend', 'plus', 'diamond', 'diamond_titanyum', 'yuksek_kapasite']
-    for (const s of series) {
-      const prods = products.mhi.split[s]
-      if (Array.isArray(prods)) {
-        for (const p of prods) {
-          productPages.push({
-            url: `${baseUrl}/urunler/mhi/${p.model.replace('-SET', '')}`,
-            lastModified: new Date(),
-            changeFrequency: 'weekly' as const,
-            priority: 0.7,
-          })
-        }
-      }
-    }
-  }
+  const productPages: MetadataRoute.Sitemap = getAllProductRouteParams()
+    .map(({ brand, model }) => {
+      const path = getProductDetailPath({ brand, model })
+      const url = `${BASE_URL}${path}`
 
-  if (products.euroform?.split) {
-    for (const p of products.euroform.split) {
-      productPages.push({
-        url: `${baseUrl}/urunler/euroform/${p.model.replace('-SET', '')}`,
-        lastModified: new Date(),
-        changeFrequency: 'weekly' as const,
-        priority: 0.7,
+      if (seen.has(url)) return null
+      seen.add(url)
+
+      const isSplitBrand = brand === 'mhi' || brand === 'euroform'
+
+      return entry(path, {
+        changeFrequency: 'weekly',
+        priority: isSplitBrand ? 0.7 : 0.65,
       })
-    }
-  }
+    })
+    .filter((page): page is SitemapEntry => page !== null)
 
   return [...staticPages, ...productPages]
 }

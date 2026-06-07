@@ -250,7 +250,7 @@ export default function VRFSistemlerPage() {
               <ArrowRight className="w-4 h-4" />
             </Link>
             <a
-              href="tel:02244131617"
+              href="tel:+902244131617"
               className="inline-flex items-center gap-2 px-6 py-3 border-2 border-teal-600 text-teal-600 font-semibold rounded-xl hover:bg-teal-50 transition-colors"
             >
               (0224) 413 16 17

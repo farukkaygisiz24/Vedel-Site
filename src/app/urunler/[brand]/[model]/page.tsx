@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import ProductDetailView from '@/components/products/ProductDetailView'
 import productsData from '@/data/products.json'
+import { getAllProductRouteParams } from '@/lib/productRoutes'
 import { Metadata } from 'next'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -77,40 +78,7 @@ function isSplitProduct(product: any): boolean {
 // ===================== STATIC PARAMS =====================
 
 export async function generateStaticParams() {
-  const params: { brand: string; model: string }[] = []
-  
-  if (products.mhi?.split) {
-    const series = ['trend', 'plus', 'premium', 'diamond', 'yuksek_kapasite', 'diamond_titanyum'] as const
-    for (const s of series) {
-      const prods = products.mhi.split[s]
-      if (Array.isArray(prods)) {
-        for (const p of prods) params.push({ brand: 'mhi', model: p.model })
-      }
-    }
-  }
-
-  if (products.euroform?.split) {
-    for (const p of products.euroform.split) {
-      params.push({ brand: 'euroform', model: p.model.replace('-SET', '') })
-    }
-  }
-
-  const categoryBrands = ['mhi_multi', 'mhi_profesyonel', 'euroform_multi', 'euroform_profesyonel']
-  for (const brandKey of categoryBrands) {
-    const brandData = products[brandKey]
-    if (brandData?.categories) {
-      for (const categoryKey of Object.keys(brandData.categories)) {
-        const items = brandData.categories[categoryKey]
-        if (Array.isArray(items)) {
-          for (const p of items) {
-            params.push({ brand: brandKey, model: p.model.replace('-SET', '') })
-          }
-        }
-      }
-    }
-  }
-
-  return params
+  return getAllProductRouteParams()
 }
 
 // ===================== METADATA =====================

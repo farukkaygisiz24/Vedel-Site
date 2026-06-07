@@ -3,7 +3,10 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
-import Script from "next/script"; // Script bileşenini ekledik
+import CookieConsent from "@/components/legal/CookieConsent";
+import PhoneClickTracker from "@/components/legal/PhoneClickTracker";
+import Script from "next/script";
+import { GOOGLE_ADS_ID } from "@/lib/googleTag";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -132,21 +135,34 @@ export default function RootLayout({
   return (
     <html lang="tr">
       <head>
-        {/* Google Ads Scriptleri */}
+        {/* Google Tag — her zaman yüklü (Google doğrulama); çerez onayından önce takip kapalı */}
+        <Script id="google-consent-default" strategy="beforeInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('consent', 'default', {
+              ad_storage: 'denied',
+              analytics_storage: 'denied',
+              ad_user_data: 'denied',
+              ad_personalization: 'denied',
+              wait_for_update: 500,
+            });
+          `}
+        </Script>
         <Script
-          src="https://www.googletagmanager.com/gtag/js?id=AW-18020941072"
-          strategy="lazyOnload"
+          src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_ID}`}
+          strategy="afterInteractive"
         />
-        <Script id="google-ads-tag" strategy="lazyOnload">
+        <Script id="google-ads-base" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
-            gtag('config', 'AW-18020941072');
+            gtag('config', '${GOOGLE_ADS_ID}');
           `}
         </Script>
 
-        {/* --- İŞTE JSON-LD BURAYA GELİYOR --- */}
+        {/* JSON-LD */}
         <Script
           id="json-ld"
           type="application/ld+json"
@@ -158,6 +174,8 @@ export default function RootLayout({
         <Header />
         <main>{children}</main>
         <Footer />
+        <CookieConsent />
+        <PhoneClickTracker />
       </body>
     </html>
   );
