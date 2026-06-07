@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<{ brand: st
   const info = brandNames[brandKey] || { title: 'Profesyonel Klimalar', desc: 'Profesyonel klima modelleri' }
   
   return {
-    title: info.title + ' | VEDEL Klima',
+    title: info.title,
     description: info.desc,
     keywords: ['profesyonel klima', 'ticari klima', brandKey === 'mhi' ? 'mitsubishi heavy' : 'euroform'],
     openGraph: {

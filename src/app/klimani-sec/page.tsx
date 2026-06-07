@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 import KlimaSecWizard from '@/components/KlimaSecWizard'
 
 export const metadata: Metadata = {
-    title: 'Klimanı Seç | Vedel Klima',
+    title: 'Klimanı Seç',
     description: 'Odanıza en uygun klimayı hesaplayın. BTU kapasite hesaplayıcı ile ihtiyacınıza özel klima önerileri alın.',
     keywords: ['klima seçimi', 'btu hesaplama', 'klima kapasite hesaplama', 'oda klima hesabı'],
     openGraph: {

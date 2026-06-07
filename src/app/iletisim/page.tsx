@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'İletişim | VEDEL Klima',
+  title: 'İletişim',
   description: 'VEDEL Klima iletişim bilgileri. Kayapa ve Özlüce bayilerimiz. (0224) 413 23 16 - vedel@vedel.com.tr',
   keywords: ['klima iletişim', 'vedel iletişim', 'bursa klima bayii', 'mhi servis', 'euroform servis'],
   openGraph: {

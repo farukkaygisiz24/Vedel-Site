@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Image from 'next/image'
 
 export const metadata: Metadata = {
-  title: 'Hakkımızda | VEDEL Klima',
+  title: 'Hakkımızda',
   description: 'VEDEL Klima olarak 25 yılı aşkın süredir iklimlendirme sektöründe hizmet veriyoruz. MHI ve Euroform yetkili bayisi olarak profesyonel klima çözümleri sunuyoruz.',
   keywords: ['klima bayii', 'bursa klima', 'mhi yetkili', 'euroform bayii', 'klima montaj', 'klima servis'],
   openGraph: {

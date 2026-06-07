@@ -1,5 +1,11 @@
 import Link from 'next/link'
 import { Home, ArrowLeft, Search } from 'lucide-react'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Sayfa Bulunamadı',
+  description: 'Aradığınız sayfa bulunamadı. VEDEL Klima ana sayfasına dönebilir veya ürünlerimizi inceleyebilirsiniz.',
+}
 
 export default function NotFound() {
   return (

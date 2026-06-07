@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL('https://vedel.com.tr'),
   title: {
-    default: "Bursa Mitsubishi Heavy Industries Yetkili Bayi | Vedel Klima",
+    default: "Bursa Mitsubishi Heavy Industries Yetkili Bayi | VEDEL Klima",
     template: "%s | VEDEL Klima",
   },
   description: "Bursa'da Mitusbishi Heavy Industries ve Euroform klima yetkili satış ve servis noktası. Profesyonel montaj hizmeti, VRF Sistem çözümleri. Hemen teklif alın: (0224) 413 23 16",

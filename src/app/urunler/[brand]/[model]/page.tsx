@@ -92,7 +92,7 @@ export async function generateMetadata({ params }: { params: Promise<{ brand: st
   const desc = product ? `${product.btu} BTU - ${product.energyClass} enerji sınıfı - ${brandName} klima` : 'Klima ürün detayları'
   
   return {
-    title: title + ' | VEDEL Klima',
+    title,
     description: desc,
     keywords: ['klima', brand, product?.model || model, `${product?.btu} btu`],
     openGraph: {
