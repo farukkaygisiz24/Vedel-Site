@@ -95,6 +95,9 @@ export async function generateMetadata({ params }: { params: Promise<{ brand: st
     title,
     description: desc,
     keywords: ['klima', brand, product?.model || model, `${product?.btu} btu`],
+    alternates: {
+      canonical: `https://vedel.com.tr/urunler/${brand}/${model}`,
+    },
     openGraph: {
       type: 'website',
       locale: 'tr_TR',

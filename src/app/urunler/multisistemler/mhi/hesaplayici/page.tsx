@@ -54,17 +54,18 @@ export default function MultiHesaplayiciPage() {
   const [selectedIndoors, setSelectedIndoors] = useState<SelectedIndoor[]>([])
   const [prices, setPrices] = useState<PriceData>({})
   const [showResult, setShowResult] = useState(false)
+  const [priceError, setPriceError] = useState(false)
 
   useEffect(() => {
     const fetchPrices = async () => {
       try {
         const response = await fetch('/api/prices')
+        if (!response.ok) throw new Error('API hatası')
         const data: PriceData = await response.json()
         setPrices(data)
       } catch (error) {
         console.error('Fiyatlar yüklenemedi:', error)
-      } finally {
-        // loading state removed
+        setPriceError(true)
       }
     }
     fetchPrices()
@@ -241,6 +242,15 @@ export default function MultiHesaplayiciPage() {
         </div>
       </div>
 
+      {priceError && (
+        <div className="container mx-auto px-4 pt-6 relative z-20">
+          <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            Fiyat bilgileri şu an yüklenemiyor. Fiyatlar için lütfen bizi arayın.
+          </div>
+        </div>
+      )}
+
       <div className="container mx-auto px-4 py-8 -mt-8 relative z-20">
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Selection Column */}
@@ -307,15 +317,17 @@ export default function MultiHesaplayiciPage() {
                               <button
                                 onClick={() => handleQuantityChange(product, -1)}
                                 disabled={quantity === 0}
+                                aria-label={`${product.model} adedini azalt`}
                                 className="w-8 h-8 rounded-md hover:bg-blue-50 disabled:opacity-30 disabled:hover:bg-transparent flex items-center justify-center transition-colors text-gray-600 hover:text-blue-600"
                               >
                                 <Minus className="w-4 h-4" />
                               </button>
-                              <span className={`w-8 text-center font-bold ${quantity > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
+                              <span className={`w-8 text-center font-bold ${quantity > 0 ? 'text-blue-600' : 'text-gray-400'}`} aria-live="polite">
                                 {quantity}
                               </span>
                               <button
                                 onClick={() => handleQuantityChange(product, 1)}
+                                aria-label={`${product.model} adedini artır`}
                                 className="w-8 h-8 rounded-md bg-gray-50 hover:bg-blue-600 hover:text-white text-gray-600 flex items-center justify-center transition-all"
                               >
                                 <Plus className="w-4 h-4" />

@@ -20,6 +20,7 @@ export default function PriceDisplay({ model, brand, className = '' }: PriceDisp
     const cached = getCachedPrices()
     const cachedPrice = cached ? findPrice(cached, model, brand) : null
     if (cachedPrice !== null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPrice(cachedPrice)
       return
     }

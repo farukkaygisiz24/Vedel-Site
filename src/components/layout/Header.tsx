@@ -10,8 +10,8 @@ const productsMenu = [
   {
     brand: 'MHI',
     logo: '/mhi-logo.png',
-    logoWidth: 1653,
-    logoHeight: 237,
+    logoWidth: 220,
+    logoHeight: 32,
     categories: [
       { name: 'Split Sistemler', href: '/urunler/splitsistemler/mhi' },
       { name: 'Multi Sistemler', href: '/urunler/multisistemler/mhi' },
@@ -21,8 +21,8 @@ const productsMenu = [
   {
     brand: 'Euroform',
     logo: '/euroform.png',
-    logoWidth: 1512,
-    logoHeight: 553,
+    logoWidth: 88,
+    logoHeight: 32,
     categories: [
       { name: 'Split Sistemler', href: '/urunler/splitsistemler/euroform' },
       { name: 'Multi Sistemler', href: '/urunler/multisistemler/euroform' },
@@ -176,43 +176,48 @@ export default function Header() {
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 transition-all duration-300 group-hover:w-full" />
               </button>
 
-              {dropdownOpen && (
-                <div
-                  className="absolute top-full left-1/2 z-40 mt-3 w-[500px] -translate-x-1/2 animate-[header-dropdown_0.2s_ease-out] rounded-xl border border-gray-100 bg-white shadow-2xl overflow-hidden"
-                >
-                  <div className="grid grid-cols-2 divide-x divide-gray-100">
-                    {productsMenu.map((brand, brandIndex) => (
-                      <div key={brandIndex} className="p-4">
-                        <div className="flex items-center justify-center mb-3 pb-2 border-b border-gray-100">
-                          <Image
-                            src={brand.logo}
-                            alt={brand.brand}
-                            width={brand.logoWidth}
-                            height={brand.logoHeight}
-                            quality={100}
-                            sizes="220px"
-                            className="h-8 w-auto object-contain"
-                            style={{ width: 'auto' }}
-                          />
-                        </div>
-                        <ul className="space-y-2">
-                          {brand.categories.map((cat, catIndex) => (
-                            <li key={catIndex}>
-                              <Link
-                                href={cat.href}
-                                className="block py-2 px-3 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
-                                onClick={() => setDropdownOpen(false)}
-                              >
-                                {cat.name}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
+              <div
+                className={`absolute top-full left-1/2 z-40 mt-3 w-[500px] -translate-x-1/2 rounded-xl border border-gray-100 bg-white shadow-2xl overflow-hidden transition-all duration-200 ${
+                  dropdownOpen
+                    ? 'visible pointer-events-auto opacity-100 animate-[header-dropdown_0.2s_ease-out]'
+                    : 'invisible pointer-events-none opacity-0'
+                }`}
+                aria-hidden={!dropdownOpen}
+              >
+                <div className="grid grid-cols-2 divide-x divide-gray-100">
+                  {productsMenu.map((brand, brandIndex) => (
+                    <div key={brandIndex} className="p-4">
+                      <div className="flex items-center justify-center mb-3 pb-2 border-b border-gray-100">
+                        <Image
+                          src={brand.logo}
+                          alt={brand.brand}
+                          width={brand.logoWidth}
+                          height={brand.logoHeight}
+                          quality={90}
+                          sizes="220px"
+                          loading="eager"
+                          className="h-8 w-auto object-contain"
+                          style={{ width: 'auto' }}
+                        />
                       </div>
-                    ))}
-                  </div>
+                      <ul className="space-y-2">
+                        {brand.categories.map((cat, catIndex) => (
+                          <li key={catIndex}>
+                            <Link
+                              href={cat.href}
+                              className="block py-2 px-3 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                              onClick={() => setDropdownOpen(false)}
+                              tabIndex={dropdownOpen ? 0 : -1}
+                            >
+                              {cat.name}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
 
             {navItems.map((item) => (
@@ -233,7 +238,7 @@ export default function Header() {
           {/* Logo — mobil: grid ile taşma yok | lg+: masaüstü düzeni */}
           <Link
             href="/"
-            className="pointer-events-auto flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3 lg:shrink-0 lg:gap-4"
+            className="pointer-events-auto flex min-w-0 items-center gap-1.5 sm:gap-2 md:gap-3 lg:max-w-[min(100%,calc(50%-8.5rem))] lg:shrink-0 lg:gap-2 xl:max-w-[min(100%,22rem)] xl:gap-4 2xl:max-w-none"
           >
             <Image
               src="/vedel-logo.png"
@@ -241,22 +246,22 @@ export default function Header() {
               width={200}
               height={200}
               priority
-              className="h-11 w-auto max-w-[3.25rem] shrink-0 object-contain sm:h-12 sm:max-w-[3.75rem] md:h-[3.75rem] md:max-w-none lg:h-14 xl:h-16"
+              className="h-12 w-auto max-w-[3.75rem] shrink-0 object-contain sm:h-14 sm:max-w-[4.25rem] md:h-16 md:max-w-none lg:h-16 xl:h-[4.5rem]"
               style={{ width: 'auto' }}
-              sizes="(max-width: 640px) 48px, (max-width: 1280px) 56px, 64px"
+              sizes="(max-width: 640px) 52px, (max-width: 1280px) 64px, 72px"
             />
             <span
               className="hidden h-5 w-px shrink-0 bg-gray-200 md:block lg:h-6"
               aria-hidden
             />
-            <div className="relative h-11 min-w-0 flex-1 sm:h-12 md:h-[3.25rem] lg:h-12 lg:w-[220px] lg:flex-none xl:h-[3.375rem] xl:w-[250px]">
+            <div className="relative h-11 min-w-0 flex-1 sm:h-12 md:h-[3.25rem] md:max-w-[38vw] lg:h-[3.25rem] lg:w-[11rem] lg:max-w-none lg:flex-none xl:h-[3.375rem] xl:w-[13rem] 2xl:w-[15.625rem]">
               <Image
                 src="/mhi-logo.png"
                 alt="MHI"
                 fill
                 priority
                 className="object-contain object-left"
-                sizes="(max-width: 640px) 60vw, (max-width: 1024px) 40vw, 250px"
+                sizes="(max-width: 640px) 60vw, (max-width: 1024px) 38vw, (max-width: 1280px) 176px, (max-width: 1536px) 208px, 250px"
                 quality={90}
               />
             </div>
@@ -369,8 +374,9 @@ export default function Header() {
                         alt={brand.brand}
                         width={brand.logoWidth}
                         height={brand.logoHeight}
-                        quality={100}
+                        quality={90}
                         sizes="140px"
+                        loading="eager"
                         className="h-6 w-auto object-contain"
                         style={{ width: 'auto' }}
                       />

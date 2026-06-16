@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-const SHEET_CSV_URL = process.env.PRICE_SHEET_URL || 'https://docs.google.com/spreadsheets/d/1p13kvy6wSne5sTlsVp_M5G_JU2pp1i7tDvImic11Nlk/export?format=csv'
+const SHEET_CSV_URL = process.env.PRICE_SHEET_URL ?? ''
 
 interface RateLimitData {
   count: number
@@ -11,19 +11,30 @@ const rateLimitMap = new Map<string, RateLimitData>()
 const RATE_LIMIT = 30
 const RATE_LIMIT_WINDOW = 60 * 1000
 
+function extractRealIp(forwardedFor: string | null): string {
+  if (!forwardedFor) return 'unknown'
+  // x-forwarded-for: client, proxy1, proxy2 — ilk IP gerçek istemci
+  const firstIp = forwardedFor.split(',')[0].trim()
+  // Sadece geçerli IPv4/IPv6 karakterlerine izin ver
+  if (/^[\d.:a-fA-F]+$/.test(firstIp)) return firstIp
+  return 'unknown'
+}
+
 function checkRateLimit(ip: string): boolean {
   const now = Date.now()
   const data = rateLimitMap.get(ip)
-  
+
   if (!data || now > data.resetTime) {
+    // Süresi geçmiş kaydı sil (memory leak önlemi)
+    if (data) rateLimitMap.delete(ip)
     rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW })
     return true
   }
-  
+
   if (data.count >= RATE_LIMIT) {
     return false
   }
-  
+
   data.count++
   return true
 }
@@ -37,6 +48,8 @@ let cache: CacheData | null = null
 const CACHE_DURATION = 60 * 60 * 1000
 
 async function fetchPricesFromSheet(): Promise<Record<string, number>> {
+  if (!SHEET_CSV_URL) throw new Error('PRICE_SHEET_URL env değişkeni tanımlanmamış')
+
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 8000)
 
@@ -85,12 +98,12 @@ function pricesResponse(prices: Record<string, number>) {
 }
 
 export async function GET(request: Request) {
-  const ip = request.headers.get('x-forwarded-for') || 'unknown'
-  
+  const ip = extractRealIp(request.headers.get('x-forwarded-for'))
+
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
       { error: 'Çok fazla istek. Lütfen biraz bekleyin.' },
-      { status: 429 }
+      { status: 429, headers: { 'Retry-After': String(RATE_LIMIT_WINDOW / 1000) } }
     )
   }
   

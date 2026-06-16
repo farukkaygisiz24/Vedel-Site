@@ -39,8 +39,11 @@ const PRICE_RANGES = [
 const ENERGY_CLASSES = ['A+++', 'A++', 'A+', 'A']
 
 export default function FilterSidebar({ products, onFilterChange, brand }: FilterSidebarProps) {
-  const [prices, setPrices] = useState<Record<string, number>>({})
+  const [prices, setPrices] = useState<Record<string, number>>(
+    () => getCachedPrices() ?? {}
+  )
   const [isMounted, setIsMounted] = useState(false)
+  const [pricesLoading, setPricesLoading] = useState(true)
 
   const [selectedBtu, setSelectedBtu] = useState<number[]>([])
   const [selectedPriceRange, setSelectedPriceRange] = useState<number>(-1)
@@ -49,14 +52,14 @@ export default function FilterSidebar({ products, onFilterChange, brand }: Filte
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true)
-    const cached = getCachedPrices()
-    if (cached) setPrices(cached)
     fetchPrices()
       .then(data => {
         setPrices(data)
       })
       .catch(() => {})
+      .finally(() => setPricesLoading(false))
   }, [])
 
   useEffect(() => {
@@ -157,7 +160,12 @@ export default function FilterSidebar({ products, onFilterChange, brand }: Filte
       </div>
 
       <div className={sectionClass}>
-        <h4 className={sectionTitleClass}>Fiyat Aralığı</h4>
+        <h4 className={sectionTitleClass}>
+          Fiyat Aralığı
+          {pricesLoading && (
+            <span className="ml-2 inline-block w-3 h-3 rounded-full border-2 border-gray-300 border-t-blue-500 animate-spin align-middle" />
+          )}
+        </h4>
         <div className="space-y-0.5">
           <label className={optionLabelClass}>
             <input

@@ -3,7 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Store, Wrench, Settings, RefreshCw, ChevronDown, FileText, Zap, Building2 } from 'lucide-react'
-import { CAMPAIGN_HERO_ENABLED, CAMPAIGN_SURFACE_CLASS } from '@/config/campaign'
+import {
+  CAMPAIGN_CONTENT_BORDER_CLASS,
+  CAMPAIGN_CONTENT_SURFACE_CLASS,
+  CAMPAIGN_HERO_ENABLED,
+} from '@/config/campaign'
 import HeroDefaultTop from './HeroDefaultTop'
 import HeroCampaignTop from './HeroCampaignTop'
 
@@ -40,7 +44,7 @@ export default function Hero() {
       <section
         className={
           CAMPAIGN_HERO_ENABLED
-            ? `${CAMPAIGN_SURFACE_CLASS} py-20 border-t border-[#e8e0d4]`
+            ? `${CAMPAIGN_CONTENT_SURFACE_CLASS} py-20 border-t ${CAMPAIGN_CONTENT_BORDER_CLASS}`
             : 'bg-gradient-to-b from-blue-50 to-white py-20'
         }
       >
@@ -263,16 +267,21 @@ export default function Hero() {
               >
                 <button
                   onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                  aria-expanded={openFaq === index}
+                  aria-controls={`faq-answer-${index}`}
                   className="w-full flex items-center justify-between p-5 text-left bg-purple-50 hover:bg-purple-100 transition-colors"
                 >
                   <span className="font-semibold text-gray-900 pr-4">
                     {faq.question}
                   </span>
                   <ChevronDown
+                    aria-hidden="true"
                     className={`w-5 h-5 text-purple-500 flex-shrink-0 transition-transform duration-300 ${openFaq === index ? 'rotate-180' : ''}`}
                   />
                 </button>
                 <div
+                  id={`faq-answer-${index}`}
+                  role="region"
                   className={`overflow-hidden transition-all duration-300 ${openFaq === index ? 'max-h-96' : 'max-h-0'}`}
                 >
                   <div className="p-5 text-gray-600 text-sm leading-relaxed border-t border-purple-100">

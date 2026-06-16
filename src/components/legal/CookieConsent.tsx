@@ -12,15 +12,16 @@ import {
 import { activateGoogleAdsTracking } from '@/lib/googleTag'
 
 export default function CookieConsent() {
-  const [choice, setChoice] = useState<CookieConsentChoice | null>(null)
+  const [choice, setChoice] = useState<CookieConsentChoice | null>(
+    () => (typeof window !== 'undefined' ? getCookieConsent() : null)
+  )
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const stored = getCookieConsent()
-    setChoice(stored)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true)
 
-    if (stored === 'accepted') {
+    if (getCookieConsent() === 'accepted') {
       activateGoogleAdsTracking()
     }
 

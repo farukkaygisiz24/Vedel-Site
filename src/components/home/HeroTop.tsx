@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, Snowflake, Shield, Store, Wrench, Info } from 'lucide-react'
 import { categories } from './heroData'

@@ -254,10 +254,14 @@ function StepOdaBoyutu({ state, onAlanChange, onTavanChange }: {
             {/* Alan slider */}
             <div>
                 <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-semibold text-gray-700">Oda Alanı</label>
+                    <label htmlFor="alan-input" className="text-sm font-semibold text-gray-700">Oda Alanı</label>
                     <div className="flex items-center gap-2">
                         <input
+                            id="alan-input"
                             type="number"
+                            min={10}
+                            max={200}
+                            aria-describedby="alan-range-hint"
                             value={state.alan}
                             onChange={(e) => {
                                 const v = parseInt(e.target.value) || 10
@@ -268,6 +272,7 @@ function StepOdaBoyutu({ state, onAlanChange, onTavanChange }: {
                         <span className="text-gray-500 font-medium">m²</span>
                     </div>
                 </div>
+                <span id="alan-range-hint" className="sr-only">10 ile 200 m² arasında bir değer girin</span>
                 <input
                     type="range"
                     min={10}
@@ -481,6 +486,7 @@ function StepKullanim({ state, onKisiChange, onElektronikChange }: {
                 <div className="flex items-center gap-2 sm:gap-4">
                     <button
                         onClick={() => onKisiChange(Math.max(1, state.kisiSayisi - 1))}
+                        aria-label="Kişi sayısını azalt"
                         className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-xl border-2 border-gray-200 flex items-center justify-center text-2xl font-bold text-gray-500 active:border-blue-500 active:text-blue-600 transition-all"
                     >
                         −
@@ -490,11 +496,13 @@ function StepKullanim({ state, onKisiChange, onElektronikChange }: {
                         min={1}
                         max={20}
                         value={state.kisiSayisi}
+                        aria-label="Kişi sayısı"
                         onChange={(e) => onKisiChange(parseInt(e.target.value))}
                         className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                     />
                     <button
                         onClick={() => onKisiChange(Math.min(20, state.kisiSayisi + 1))}
+                        aria-label="Kişi sayısını artır"
                         className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-xl border-2 border-gray-200 flex items-center justify-center text-2xl font-bold text-gray-500 active:border-blue-500 active:text-blue-600 transition-all"
                     >
                         +
@@ -647,7 +655,10 @@ function StepSonuc({ btu, matchedProducts }: { btu: number; matchedProducts: Mat
             {/* Matched Products */}
             {!needsProfesyonel && matchedProducts.length > 0 && (
                 <div>
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">Size Uygun Klimalar</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4">
+                        Size Uygun Klimalar
+                        <span className="ml-2 text-sm font-normal text-gray-400">({matchedProducts.length} ürün)</span>
+                    </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {matchedProducts.map(product => (
                             <Link href={product.link} key={product.id} className="block h-full">
