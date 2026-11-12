@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+    {% include 'portal/_ios_zoom.html' %}
+    <link rel="icon" href="{% url 'portal-favicon' %}" type="image/png" />
+    <link rel="apple-touch-icon" href="{% url 'portal-favicon' %}" />
+    <title>Hesabım | Vedel Servis</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        background: #f5f5f7;
+        color: #1d1d1f;
+        -webkit-font-smoothing: antialiased;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 52px;
+        padding: 0 22px;
+        background: rgba(255,255,255,0.72);
+        backdrop-filter: saturate(180%) blur(20px);
+        border-bottom: 0.5px solid rgba(0,0,0,0.08);
+      }
+      .brand { margin: 0; font-size: 13px; font-weight: 590; letter-spacing: -0.01em; }
+      a {
+        color: #dc2626;
+        font-size: 14px;
+        font-weight: 510;
+        text-decoration: none;
+      }
+      main { max-width: 720px; margin: 56px auto; padding: 0 24px; }
+      h1 { margin: 0 0 8px; font-size: 40px; font-weight: 590; letter-spacing: -0.03em; }
+      p { color: #6e6e73; line-height: 1.55; font-size: 17px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <p class="brand">Vedel Servis</p>
+      <a href="{% url 'portal-logout' %}">Çıkış</a>
+    </header>
+    <main>
+      <h1>Hoş geldiniz, {{ user.username }}</h1>
+      <p>Müşteri paneli burada gelişecek. Şimdilik giriş ve çıkış çalışıyor.</p>
+    </main>
+  </body>
+</html>

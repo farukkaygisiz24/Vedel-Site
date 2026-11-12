@@ -1,0 +1,40 @@
+<tr>
+  <th colspan="4" class="device-sheet-brand">
+    <div class="device-sheet-head">
+      <span>Bakım</span>
+      {% if readonly %}
+      <span class="device-care-summary">
+        {% for months, label in pack.CARE_INTERVALS %}{% if interval == months %}{{ label }}{% endif %}{% endfor %}
+        {% if last %} · {{ last|date:'d.m.Y' }}{% endif %}
+        {% if next %} → {{ next|date:'d.m.Y' }}{% endif %}
+      </span>
+      {% endif %}
+    </div>
+  </th>
+</tr>
+{% if not readonly %}
+<tr>
+  <td colspan="4" class="device-care-cell">
+    <div class="device-care-fields" data-care>
+      <div class="seg is-mini" role="radiogroup" aria-label="Bakım aralığı">
+        {% for months, label in pack.CARE_INTERVALS %}
+        <label>
+          <input type="radio" name="pack_interval_{{ pack.pk }}" value="{{ months }}" data-care-interval{% if interval == months %} checked{% endif %} />
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="device-care-dates">
+        <div>
+          <p class="field-label">Son bakım</p>
+          <input class="device-serial" type="date" name="pack_last_{{ pack.pk }}" data-care-last value="{{ last|date:'Y-m-d' }}" aria-label="Son bakım" />
+        </div>
+        <div>
+          <p class="field-label">Sonraki bakım</p>
+          <input class="device-serial" type="date" name="pack_next_{{ pack.pk }}" data-care-next value="{{ next|date:'Y-m-d' }}" aria-label="Sonraki bakım" readonly tabindex="-1" />
+        </div>
+      </div>
+    </div>
+  </td>
+</tr>
+{% endif %}

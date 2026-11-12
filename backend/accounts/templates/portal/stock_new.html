@@ -1,0 +1,373 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Yeni ürün | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Yeni ürün</h1>
+      <p class="lead">Kategori kodu verir. Marka ve model satışta birlikte görünür.</p>
+    </div>
+    <div class="toolbar-actions">
+      <div class="toolbar-sku">
+        <span class="date-kicker">Stok kodu</span>
+        <b id="sku-view">{{ next_sku }}</b>
+      </div>
+      <a class="btn is-ghost" href="{{ back_href }}">Listeye dön</a>
+    </div>
+  </div>
+  {% if error %}<p class="flash is-err" role="alert">{{ error }}</p>{% endif %}
+
+  <form class="wizard" method="post" action="{% url 'portal-stock-new' %}" id="product-form" autocomplete="off">
+    {% csrf_token %}
+    <input type="hidden" name="sku" id="p_sku" value="{{ next_sku }}" />
+
+    <p class="field-label">Kategori</p>
+    <div class="party-tools">
+      <div class="pick-chip" data-cat-pick>
+        <button type="button" class="date-trigger" aria-haspopup="listbox" aria-expanded="false" id="cat-trigger">
+          <span data-cat-label>{{ category_label }}</span>
+        </button>
+        <input type="hidden" name="category_id" id="p_category_id" value="{{ category_id }}" />
+        <div class="date-pop" role="listbox" aria-label="Kategori seç">
+          <input type="search" data-pick-q placeholder="Kategori veya önek ara" autocomplete="off" />
+          <div class="pick-list" data-pick-list></div>
+        </div>
+      </div>
+      <button class="btn" type="button" id="open-category">Yeni kategori</button>
+    </div>
+
+    <p class="field-label">Ürün</p>
+    <div class="group">
+      <div class="row">
+        <input id="p_brand" name="brand" placeholder=" " data-title autocomplete="off" value="{{ form_brand }}" />
+        <label for="p_brand">Marka</label>
+      </div>
+      <div class="row">
+        <input id="p_name" name="name" placeholder=" " required data-upper autocomplete="off" value="{{ form_name }}" />
+        <label for="p_name">Ürün adı</label>
+      </div>
+      <div class="row">
+        <input id="p_unit" name="unit" placeholder=" " data-upper autocomplete="off" value="{{ form_unit }}" />
+        <label for="p_unit">Birim</label>
+      </div>
+    </div>
+
+    {% include 'portal/_product_klima.html' with category_is_klima=category_is_klima form_device_kind=form_device_kind outdoor_name=form_outdoor_name %}
+
+    <p class="field-label">Fiyat</p>
+    <div class="pay-grid">
+      <label class="pay-card">
+        <span class="pay-kicker">Alış</span>
+        <input id="p_buy_price" name="buy_price" inputmode="decimal" placeholder="0,00" autocomplete="off" value="{{ form_buy }}" />
+      </label>
+      <label class="pay-card">
+        <span class="pay-kicker">Satış</span>
+        <input id="p_sale_price" name="sale_price" inputmode="decimal" placeholder="0,00" autocomplete="off" value="{{ form_sale }}" />
+      </label>
+      <label class="pay-card">
+        <span class="pay-kicker">KDV %</span>
+        <input id="p_vat_rate" name="vat_rate" inputmode="decimal" placeholder="20" value="{{ form_vat }}" />
+      </label>
+    </div>
+
+    <p class="field-label">Stok</p>
+    <div class="pay-grid is-two">
+      <div class="pay-card" id="alert-qty-card">
+        <div class="pay-head">
+          <span class="pay-kicker">Kritik eşik · <span id="alert-unit-label">{{ form_unit }}</span></span>
+          <span class="toggle">
+            <input type="checkbox" name="alert_on" id="p_alert_on" value="1"{% if form_alert_on %} checked{% endif %} />
+            <i></i>
+          </span>
+        </div>
+        <input id="p_alert_qty" name="alert_qty" inputmode="decimal" placeholder="0" value="{{ form_alert }}" />
+      </div>
+      <label class="pay-card">
+        <span class="pay-head">
+          <span class="pay-kicker">İlk stok · <span id="qty-unit-label">{{ form_unit }}</span></span>
+        </span>
+        <input id="p_qty" name="qty" inputmode="decimal" placeholder="0" value="{{ form_qty }}" />
+      </label>
+    </div>
+    <div class="group">
+      <div class="row">
+        <input id="p_note" name="note" placeholder=" " data-upper value="{{ form_note }}" />
+        <label for="p_note">Giriş notu</label>
+      </div>
+    </div>
+
+    <div class="wizard-nav">
+      <button class="btn" type="submit">Ürünü kaydet</button>
+    </div>
+  </form>
+
+  <div class="modal" id="category-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Depo</span>
+        <h2>Yeni kategori</h2>
+        <p class="step-copy">Önek kart kodunu verir. Marka bu kategorideki ürüne otomatik gelir.</p>
+      </div>
+      <form id="category-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="category" />
+        <div class="modal-body">
+          <div class="group">
+            <div class="row">
+              <input id="c_name" name="name" placeholder=" " required data-title autocomplete="off" />
+              <label for="c_name">Kategori adı</label>
+            </div>
+            <div class="row">
+              <input id="c_prefix" name="sku_prefix" placeholder=" " required data-upper autocomplete="off" maxlength="6" />
+              <label for="c_prefix">Stok öneki</label>
+            </div>
+            <div class="row">
+              <input id="c_brand" name="brand" placeholder=" " data-title autocomplete="off" />
+              <label for="c_brand">Marka</label>
+            </div>
+          </div>
+          <label class="switch" for="c_is_klima" style="margin-top:16px">
+            <span>
+              <b>Klima kategorisi</b>
+              <small class="hint">Split ve multi cihaz kartı bu kategoride açılır.</small>
+            </span>
+            <span class="toggle">
+              <input type="checkbox" name="is_klima" id="c_is_klima" value="1" />
+              <i></i>
+            </span>
+          </label>
+          <p class="hint">Önek 2–6 harf. MHI, ERF, STK. Marka boş bırakılabilir.</p>
+        </div>
+        <p class="modal-alert" id="category-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-category">Vazgeç</button>
+          <button class="btn" type="submit" id="save-category">Kategoriyi ekle</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {{ sku_map|json_script:"sku-map" }}
+  {{ cat_choices|json_script:"cat-choices" }}
+  <script>
+    (function () {
+      var skuEl = document.getElementById('p_sku');
+      var skuView = document.getElementById('sku-view');
+      var catEl = document.getElementById('p_category_id');
+      var brandEl = document.getElementById('p_brand');
+      var openBtn = document.getElementById('open-category');
+      var catModal = document.getElementById('category-modal');
+      var catForm = document.getElementById('category-form');
+      var pick = document.querySelector('[data-cat-pick]');
+      var trigger = document.getElementById('cat-trigger');
+      var label = pick.querySelector('[data-cat-label]');
+      var pop = pick.querySelector('.date-pop');
+      var queryEl = pick.querySelector('[data-pick-q]');
+      var listEl = pick.querySelector('[data-pick-list]');
+      var map = {};
+      var cats = [];
+      try { map = JSON.parse(document.getElementById('sku-map').textContent) || {}; } catch (err) {}
+      try { cats = JSON.parse(document.getElementById('cat-choices').textContent) || []; } catch (err) {}
+      var unitEl = document.getElementById('p_unit');
+      var qtyUnit = document.getElementById('qty-unit-label');
+      var alertUnit = document.getElementById('alert-unit-label');
+      var alertOnEl = document.getElementById('p_alert_on');
+      var alertQtyCard = document.getElementById('alert-qty-card');
+      function applyUnitLabel() {
+        var unit = String(unitEl && unitEl.value || '').replace(/i/g, 'İ').replace(/ı/g, 'I').toUpperCase().trim() || 'ADET';
+        if (qtyUnit) qtyUnit.textContent = unit;
+        if (alertUnit) alertUnit.textContent = unit;
+      }
+      function applyAlertOn() {
+        var on = !!(alertOnEl && alertOnEl.checked);
+        if (alertQtyCard) alertQtyCard.classList.toggle('is-off', !on);
+      }
+      if (unitEl) {
+        unitEl.addEventListener('input', applyUnitLabel);
+        applyUnitLabel();
+      }
+      if (alertOnEl) {
+        alertOnEl.addEventListener('change', applyAlertOn);
+        applyAlertOn();
+      }
+      function catLabel(item) {
+        return (item.name || '') + ' · ' + (item.prefix || '');
+      }
+      function findCat(id) {
+        var key = String(id || '');
+        for (var i = 0; i < cats.length; i += 1) {
+          if (String(cats[i].id) === key) return cats[i];
+        }
+        return cats[0] || { id: '', name: 'Merkez Depo', prefix: 'STK', brand: '' };
+      }
+      function applySku() {
+        var key = catEl.value || '';
+        var code = map[key] || map[''] || skuEl.value;
+        skuEl.value = code;
+        skuView.textContent = code;
+      }
+      function applyBrand(item, force) {
+        if (!brandEl) return;
+        if (!force && brandEl.value.trim()) return;
+        brandEl.value = (item && item.brand) || '';
+      }
+      function setCat(id, closePick) {
+        var item = findCat(id);
+        catEl.value = item.id || '';
+        label.textContent = catLabel(item);
+        applySku();
+        applyBrand(item, !!closePick);
+        paintPick();
+        if (window.syncKlimaFields) window.syncKlimaFields(!!item.is_klima);
+        if (closePick) closePickPop();
+      }
+      function paintPick() {
+        var q = String(queryEl.value || '').trim().toLocaleUpperCase('tr-TR');
+        var current = String(catEl.value || '');
+        listEl.innerHTML = '';
+        var shown = 0;
+        cats.forEach(function (item) {
+          var hay = catLabel(item).toLocaleUpperCase('tr-TR');
+          if (q && hay.indexOf(q) < 0) return;
+          shown += 1;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'pick-opt' + (String(item.id) === current ? ' is-on' : '');
+          btn.textContent = catLabel(item);
+          btn.addEventListener('click', function () { setCat(item.id, true); });
+          listEl.appendChild(btn);
+        });
+        if (!shown) {
+          var empty = document.createElement('p');
+          empty.className = 'pick-empty';
+          empty.textContent = q ? 'Eşleşen kategori yok.' : 'Kategori yok.';
+          listEl.appendChild(empty);
+        }
+      }
+      function isPickOpen() {
+        return pick.classList.contains('is-open');
+      }
+      function openPickPop() {
+        pick.classList.add('is-open');
+        trigger.setAttribute('aria-expanded', 'true');
+        queryEl.value = '';
+        paintPick();
+        window.setTimeout(function () { try { queryEl.focus(); } catch (err) {} }, 20);
+      }
+      function closePickPop() {
+        pick.classList.remove('is-open');
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+      trigger.addEventListener('click', function (event) {
+        event.stopPropagation();
+        if (isPickOpen()) closePickPop();
+        else openPickPop();
+      });
+      pop.addEventListener('click', function (event) { event.stopPropagation(); });
+      queryEl.addEventListener('input', paintPick);
+      queryEl.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          var first = listEl.querySelector('.pick-opt');
+          if (first) first.click();
+        }
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          closePickPop();
+        }
+      });
+      document.addEventListener('click', function (event) {
+        if (event.target.closest && event.target.closest('[data-cat-pick]')) return;
+        closePickPop();
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape' || !isPickOpen()) return;
+        if (document.querySelector('.modal:not([hidden])')) return;
+        closePickPop();
+      });
+      setCat(catEl.value, false);
+      var err = document.getElementById('category-error');
+      function revealCatModal() {
+        catForm.reset();
+        err.hidden = true;
+        err.textContent = '';
+        catModal.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { catModal.classList.add('is-on'); });
+        });
+        window.setTimeout(function () {
+          try { document.getElementById('c_name').focus(); } catch (e) {}
+        }, 40);
+      }
+      function hideCatModal() {
+        catModal.classList.remove('is-on');
+        window.setTimeout(function () {
+          catModal.hidden = true;
+          catForm.reset();
+          err.hidden = true;
+        }, 280);
+      }
+      openBtn.addEventListener('click', function () {
+        closePickPop();
+        revealCatModal();
+      });
+      document.getElementById('close-category').addEventListener('click', hideCatModal);
+      catModal.addEventListener('click', function (event) {
+        if (event.target === catModal) hideCatModal();
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape' || catModal.hidden) return;
+        event.preventDefault();
+        hideCatModal();
+      });
+
+      var csrf = document.querySelector('#category-form [name=csrfmiddlewaretoken]').value;
+      catForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var name = document.getElementById('c_name').value.trim();
+        var prefix = document.getElementById('c_prefix').value.trim();
+        if (!name || !prefix) {
+          err.textContent = 'Kategori adı ve önek zorunlu.';
+          err.hidden = false;
+          return;
+        }
+        err.hidden = true;
+        fetch('{% url "portal-stock" %}', {
+          method: 'POST',
+          body: new FormData(catForm),
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+            'X-CSRFToken': csrf
+          },
+          credentials: 'same-origin'
+        }).then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok && data.ok, data: data };
+          });
+        }).then(function (result) {
+          if (!result.ok) {
+            err.textContent = (result.data && result.data.error) || 'Kategori kaydedilemedi.';
+            err.hidden = false;
+            return;
+          }
+          var added = {
+            id: String(result.data.id),
+            name: result.data.name || '',
+            prefix: result.data.prefix || '',
+            brand: result.data.brand || '',
+            is_klima: !!result.data.is_klima
+          };
+          cats.push(added);
+          map[added.id] = result.data.next_sku || '';
+          setCat(added.id, true);
+          hideCatModal();
+          if (window.takePortalToast) window.takePortalToast(result.data);
+        }).catch(function () {
+          err.textContent = 'Bağlantı kurulamadı.';
+          err.hidden = false;
+        });
+      });
+    })();
+  </script>
+{% endblock %}

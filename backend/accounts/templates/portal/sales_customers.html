@@ -1,0 +1,159 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}Müşteriler | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Müşteriler</h1>
+      <p class="lead">Güncel bakiyeler. İş ve tahsil seçilen döneme aittir.</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn is-ghost" href="{% url 'portal-sales' %}">Satış listesi</a>
+      <button class="btn" type="button" id="open-party">Yeni müşteri</button>
+    </div>
+  </div>
+  {% if error %}<p class="flash is-err">{{ error }}</p>{% endif %}
+
+  <div class="party-stats">
+    <div class="party-stat">
+      <span>Kalan borç</span>
+      <b class="money{% if remain_total > 0 %} is-over{% endif %}">{{ remain_total|tr_money }} ₺</b>
+    </div>
+    <div class="party-stat">
+      <span>İş</span>
+      <b class="money">{{ work_total|tr_money }} ₺</b>
+    </div>
+    <div class="party-stat">
+      <span>Tahsil</span>
+      <b class="money">{{ paid_total|tr_money }} ₺</b>
+    </div>
+    <div class="party-stat">
+      <span>Borçlu</span>
+      <b>{{ due_count }}</b>
+    </div>
+  </div>
+
+  <form class="sale-filters" method="get" data-sale-filters>
+    <div class="sale-filters-top">
+      <input type="search" name="q" value="{{ query }}" placeholder="Kod, isim, unvan veya telefon" autocomplete="off" />
+      {% include 'portal/_datepicker.html' with date_name='from' date_value=date_from date_kicker='Başlangıç' date_optional=True %}
+      {% include 'portal/_datepicker.html' with date_name='to' date_value=date_to date_kicker='Bitiş' date_optional=True %}
+    </div>
+    <div class="sale-filters-bar">
+      <div class="sale-filter">
+        <span class="sale-filter-kicker">Müşteri</span>
+        <div class="sale-filter-opts">
+          <label>
+            <input type="radio" name="kind" value=""{% if not kind %} checked{% endif %} />
+            <span>Tümü</span>
+          </label>
+          <label>
+            <input type="radio" name="kind" value="legal"{% if kind == 'legal' %} checked{% endif %} />
+            <span>Tüzel</span>
+          </label>
+          <label>
+            <input type="radio" name="kind" value="real"{% if kind == 'real' %} checked{% endif %} />
+            <span>Gerçek</span>
+          </label>
+        </div>
+      </div>
+      <div class="sale-filter">
+        <span class="sale-filter-kicker">Bakiye</span>
+        <div class="sale-filter-opts">
+          <label>
+            <input type="radio" name="debt" value=""{% if not debt %} checked{% endif %} />
+            <span>Tümü</span>
+          </label>
+          <label>
+            <input type="radio" name="debt" value="due"{% if debt == 'due' %} checked{% endif %} />
+            <span>Borçlu</span>
+          </label>
+          <label>
+            <input type="radio" name="debt" value="clear"{% if debt == 'clear' %} checked{% endif %} />
+            <span>Kapalı</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="sheet-wrap sale-sheet party-sheet">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>Müşteri</th>
+          <th>Tür</th>
+          <th>Telefon</th>
+          <th>Fiş</th>
+          <th>İş</th>
+          <th>Tahsil</th>
+          <th>Kalan</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in parties %}
+        <tr class="sale-row">
+          <td><a class="sale-row-go" href="{{ item.get_absolute_url }}">{{ item.number }}</a></td>
+          <td>{{ item.display_name }}</td>
+          <td>{{ item.get_kind_display }}</td>
+          <td>{{ item.phone|tel_link }}</td>
+          <td class="num">{{ item.sale_count }}</td>
+          <td class="money">{{ item.work_sum|tr_money }} ₺</td>
+          <td class="money">{{ item.paid_sum|tr_money }} ₺</td>
+          <td class="money{% if item.remain_sum > 0 %} is-over{% endif %}">{{ item.remain_sum|tr_money }} ₺</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="empty">{{ empty_copy }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if paginator.count %}
+  <p class="pager-meta">{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ paginator.count }}</p>
+  {% endif %}
+  <nav class="pager" aria-label="Sayfa"{% if paginator.num_pages <= 1 %} hidden{% endif %}>
+    {% if page_obj.has_previous %}
+    <a href="{{ prev_href }}">‹</a>
+    {% else %}
+    <span class="is-off">‹</span>
+    {% endif %}
+    {% for item in page_links %}
+      {% if item.gap %}
+      <span class="is-off">{{ item.label }}</span>
+      {% elif item.on %}
+      <a href="{{ item.href }}" class="is-on" aria-current="page">{{ item.label }}</a>
+      {% else %}
+      <a href="{{ item.href }}">{{ item.label }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <a href="{{ next_href }}">›</a>
+    {% else %}
+    <span class="is-off">›</span>
+    {% endif %}
+  </nav>
+
+  {% include 'portal/_party_modal.html' %}
+  <script>
+    (function () {
+      var formFilters = document.querySelector('[data-sale-filters]');
+      if (!formFilters) return;
+      formFilters.addEventListener('submit', function () {
+        formFilters.querySelectorAll('input').forEach(function (el) {
+          if (el.disabled) return;
+          if (!String(el.value || '').trim()) el.disabled = true;
+        });
+      });
+      formFilters.querySelectorAll('.sale-filter input').forEach(function (el) {
+        el.addEventListener('change', function () {
+          if (typeof formFilters.requestSubmit === 'function') formFilters.requestSubmit();
+          else formFilters.submit();
+        });
+      });
+    })();
+  </script>
+{% endblock %}

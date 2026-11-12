@@ -1,0 +1,521 @@
+
+      @media (max-width: 860px) {
+        :root { --page-pad-x: 16px; }
+
+        body {
+          grid-template-columns: minmax(0, 1fr);
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
+
+        body.nav-open,
+        body.has-modal { overflow: hidden; }
+
+        /* Shell: sidebar becomes an off-canvas drawer */
+        .stage { flex-direction: row; min-width: 0; }
+
+        .window {
+          position: fixed;
+          top: 0;
+          bottom: 0;
+          left: 0;
+          z-index: 60;
+          width: min(84vw, 300px);
+          height: 100%;
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+          box-shadow: 0 0 0 0.5px var(--hairline), 18px 0 40px rgba(15, 15, 16, 0.18);
+          transform: translateX(calc(-100% - 24px));
+          visibility: hidden;
+          transition:
+            transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+            visibility 0s linear 0.34s;
+        }
+
+        body.nav-open .window {
+          transform: none;
+          visibility: visible;
+          transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .window .body { border-right: 0; }
+
+        .side-link { min-height: 44px; }
+        .side-sub { min-height: 40px; }
+
+        .nav-scrim {
+          display: block;
+          /* Not fixed: Safari tints its bars from fixed layers, and this one would turn them grey */
+          position: absolute;
+          inset: 0;
+          z-index: 59;
+          background: rgba(15, 15, 16, 0.32);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.28s ease;
+        }
+
+        body.nav-open .nav-scrim {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .main-col { width: 100%; min-width: 0; }
+
+        .topbar {
+          gap: 8px;
+          flex-basis: calc(56px + env(safe-area-inset-top));
+          height: calc(56px + env(safe-area-inset-top));
+          padding: env(safe-area-inset-top) 12px 0;
+        }
+
+        .nav-toggle {
+          display: grid;
+          place-items: center;
+          flex: 0 0 40px;
+          width: 40px;
+          height: 40px;
+          margin-left: -4px;
+          padding: 0;
+          border: 0;
+          border-radius: 10px;
+          background: transparent;
+          color: var(--label);
+          cursor: pointer;
+        }
+
+        .nav-toggle:active { background: rgba(0, 0, 0, 0.06); }
+        .nav-toggle svg { width: 22px; height: 22px; }
+
+        .search {
+          flex: 1 1 auto;
+          width: auto;
+          height: 40px;
+        }
+
+        .search input {
+          height: 40px;
+          font-size: 16px;
+        }
+
+        .profile-name { display: none; }
+
+        .profile-btn {
+          min-width: 0;
+          width: 40px;
+          height: 40px;
+          padding: 0;
+        }
+
+        .profile-pop {
+          position: fixed;
+          top: calc(56px + env(safe-area-inset-top) + 4px);
+          right: 12px;
+          left: auto;
+          min-width: 220px;
+        }
+
+        .profile-pop a {
+          display: flex;
+          align-items: center;
+          min-height: 44px;
+          font-size: 15px;
+        }
+
+        .workspace {
+          padding: 22px var(--page-pad-x) calc(32px + env(safe-area-inset-bottom));
+        }
+
+        h1 { font-size: 28px; }
+        .lead { margin-bottom: 20px; }
+
+        /* Touch targets; 16px inputs keep iOS from zooming on focus */
+        .btn,
+        .save,
+        .wizard-nav .btn { min-height: 44px; }
+
+        input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+        select,
+        textarea { font-size: 16px; }
+
+        .panel,
+        .panel.is-wide { width: 100%; }
+
+        /* Toolbars and headers wrap instead of overflowing */
+        .toolbar,
+        .wizard-head,
+        .fis-toolbar-actions,
+        .totals-bar {
+          flex-wrap: wrap;
+        }
+
+        .toolbar { gap: 12px; }
+
+        .toolbar-actions {
+          flex: 1 1 100%;
+          flex-wrap: wrap;
+          padding-top: 0;
+          margin-bottom: 16px;
+        }
+
+        .toolbar-actions > .btn,
+        .toolbar-actions > a,
+        .toolbar-actions > button {
+          flex: 1 1 auto;
+          justify-content: center;
+        }
+
+        .toolbar-sku { white-space: normal; }
+
+        .fis-toolbar-actions {
+          flex: 1 1 100%;
+          min-width: 0;
+        }
+
+        .fis > .toolbar .fis-toolbar-actions .btn,
+        .fis .wizard-nav .btn {
+          flex: 1 1 auto;
+          white-space: nowrap;
+          width: auto;
+          min-width: 0;
+          justify-content: center;
+        }
+
+        .totals-bar {
+          align-items: stretch;
+          gap: 12px;
+        }
+
+        .totals-bar > * { flex: 1 1 100%; }
+
+        /* Horizontal strips: steps, tabs, year chips scroll sideways */
+        .steps,
+        .fis-tabs,
+        .sale-years {
+          flex-wrap: nowrap;
+          overflow-x: auto;
+          overscroll-behavior-x: contain;
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .steps::-webkit-scrollbar,
+        .fis-tabs::-webkit-scrollbar,
+        .sale-years::-webkit-scrollbar { display: none; }
+
+        .steps button,
+        .fis-tabs a,
+        .sale-years a {
+          flex: 0 0 auto;
+          white-space: nowrap;
+        }
+
+        .steps button,
+        .fis-tabs a {
+          min-height: 32px;
+        }
+
+        /* Grids collapse */
+        .sale-filters-top { flex-wrap: wrap; }
+        .sale-filters-top input[type="search"] { min-width: 0; flex: 1 1 100%; }
+        .sale-filters-bar { grid-template-columns: 1fr; }
+        .sale-filter + .sale-filter { box-shadow: inset 0 0.5px 0 var(--hairline); }
+        .sale-filter { height: 48px; }
+        .sale-filter-kicker { flex-basis: 4.2em; }
+        .sale-filter-opts { height: 36px; }
+        .sale-filter-opts span { padding: 0 2px; }
+        .sale-filter-opts.is-four span { font-size: 12px; }
+
+        .party-stats { grid-template-columns: 1fr 1fr; }
+        .party-stat + .party-stat { box-shadow: none; }
+        .party-stat:nth-child(2n) { box-shadow: inset 0.5px 0 0 var(--hairline); }
+        .party-stat:nth-child(n+3) { box-shadow: inset 0 0.5px 0 var(--hairline); }
+        .party-stat:nth-child(4) { box-shadow: inset 0.5px 0 0 var(--hairline), inset 0 0.5px 0 var(--hairline); }
+
+        .party-tools { flex-wrap: wrap; }
+
+        .pay-grid,
+        .pay-grid.is-two { grid-template-columns: 1fr; }
+
+        .fis-facts,
+        .fis-settle,
+        .fis-settle.is-quad { grid-template-columns: 1fr; }
+
+        .fis-meta { flex-wrap: wrap; }
+
+        .day-cal-row { grid-template-columns: minmax(0, 1fr); }
+        .day-cal,
+        .day-jobs { min-width: 0; }
+
+        .week-board-grid {
+          grid-template-columns: repeat(7, minmax(132px, 1fr));
+          overflow-x: auto;
+          scroll-snap-type: x proximity;
+        }
+
+        .week-board-grid > * { scroll-snap-align: start; }
+
+        .crew-doc { grid-template-columns: minmax(0, 1fr) 40px; }
+        .crew-doc .date-chip,
+        .crew-doc .file-pick { grid-column: 1; }
+        .file-pick { max-width: none; }
+
+        .mount-row {
+          grid-template-columns: 1fr 1fr 40px;
+        }
+
+        .mount-row > :first-child { grid-column: 1 / -1; }
+
+        /* Line editors: description on its own row, numbers below */
+        .line-head { display: none; }
+
+        .line-row {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.7fr) 40px;
+          min-width: 0;
+          row-gap: 8px;
+        }
+
+        .line-row > :first-child { grid-column: 1 / 4; }
+        .line-row > [data-remove] { grid-column: 4; grid-row: 1; }
+        .line-row > [data-line-total] {
+          grid-column: 1 / -1;
+          text-align: right;
+          font-weight: 590;
+        }
+
+        .pay-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px; }
+
+        #field-lines .line-head,
+        #field-lines .line-row {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) 40px;
+          min-width: 0;
+        }
+
+        .wizard,
+        .fis { --fis-pad: var(--page-pad-x); }
+        .fis { --action-w: 128px; }
+        .wizard-head { gap: 10px; }
+
+        .wizard-nav {
+          position: sticky;
+          bottom: calc(-32px - env(safe-area-inset-bottom));
+          z-index: 5;
+          margin-left: calc(-1 * var(--page-pad-x));
+          margin-right: calc(-1 * var(--page-pad-x));
+          padding: 12px var(--page-pad-x) calc(12px + env(safe-area-inset-bottom));
+          background: var(--fill);
+          box-shadow: 0 -0.5px 0 var(--hairline);
+        }
+
+        .workspace:has(.prod-menu:not([hidden]), .pick-chip.is-open, [data-outdoor-pick].is-open, input:focus, textarea:focus) .wizard-nav {
+          position: static;
+        }
+
+        .wizard-nav .btn,
+        .wizard-nav .save {
+          flex: 1 1 0;
+          min-width: 0;
+          justify-content: center;
+        }
+
+        /* Tables become stacked cards; labels come from data-label (set by JS) */
+        .sheet-wrap {
+          background: transparent;
+          box-shadow: none;
+          overflow: visible;
+        }
+
+        .sheet,
+        .sheet tbody,
+        .sheet tr,
+        .sheet td { display: block; width: 100%; }
+
+        .sheet thead { display: none; }
+
+        .sheet tr {
+          margin: 0 0 10px;
+          padding: 6px 14px;
+          border-radius: 10px;
+          background: var(--field);
+          box-shadow: 0 0 0 0.5px var(--hairline);
+        }
+
+        .sheet td {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 16px;
+          min-height: 36px;
+          padding: 8px 0;
+          border-top: 0;
+          text-align: right;
+          white-space: normal !important;
+          overflow-wrap: anywhere;
+        }
+
+        .sheet td + td { border-top: 0.5px solid var(--hairline); }
+
+        .sheet td::before {
+          content: attr(data-label);
+          flex: 0 0 auto;
+          max-width: 45%;
+          color: var(--secondary);
+          font-size: 12px;
+          font-weight: 510;
+          text-align: left;
+        }
+
+        .sheet td:not([data-label])::before,
+        .sheet td[data-label=""]::before { display: none; }
+
+        .sheet td:first-child {
+          justify-content: flex-start;
+          text-align: left;
+          font-weight: 590;
+        }
+
+        .sheet td:first-child::before { display: none; }
+
+        .sheet td[colspan] {
+          justify-content: center;
+          text-align: center;
+        }
+
+        .sheet td[colspan]::before { display: none; }
+
+        .sheet td input,
+        .sheet td select { max-width: 60%; }
+
+        .sheet td input[type="date"] { min-width: 0; }
+
+        /* Modals: full-screen sheets that slide up */
+        .modal {
+          grid-template-rows: minmax(0, 1fr);
+          place-items: stretch;
+          padding: 0;
+          /* Safari tints its bars from this layer, so a scrim would turn the status bar grey */
+          background: var(--field);
+          /* Covers the page below the modal, behind the keyboard toolbar */
+          box-shadow: 0 50vh 0 50vh var(--field);
+        }
+
+        .modal-card,
+        .modal-card.is-pdf,
+        .modal-card.is-photo,
+        #pay-modal .modal-card,
+        #stock-in-modal .modal-card,
+        #crew-edit-modal .modal-card,
+        #user-edit-modal .modal-card {
+          width: 100%;
+          height: 100%;
+          max-height: none;
+          overflow: hidden;
+          border-radius: 0;
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+          transform: translateY(100%);
+          opacity: 1;
+          transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .modal.is-on .modal-card,
+        #pay-modal.is-on .modal-card,
+        #stock-in-modal.is-on .modal-card,
+        #crew-edit-modal.is-on .modal-card,
+        #user-edit-modal.is-on .modal-card { transform: none; }
+
+        /* Status and confirm-only cards (no body) stay compact at the bottom */
+        .modal:has(.modal-card.is-status),
+        .modal:not(:has(.modal-body, .photo-stage, .pdf-stage)) {
+          place-items: end stretch;
+          background: rgba(15, 15, 16, 0.32);
+          box-shadow: none;
+        }
+
+        .modal-card.is-status,
+        .modal-card:not(:has(.modal-body, .photo-stage, .pdf-stage)) {
+          width: 100%;
+          height: auto;
+          padding-top: 0;
+          border-radius: 20px 20px 0 0;
+        }
+
+        /* Safari paints the topbar over modals that live inside the scrolling workspace */
+        body:has(.modal:not([hidden]) .modal-body, .modal:not([hidden]) .photo-stage, .modal:not([hidden]) .pdf-stage) .topbar {
+          visibility: hidden;
+        }
+
+        .modal-head { padding: 16px 18px 12px; }
+        .modal-card h2 { font-size: 22px; }
+
+        .modal-body,
+        #pay-modal .modal-body {
+          flex: 1 1 auto;
+          min-height: 0;
+          overflow: auto;
+          overscroll-behavior: contain;
+          padding: 14px 18px 16px;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .modal-foot,
+        .modal .wizard-nav {
+          position: static;
+          flex: 0 0 auto;
+          flex-wrap: wrap;
+          margin: 0;
+          padding: 12px 18px;
+          background: var(--field);
+          box-shadow: 0 -0.5px 0 var(--hairline);
+        }
+
+        .modal-foot .btn,
+        .modal-foot .save {
+          flex: 1 1 0;
+          min-width: 0;
+          justify-content: center;
+        }
+
+        /* Popovers stay on screen */
+        [data-datepicker]:not(.pick-chip) > .date-pop {
+          position: fixed;
+          top: auto;
+          right: 0;
+          bottom: 0;
+          left: 0;
+          z-index: 70;
+          width: auto;
+          padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+          border-radius: 20px 20px 0 0;
+          box-shadow: 0 0 0 0.5px var(--hairline), 0 -18px 40px rgba(15, 15, 16, 0.18);
+        }
+
+        .pick-chip .date-pop { max-height: min(60dvh, 420px); overflow: auto; }
+
+        .pay-ops-menu,
+        .prod-menu { max-width: calc(100vw - 32px); }
+
+        .date-trigger { max-width: 100%; }
+
+        .portal-toasts {
+          right: 12px;
+          left: 12px;
+          bottom: calc(12px + env(safe-area-inset-bottom));
+          align-items: stretch;
+        }
+
+        .portal-toast { width: 100%; }
+
+        .field-today { margin-bottom: 22px; }
+      }
+
+      @media (max-width: 480px) {
+        h1 { font-size: 26px; }
+
+      }
+
+      @media (max-width: 860px) and (prefers-reduced-motion: reduce) {
+        .window,
+        .nav-scrim,
+        .modal-card { transition: none !important; }
+      }

@@ -1,0 +1,1656 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{% if job %}{{ job.number }}{% else %}Yeni iş{% endif %} | Vedel Servis{% endblock %}
+
+{% block workspace %}
+{% if office_close %}<div class="fis">{% endif %}
+  <div class="toolbar">
+    <div>
+      <h1>{% if job %}{{ job.number }}{% else %}Yeni iş{% endif %}</h1>
+      {% if not office_close %}
+      <p class="lead">{% if tech_mode %}Oda, seri, grup, fotoğraf ve montaj malzemesi.{% elif from_sale %}Servis ön raporu.{% else %}Müşteri, personel ve cihaz. Kalem kapatmada.{% endif %}{% if job and job.time %} İstenen saat {{ job.time|time:'H:i' }}.{% endif %}</p>
+      {% endif %}
+      {% if job %}
+      <div class="fis-meta">
+        {% if office_close %}<span class="fis-chip">Teslim</span>{% endif %}
+        <span class="fis-chip">{{ job.kind_label }}</span>
+        {% if office_close %}
+        <span class="fis-chip">{{ job.date|date:'d.m.Y' }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}</span>
+        {% if job.assignee_label %}<span class="fis-chip">{{ job.assignee_label }}</span>{% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="{% if office_close %}fis-toolbar-actions{% else %}toolbar-actions{% endif %}">
+      {% if job and job.sale and not tech_mode %}
+      <a class="btn is-ghost" href="{{ job.sale.get_absolute_url }}">Satış fişi</a>
+      {% endif %}
+      <a class="btn is-ghost" href="{% url 'portal-service' %}">Listeye dön</a>
+    </div>
+  </div>
+  <p class="flash is-err" id="job-error"{% if not error %} hidden{% endif %} role="alert">{{ error }}</p>
+
+  <form class="wizard{% if office_close %} is-slip{% endif %}" method="post" action="{% if job %}{{ job.get_absolute_url }}{% else %}{% url 'portal-service-job-new' %}{% endif %}" id="job-form" autocomplete="off" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="party_mode" value="existing" />
+    <input type="hidden" name="party_id" id="party_id" value="{% if initial_party %}{{ initial_party.id }}{% endif %}" />
+
+    {% if office_close %}
+    <input type="hidden" name="assignee_id" id="assignee_id" value="{{ assignee_id|default_if_none:'' }}" />
+    <input type="hidden" name="date" id="service_date" value="{{ job_date }}" />
+    {% if job_time %}<input type="hidden" name="service_time" value="{{ job_time }}" />{% endif %}
+    <input type="hidden" name="device_mode" value="{{ device_mode }}" />
+    <input type="hidden" name="device_id" id="device_id" value="{{ initial_device_id }}" />
+
+    <section class="fis-letter">
+      <div class="fis-letter-head">
+        <div>
+          <span class="fis-kicker">Servis fişi</span>
+          <div class="fis-name">{{ job.party.display_name }}</div>
+          <p>{{ job.party.get_kind_display }}</p>
+        </div>
+      </div>
+      <dl class="fis-facts">
+        {% include 'portal/_party_facts.html' with party=job.party %}
+        <div>
+          <dt>Personel</dt>
+          <dd>{% if job.assignee %}{{ job.assignee.display_name }}{% if job.assignee.title %} · {{ job.assignee.title }}{% endif %}{% elif job.assign_all %}Hepsi{% else %}Atanmadı{% endif %}</dd>
+        </div>
+        <div>
+          <dt>Randevu</dt>
+          <dd>{{ job.date|date:'d.m.Y' }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}</dd>
+        </div>
+        {% if job.device and not sold_groups %}
+        <div>
+          <dt>Cihaz</dt>
+          <dd>{{ job.device.name }}{% if job.device.place %} · {{ job.device.place }}{% endif %}</dd>
+        </div>
+        {% endif %}
+        {% if work_name %}
+        <div>
+          <dt>Yapılacak iş</dt>
+          <dd>{{ work_name }}</dd>
+        </div>
+        {% endif %}
+      </dl>
+    </section>
+
+    {% if sold_groups %}
+    <section class="fis-block">
+      <p class="field-label">Cihaz</p>
+      {% include 'portal/_job_sold_units.html' with readonly=True %}
+    </section>
+    {% endif %}
+
+    {% if photos %}
+    <section class="fis-block">
+      <p class="field-label">Görseller</p>
+      <div class="device-album">
+        {% for item in photos %}
+        <a href="{{ item.file_url }}" target="_blank" rel="noopener">
+          <img class="device-album-shot" src="{{ item.file_url }}" alt="" />
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="fis-block">
+    <p class="field-label">Kalemler</p>
+    <div class="line-table" id="job-lines">
+      <div class="line-head">
+        <span>Kalem</span>
+        <span>Adet</span>
+        <span>Satış</span>
+        <span>KDV %</span>
+        <span>Tutar</span>
+        <span></span>
+      </div>
+    </div>
+    <div class="line-actions">
+      <button class="btn is-ghost" type="button" id="add-labor">İşçilik ekle</button>
+      <button class="btn is-ghost" type="button" id="add-part">Parça ekle</button>
+    </div>
+    <div class="totals-bar">
+      <div class="seg is-mini" aria-label="KDV">
+        {% for value, label in vat_choices %}
+        <label>
+          <input type="radio" name="vat_mode" value="{{ value }}"{% if vat_mode == value %} checked{% endif %} />
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="totals-stack">
+        <span>Ara toplam</span>
+        <b id="sum-net">0,00 ₺</b>
+        <span>KDV</span>
+        <b id="sum-vat">0,00 ₺</b>
+        <span>Genel toplam</span>
+        <b id="sum-grand" class="is-grand">0,00 ₺</b>
+      </div>
+      <div class="totals-stack">
+        <span>Maliyet</span>
+        <b id="sum-cost">0,00 ₺</b>
+        <span>Satış</span>
+        <b id="sum-sale">0,00 ₺</b>
+        <span>Kar</span>
+        <b id="sum-profit">0,00 ₺</b>
+      </div>
+    </div>
+    </section>
+    <section class="fis-block">
+      <p class="field-label">İşlem notu</p>
+      <div class="sheet-wrap">
+        <div class="group">
+          <div class="row">
+            <input id="id_notes" name="notes" placeholder=" " value="{{ notes }}" />
+            <label for="id_notes">İşlem notu</label>
+          </div>
+        </div>
+      </div>
+    </section>
+    {% else %}
+    {% if not tech_mode %}
+    <div class="wizard-head">
+      <div class="steps" role="tablist">
+        <button type="button" class="is-on" data-go="1">1 · Müşteri</button>
+        <button type="button" data-go="2">2 · Personel</button>
+        <button type="button" data-go="3">3 · Cihaz</button>
+      </div>
+    </div>
+    {% endif %}
+
+    <section class="step-pane{% if not tech_mode %} is-on{% endif %}" data-step="1"{% if tech_mode %} hidden{% endif %}>
+      <p class="step-copy">{% if job and job.sale %}<a href="{{ job.sale.get_absolute_url }}">{{ job.sale.number }}</a> satışından planlandı.{% else %}Servisin bağlandığı müşteri. Kayıtlı müşteriler listede.{% endif %}</p>
+      {% if from_sale %}
+      {% include 'portal/_party_letter.html' with party=job.party %}
+      {% else %}
+      <div class="party-tools" id="party-tools"{% if initial_party %} hidden{% endif %}>
+        <input type="search" id="party-search" placeholder="Kod, isim, unvan veya telefon ara" autocomplete="off" />
+        <button class="btn" type="button" id="open-party">Yeni müşteri</button>
+      </div>
+      <div class="picked" id="picked-party"{% if not initial_party %} hidden{% endif %}>
+        <div>
+          <b id="picked-name">{% if initial_party %}{{ initial_party.name }}{% endif %}</b>
+          <small id="picked-meta">{% if initial_party %}{{ initial_party.kind_label }} · {{ initial_party.phone }}{% endif %}</small>
+        </div>
+        <button class="btn is-ghost" type="button" id="clear-party">Değiştir</button>
+      </div>
+      <div class="party-list" id="party-list"{% if initial_party %} hidden{% endif %}></div>
+      <div class="pager" id="party-pager" hidden></div>
+      <p class="pager-meta" id="party-meta"{% if initial_party %} hidden{% endif %}></p>
+      {% endif %}
+    </section>
+
+    <section class="step-pane" data-step="2"{% if tech_mode %} hidden{% endif %}>
+      <p class="step-copy">Varsayılan tüm personel. İsterseniz bir kişiye atayın.</p>
+      <p class="field-label">Personel</p>
+      <div class="pick-chip" data-pick data-pick-empty="Eşleşen personel yok." data-pick-blank="Personel seç">
+        <button type="button" class="date-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="assignee-list">
+          <span data-pick-label{% if not assignee_id %} class="is-empty"{% endif %}>{% if assignee_name %}{{ assignee_name }}{% else %}Personel seç{% endif %}</span>
+        </button>
+        <input type="hidden" name="assignee_id" id="assignee_id" value="{{ assignee_id|default_if_none:'' }}" />
+        <div class="date-pop" id="assignee-list">
+          <div class="pick-search">
+            <span class="pick-search-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M16 16.5 20 20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </span>
+            <input type="search" data-pick-q placeholder="Personel ara" autocomplete="off" aria-autocomplete="list" aria-controls="assignee-opts" />
+          </div>
+          <div class="pick-list" data-pick-list role="listbox" aria-label="Görevli seç" id="assignee-opts">
+            <button type="button" class="pick-opt{% if assignee_id == 'all' %} is-on{% endif %}" role="option" data-pick-id="all" data-pick-label="Hepsi" data-pick-hay="Hepsi tüm personel"><span>Hepsi</span><small>Tüm personel</small></button>
+            {% for item in crew %}
+            <button type="button" class="pick-opt{% if assignee_id == item.pk %} is-on{% endif %}" role="option" data-pick-id="{{ item.pk }}" data-pick-label="{{ item.display_name }}" data-pick-hay="{{ item.display_name }} {{ item.number }} {{ item.title }}"><span>{{ item.display_name }}</span>{% if item.title %}<small>{{ item.title }}</small>{% endif %}</button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <p class="hint">Kaydetmek için personel seçin. Hepsi seçiliyse iş tüm sahaya düşer.</p>
+      <p class="field-label">Gün ve saat</p>
+      {% include 'portal/_service_cal.html' with cal_date_name='date' cal_date_value=job_date hours_optional=True %}
+    </section>
+
+    <section class="step-pane{% if tech_mode %} is-on{% endif %}" data-step="3">
+      {% if from_sale or tech_mode %}
+      <p class="step-copy">Satıştan gelen cihazlar.{% if warranty_missing %} Garanti girilmedi.{% endif %}</p>
+      {% include 'portal/_job_sold_units.html' %}
+      {% else %}
+      <p class="step-copy">Kayıtlı cihaz varsa seçin. İş seçmek zorunlu değil.</p>
+      <p class="field-label">Cihaz</p>
+      <div class="seg" id="device-mode-seg">
+        <label>
+          <input type="radio" name="device_mode" value="existing"{% if device_mode == 'existing' %} checked{% endif %} />
+          <span>Kayıtlı</span>
+        </label>
+        <label>
+          <input type="radio" name="device_mode" value="none"{% if device_mode == 'none' %} checked{% endif %} />
+          <span>Cihaz yok</span>
+        </label>
+      </div>
+      <input type="hidden" name="device_id" id="device_id" value="{{ initial_device_id }}" />
+      <div id="device-existing"{% if device_mode != 'existing' %} hidden{% endif %}>
+        <div class="picked" id="picked-device" hidden>
+          <div>
+            <b id="picked-device-name"></b>
+            <small id="picked-device-meta"></small>
+          </div>
+          <button class="btn is-ghost" type="button" id="clear-device">Değiştir</button>
+        </div>
+        <div class="party-list" id="device-list"></div>
+        <p class="pager-meta" id="device-meta"></p>
+      </div>
+      <p class="hint" id="device-none-copy"{% if device_mode != 'none' %} hidden{% endif %}>Bu işe cihaz bağlanmayacak.</p>
+
+      <p class="field-label">İş</p>
+      <div class="pick-chip" data-pick data-pick-empty="Eşleşen iş yok." data-pick-blank="İş seç">
+        <button type="button" class="date-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="work-list">
+          <span data-pick-label{% if not work_id %} class="is-empty"{% endif %}>{% if work_name %}{{ work_name }}{% else %}İş seç{% endif %}</span>
+        </button>
+        <input type="hidden" name="work_id" id="work_id" value="{{ work_id }}" />
+        <div class="date-pop" id="work-list">
+          <div class="pick-search">
+            <span class="pick-search-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M16 16.5 20 20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </span>
+            <input type="search" data-pick-q placeholder="İş ara" autocomplete="off" aria-autocomplete="list" aria-controls="work-opts" />
+          </div>
+          <div class="pick-list" data-pick-list role="listbox" aria-label="İş seç" id="work-opts">
+            <button type="button" class="pick-opt{% if not work_id %} is-on{% endif %}" role="option" data-pick-id="" data-pick-label="" data-pick-hay="Seçilmedi">Seçilmedi</button>
+            {% for item in work_choices %}
+            <button type="button" class="pick-opt{% if work_id == item.pk|stringformat:'s' %} is-on{% endif %}" role="option" data-pick-id="{{ item.pk }}" data-pick-label="{{ item.name }}" data-pick-hay="{{ item.name }} {{ item.sku }}"><span>{{ item.name }}</span><small>{{ item.sku }}</small></button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <p class="hint">Seçmezseniz iş yine kaydedilir.</p>
+      {% endif %}
+
+      <div class="group" style="margin-top:22px">
+        <div class="row">
+          <input id="id_notes" name="notes" placeholder=" " value="{{ notes }}" />
+          <label for="id_notes">İşlem notu</label>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <div class="wizard-nav">
+      <button class="btn is-ghost" type="button" id="prev-step" hidden>Geri</button>
+      <button class="btn" type="button" id="next-step"{% if tech_mode or office_close %} hidden{% endif %}{% if not office_close %} disabled{% endif %}>Devam</button>
+      {% if job and not tech_mode %}
+      <button class="btn is-ghost" type="submit" name="action" value="delete" id="delete-job" hidden>Sil</button>
+      {% endif %}
+      <button class="btn is-ghost" type="submit" name="action" value="save" id="save-job"{% if not tech_mode and not office_close %} hidden{% endif %}>Kaydet</button>
+      {% if not tech_mode %}
+      <button class="btn" type="submit" name="action" value="close" id="close-job"{% if not office_close %} hidden{% endif %}>
+        <span class="btn-label">Kapat</span>
+        <span class="btn-spin" aria-hidden="true"></span>
+      </button>
+      {% endif %}
+    </div>
+  </form>
+{% if office_close %}</div>{% endif %}
+
+  <div class="modal" id="job-ok-modal" hidden>
+    <div class="modal-card is-status">
+      <div class="modal-head">
+        <span class="fis-kicker">Servis</span>
+        <h2>İş kapatıldı</h2>
+        <p class="step-copy">Kapalı servis fişine yönlendiriliyorsunuz.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mount-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Klima Montaj Malzemesi</span>
+        <h2>Montaj</h2>
+        <p class="step-copy">Bu depodan kullanılan malzeme ve adet.</p>
+      </div>
+      <div class="modal-body">
+        <p class="flash is-err" id="mount-error" hidden role="alert"></p>
+        <div class="mount-table">
+          <div class="mount-head">
+            <span>Ürün veya stok kodu</span>
+            <span>Birim</span>
+            <span>Miktar</span>
+            <span></span>
+          </div>
+          <div id="mount-rows"></div>
+        </div>
+        <div class="line-actions">
+          <button class="btn is-ghost" type="button" id="mount-add">Malzeme ekle</button>
+        </div>
+      </div>
+      <div class="wizard-nav modal-foot">
+        <button class="btn is-ghost" type="button" id="close-mount">Vazgeç</button>
+        <button class="btn" type="button" id="save-mount">Tamam</button>
+      </div>
+    </div>
+  </div>
+
+  <template id="mount-row-tpl">
+    <div class="mount-row" data-mount-row>
+      <div class="prod-pick">
+        <input type="hidden" data-mount-product />
+        <input type="hidden" data-mount-label />
+        <input type="search" class="prod-q" placeholder="Ürün veya stok kodu" autocomplete="off" aria-label="Ürün veya stok kodu" />
+        <div class="prod-menu" hidden></div>
+      </div>
+      <input data-mount-unit readonly tabindex="-1" aria-label="Birim" />
+      <input data-mount-qty inputmode="decimal" aria-label="Miktar" />
+      <button class="icon-btn" type="button" data-remove aria-label="Kalemi sil">×</button>
+    </div>
+  </template>
+
+  {% include 'portal/_photo_modal.html' %}
+
+  {% if not from_sale %}{% include 'portal/_party_modal.html' %}{% endif %}
+
+  <template id="labor-tpl">
+    <div class="line-block">
+      <div class="line-row">
+        <div>
+          <input type="hidden" name="kind" value="labor" />
+          <input type="hidden" name="product_id" />
+          <input type="hidden" name="cost_price" value="0" />
+          <input name="description" placeholder="Demontaj, montaj, işçilik" data-upper autocomplete="off" />
+        </div>
+        <input name="qty" inputmode="decimal" value="1" required tabindex="-1" />
+        <input name="unit_price" inputmode="decimal" placeholder="0,00" />
+        <input name="vat_rate" inputmode="decimal" value="20" tabindex="-1" />
+        <span class="money" data-line-total>0,00 ₺</span>
+        <button class="icon-btn" type="button" data-remove aria-label="Kalemi sil" tabindex="-1">×</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="part-tpl">
+    <div class="line-block">
+      <div class="line-row">
+        <div class="prod-pick">
+          <input type="hidden" name="kind" value="part" />
+          <input type="hidden" name="cost_price" />
+          <input type="hidden" name="product_id" />
+          <input type="hidden" name="description" />
+          <input type="search" class="prod-q" placeholder="Ürün veya stok kodu" autocomplete="off" />
+          <div class="prod-menu" hidden></div>
+        </div>
+        <input name="qty" inputmode="decimal" value="1" required tabindex="-1" />
+        <input name="unit_price" inputmode="decimal" placeholder="0,00" />
+        <input name="vat_rate" inputmode="decimal" value="20" placeholder="%" tabindex="-1" />
+        <span class="money" data-line-total>0,00 ₺</span>
+        <button class="icon-btn" type="button" data-remove aria-label="Kalemi sil" tabindex="-1">×</button>
+      </div>
+    </div>
+  </template>
+
+  <div class="modal" id="product-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Depo</span>
+        <h2>Depoya ürün</h2>
+        <p class="step-copy">Yeni stok kartı. Parça kalemine seçili gelir.</p>
+      </div>
+      <form id="product-modal-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="product" />
+        <div class="modal-body">
+          <div class="group">
+            <div class="row">
+              <input id="p_sku" name="sku" placeholder=" " readonly tabindex="-1" />
+              <label for="p_sku">Stok kodu</label>
+            </div>
+            <div class="row">
+              <input id="p_brand" name="brand" placeholder=" " data-title autocomplete="off" />
+              <label for="p_brand">Marka</label>
+            </div>
+            <div class="row">
+              <input id="p_name" name="name" placeholder=" " required data-upper autocomplete="off" />
+              <label for="p_name">Ürün adı</label>
+            </div>
+            <div class="row">
+              <input id="p_unit" name="unit" placeholder=" " value="ADET" data-upper autocomplete="off" />
+              <label for="p_unit">Birim</label>
+            </div>
+            <div class="row">
+              <input id="p_buy_price" name="buy_price" inputmode="decimal" placeholder=" " autocomplete="off" />
+              <label for="p_buy_price">Alış fiyatı</label>
+            </div>
+            <div class="row">
+              <input id="p_sale_price" name="sale_price" inputmode="decimal" placeholder=" " autocomplete="off" />
+              <label for="p_sale_price">Satış fiyatı</label>
+            </div>
+            <div class="row">
+              <input id="p_vat_rate" name="vat_rate" value="20" placeholder=" " inputmode="decimal" />
+              <label for="p_vat_rate">KDV %</label>
+            </div>
+            <div class="row">
+              <input id="p_qty" name="qty" inputmode="decimal" placeholder=" " />
+              <label for="p_qty">Elde stok</label>
+            </div>
+          </div>
+        </div>
+        <p class="modal-alert" id="product-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-product">Vazgeç</button>
+          <button class="btn" type="submit" id="save-product">Ürünü kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {{ initial_party|json_script:"initial-party" }}
+  {{ devices|json_script:"initial-devices" }}
+  {{ initial_lines|json_script:"initial-lines" }}
+  {{ initial_device_id|json_script:"initial-device-id" }}
+  {{ service_load|json_script:"service-load" }}
+  {% include 'portal/_service_cal_script.html' %}
+
+  <script>
+    (function () {
+      var csrf = document.querySelector('#job-form [name=csrfmiddlewaretoken]').value;
+      var customersUrl = '{% url "portal-sales-customers" %}';
+      var stockUrl = '{% url "portal-stock" %}';
+      var devicesUrl = '{% url "portal-service-devices" %}';
+      var partyId = document.getElementById('party_id').value;
+      var partyPage = 1;
+      var partyQuery = '';
+      var partyPages = 1;
+      var partyCount = 0;
+      var searchTimer = 0;
+      var fetchCtl = null;
+      var pageCache = {};
+      var list = document.getElementById('party-list');
+      var pager = document.getElementById('party-pager');
+      var meta = document.getElementById('party-meta');
+      var picked = document.getElementById('picked-party');
+      var tools = document.getElementById('party-tools');
+      var lines = document.getElementById('job-lines');
+      var fromSale = {% if from_sale %}true{% else %}false{% endif %};
+      var techMode = {% if tech_mode %}true{% else %}false{% endif %};
+      var officeClose = {% if office_close %}true{% else %}false{% endif %};
+      var productRow = null;
+      var nextSku = '';
+      var step = 1;
+      var panes = document.querySelectorAll('.step-pane');
+      var tabs = document.querySelectorAll('.steps button');
+      var deviceRows = [];
+      var deviceId = document.getElementById('device_id') ? document.getElementById('device_id').value : '';
+
+      function money(n) {
+        return (Math.round(n * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
+      }
+      function parseMoney(raw) {
+        var text = String(raw || '').trim().replace(/\s/g, '');
+        if (!text) return 0;
+        if (text.indexOf(',') >= 0) return parseFloat(text.replace(/\./g, '').replace(',', '.')) || 0;
+        return parseFloat(text) || 0;
+      }
+      function formatMoneyNumber(n) {
+        if (!isFinite(n)) return '';
+        return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      function moneyOrBlank(raw) {
+        var n = parseFloat(raw);
+        if (!isFinite(n) || n === 0) return '';
+        return formatMoneyNumber(n);
+      }
+      function vatMode() {
+        var el = document.querySelector('input[name=vat_mode]:checked');
+        return el ? el.value : 'none';
+      }
+      function vatRateForMode() {
+        return vatMode() === 'none' ? '0' : '20';
+      }
+      function applyVatRates() {
+        if (!lines) return;
+        var rate = vatRateForMode();
+        lines.querySelectorAll('[name=vat_rate]').forEach(function (el) {
+          el.value = rate;
+        });
+      }
+      function assigneeId() {
+        var el = document.getElementById('assignee_id');
+        return el ? String(el.value || '').trim() : '';
+      }
+      function readJson(id) {
+        var el = document.getElementById(id);
+        if (!el) return null;
+        try { return JSON.parse(el.textContent); } catch (err) { return null; }
+      }
+      function lineSum() {
+        if (!lines) return;
+        var grand = 0, cost = 0, net = 0, vat = 0;
+        var sumCost = document.getElementById('sum-cost');
+        var sumGrand = document.getElementById('sum-grand');
+        var sumProfit = document.getElementById('sum-profit');
+        var sumNet = document.getElementById('sum-net');
+        var sumVat = document.getElementById('sum-vat');
+        var sumSale = document.getElementById('sum-sale');
+        lines.querySelectorAll('.line-row').forEach(function (row) {
+          var qty = parseFloat(String(row.querySelector('[name=qty]').value).replace(',', '.')) || 0;
+          var price = parseMoney(row.querySelector('[name=unit_price]').value);
+          var rate = parseFloat(String(row.querySelector('[name=vat_rate]').value).replace(',', '.')) || 0;
+          var base = qty * price;
+          var n, v, t;
+          if (vatMode() === 'none') {
+            n = base;
+            v = 0;
+            t = base;
+          } else if (vatMode() === 'included') {
+            t = base;
+            n = t / (1 + rate / 100);
+            v = t - n;
+          } else {
+            n = base;
+            v = n * rate / 100;
+            t = n + v;
+          }
+          net += n;
+          vat += v;
+          grand += t;
+          var costBase = qty * parseMoney(row.querySelector('[name=cost_price]').value);
+          if (vatMode() === 'included' && rate) costBase = costBase * (1 + rate / 100);
+          cost += costBase;
+          row.querySelector('[data-line-total]').textContent = money(t);
+        });
+        if (sumNet) sumNet.textContent = money(net);
+        if (sumVat) sumVat.textContent = money(vat);
+        if (sumGrand) sumGrand.textContent = money(grand);
+        if (sumSale) sumSale.textContent = money(grand);
+        if (sumCost) sumCost.textContent = money(cost);
+        if (sumProfit) sumProfit.textContent = money(grand - cost);
+      }
+      function bindMoney(el) {
+        if (!el) return;
+        el.addEventListener('blur', function () {
+          var n = parseMoney(el.value);
+          if (el.value.trim()) el.value = formatMoneyNumber(n);
+          lineSum();
+        });
+        el.addEventListener('input', lineSum);
+      }
+      function priceInputs() {
+        if (!lines) return [];
+        return Array.prototype.slice.call(lines.querySelectorAll('[name=unit_price]'));
+      }
+      function bindPriceTab(el) {
+        if (!el) return;
+        el.addEventListener('focus', function () {
+          window.requestAnimationFrame(function () { el.select(); });
+        });
+        el.addEventListener('keydown', function (event) {
+          if (event.key !== 'Tab') return;
+          var list = priceInputs();
+          var index = list.indexOf(el);
+          if (index < 0) return;
+          var next = event.shiftKey ? list[index - 1] : list[index + 1];
+          if (!next) return;
+          event.preventDefault();
+          next.focus();
+        });
+      }
+      function prettyDeviceDate(iso) {
+        var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return '';
+        var shorts = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+        return Number(m[3]) + ' ' + shorts[Number(m[2]) - 1] + ' ' + m[1];
+      }
+      function deviceMeta(d) {
+        var bits = [];
+        if (d.source) bits.push(d.source);
+        if (d.place) bits.push(d.place);
+        if (d.serial) bits.push(d.serial);
+        if (d.next_due) bits.push('sonraki ' + prettyDeviceDate(d.next_due));
+        else if (d.last_serviced_on) bits.push('son ' + prettyDeviceDate(d.last_serviced_on));
+        return bits.join(' · ');
+      }
+      function deviceMode() {
+        var el = document.querySelector('input[name=device_mode]:checked') || document.querySelector('input[name=device_mode]');
+        return el ? el.value : 'none';
+      }
+      function hidePickedDevice() {
+        var pickedDev = document.getElementById('picked-device');
+        var listEl = document.getElementById('device-list');
+        var metaEl = document.getElementById('device-meta');
+        if (pickedDev) pickedDev.hidden = true;
+        if (listEl) listEl.hidden = false;
+        if (metaEl) metaEl.hidden = false;
+      }
+      function selectDevice(d) {
+        if (!d) return;
+        deviceId = String(d.id);
+        var hid = document.getElementById('device_id');
+        if (hid) hid.value = deviceId;
+        var nameEl = document.getElementById('picked-device-name');
+        var metaLine = document.getElementById('picked-device-meta');
+        if (nameEl) nameEl.textContent = d.name;
+        if (metaLine) metaLine.textContent = deviceMeta(d) || (d.interval_label || '');
+        var pickedDev = document.getElementById('picked-device');
+        var listEl = document.getElementById('device-list');
+        var metaEl = document.getElementById('device-meta');
+        if (pickedDev) pickedDev.hidden = false;
+        if (listEl) listEl.hidden = true;
+        if (metaEl) metaEl.hidden = true;
+      }
+      function paintDeviceList(rows, selected) {
+        var listEl = document.getElementById('device-list');
+        var metaEl = document.getElementById('device-meta');
+        if (!listEl) return;
+        deviceRows = rows || [];
+        var current = selected || deviceId || '';
+        listEl.innerHTML = '';
+        deviceRows.forEach(function (d) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'party-card' + (String(d.id) === String(current) ? ' is-on' : '');
+          btn.innerHTML = '<div><b></b><small></small></div><span class="pill"></span>';
+          btn.querySelector('b').textContent = d.name;
+          btn.querySelector('small').textContent = deviceMeta(d);
+          btn.querySelector('.pill').textContent = d.interval_label || '';
+          btn.addEventListener('click', function () { selectDevice(d); });
+          listEl.appendChild(btn);
+        });
+        if (!deviceRows.length) {
+          var empty = document.createElement('p');
+          empty.className = 'empty';
+          empty.textContent = partyId ? 'Bu müşteride kayıtlı cihaz yok.' : 'Önce müşteri seçin.';
+          listEl.appendChild(empty);
+        }
+        if (metaEl) metaEl.textContent = deviceRows.length ? (deviceRows.length + ' cihaz') : '';
+        var match = deviceRows.filter(function (d) { return String(d.id) === String(current); })[0];
+        if (match) selectDevice(match);
+        else hidePickedDevice();
+      }
+      function setDeviceMode(mode, selected) {
+        document.querySelectorAll('input[name=device_mode]').forEach(function (el) {
+          el.checked = el.value === mode;
+        });
+        var existing = document.getElementById('device-existing');
+        var noneCopy = document.getElementById('device-none-copy');
+        if (existing) existing.hidden = mode !== 'existing';
+        if (noneCopy) noneCopy.hidden = mode !== 'none';
+        if (mode !== 'existing') {
+          var hid = document.getElementById('device_id');
+          if (hid) hid.value = '';
+          deviceId = '';
+          hidePickedDevice();
+          return;
+        }
+        paintDeviceList(deviceRows, selected || '');
+      }
+      function loadDevices(id, selected) {
+        if (!id) {
+          paintDeviceList([], '');
+          setDeviceMode('none');
+          return;
+        }
+        fetch(devicesUrl + '?party=' + encodeURIComponent(id), {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        }).then(function (r) { return r.json(); })
+          .then(function (data) {
+            var rows = (data && data.ok) ? (data.results || []) : [];
+            paintDeviceList(rows, selected);
+            if (selected && rows.some(function (d) { return String(d.id) === String(selected); })) {
+              setDeviceMode('existing', selected);
+            } else {
+              setDeviceMode(rows.length ? 'existing' : 'none');
+            }
+          }).catch(function () {});
+      }
+      function syncContinue() {
+        var next = document.getElementById('next-step');
+        var hasAssignee = Boolean(assigneeId());
+        if (next) next.disabled = !partyId || (step === 2 && !hasAssignee);
+        tabs.forEach(function (tab, i) {
+          if (i === 1) tab.disabled = !partyId;
+          if (i > 1) tab.disabled = !partyId || !hasAssignee;
+        });
+      }
+      function showStep(n) {
+        var prev = document.getElementById('prev-step');
+        var next = document.getElementById('next-step');
+        var saveBtn = document.getElementById('save-job');
+        var closeBtn = document.getElementById('close-job');
+        var deleteBtn = document.getElementById('delete-job');
+        if (officeClose) {
+          step = 3;
+          if (prev) prev.hidden = true;
+          if (next) next.hidden = true;
+          if (saveBtn) saveBtn.hidden = false;
+          if (closeBtn) closeBtn.hidden = false;
+          if (deleteBtn) deleteBtn.hidden = true;
+          lineSum();
+          return;
+        }
+        step = n;
+        panes.forEach(function (pane) {
+          pane.classList.toggle('is-on', Number(pane.getAttribute('data-step')) === n);
+        });
+        tabs.forEach(function (tab, i) {
+          tab.classList.toggle('is-on', i === n - 1);
+          tab.classList.toggle('is-done', i < n - 1);
+        });
+        if (prev) prev.hidden = techMode || n === 1;
+        if (next) next.hidden = techMode || n === 3;
+        if (saveBtn) saveBtn.hidden = n !== 3;
+        if (closeBtn) closeBtn.hidden = true;
+        if (deleteBtn) deleteBtn.hidden = techMode || n !== 3;
+        syncContinue();
+        if (n === 2) {
+          var cal = document.querySelector('[data-service-cal]');
+          if (cal && cal.refreshServiceCal) cal.refreshServiceCal();
+        }
+        if (n === 3) lineSum();
+      }
+      function selectParty(p) {
+        if (fromSale) return;
+        partyId = String(p.id);
+        document.getElementById('party_id').value = partyId;
+        document.getElementById('picked-name').textContent = p.name;
+        document.getElementById('picked-meta').textContent = (p.kind_label || '') + ' · ' + (p.phone || '');
+        if (picked) picked.hidden = false;
+        if (list) list.hidden = true;
+        if (pager) pager.hidden = true;
+        if (meta) meta.hidden = true;
+        if (tools) tools.hidden = true;
+        loadDevices(partyId);
+        syncContinue();
+      }
+      window.onPartySaved = function (p) {
+        pageCache = {};
+        selectParty(p);
+      };
+      function showSkeletons() {
+        list.innerHTML = '';
+        for (var i = 0; i < 3; i += 1) {
+          var skel = document.createElement('div');
+          skel.className = 'party-card is-skel';
+          list.appendChild(skel);
+        }
+      }
+      function drawPager() {
+        pager.innerHTML = '';
+        if (partyPages <= 1) { pager.hidden = true; return; }
+        pager.hidden = false;
+        function addBtn(label, page, opts) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = label;
+          if (opts && opts.on) btn.className = 'is-on';
+          btn.disabled = Boolean(opts && opts.disabled);
+          btn.addEventListener('click', function () { loadParties(page, partyQuery); });
+          pager.appendChild(btn);
+        }
+        addBtn('‹', Math.max(1, partyPage - 1), { disabled: partyPage === 1 });
+        for (var i = 1; i <= partyPages; i += 1) addBtn(String(i), i, { on: i === partyPage });
+        addBtn('›', Math.min(partyPages, partyPage + 1), { disabled: partyPage === partyPages });
+      }
+      function paintParties(rows) {
+        list.innerHTML = '';
+        rows.forEach(function (p) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'party-card' + (String(p.id) === String(partyId) ? ' is-on' : '');
+          btn.innerHTML = '<div><b></b><small></small></div><span class="pill"></span>';
+          btn.querySelector('b').textContent = p.name;
+          btn.querySelector('small').textContent = [p.number, p.phone].filter(Boolean).join(' · ');
+          btn.querySelector('.pill').textContent = p.kind_label;
+          btn.addEventListener('click', function () { selectParty(p); });
+          list.appendChild(btn);
+        });
+        if (!rows.length) {
+          var empty = document.createElement('p');
+          empty.className = 'empty';
+          empty.textContent = partyQuery ? 'Eşleşen cari yok.' : 'Kayıtlı cari yok.';
+          list.appendChild(empty);
+        }
+        meta.textContent = partyCount ? (partyCount + ' cari') : '';
+        drawPager();
+      }
+      function loadParties(page, query) {
+        if (!list) return;
+        partyPage = page;
+        partyQuery = query || '';
+        if (fetchCtl) fetchCtl.abort();
+        fetchCtl = new AbortController();
+        list.classList.add('is-loading');
+        showSkeletons();
+        fetch(customersUrl + '?page=' + page + '&q=' + encodeURIComponent(partyQuery), {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          signal: fetchCtl.signal
+        }).then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!data || !data.ok) throw new Error('party');
+            partyPage = data.page || page;
+            partyPages = data.pages || 1;
+            partyCount = data.count || 0;
+            paintParties(data.results || []);
+            list.classList.remove('is-loading');
+          }).catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+            list.classList.remove('is-loading');
+            list.innerHTML = '<p class="empty">Müşteriler yüklenemedi.</p>';
+          });
+      }
+      var clearParty = document.getElementById('clear-party');
+      if (clearParty) {
+        clearParty.addEventListener('click', function () {
+          partyId = '';
+          document.getElementById('party_id').value = '';
+          if (picked) picked.hidden = true;
+          if (list) list.hidden = false;
+          if (meta) meta.hidden = false;
+          if (tools) tools.hidden = false;
+          paintDeviceList([], '');
+          setDeviceMode('none');
+          syncContinue();
+          var search = document.getElementById('party-search');
+          loadParties(partyPage, search ? search.value.trim() : '');
+        });
+      }
+      var partySearch = document.getElementById('party-search');
+      if (partySearch) {
+        partySearch.addEventListener('input', function (event) {
+          var value = event.target.value.trim();
+          window.clearTimeout(searchTimer);
+          searchTimer = window.setTimeout(function () { loadParties(1, value); }, 400);
+        });
+      }
+
+      function closeProdMenus(except) {
+        if (!lines) return;
+        lines.querySelectorAll('.prod-menu').forEach(function (menu) {
+          if (menu === except) return;
+          menu.hidden = true;
+          menu.innerHTML = '';
+        });
+      }
+      function applyProduct(row, p) {
+        if (!row || !p) return;
+        row.querySelector('[name=product_id]').value = p.id;
+        row.querySelector('.prod-q').value = p.label || p.name || '';
+        var desc = row.querySelector('[name=description]');
+        if (desc) desc.value = p.label || p.name || '';
+        row.querySelector('[name=unit_price]').value = moneyOrBlank(p.price);
+        row.querySelector('[name=cost_price]').value = formatMoneyNumber(parseFloat(p.buy) || 0);
+        row.querySelector('[name=vat_rate]').value = vatMode() === 'none' ? '0' : String(p.vat || '20');
+        lineSum();
+      }
+      function paintProdMenu(row, results, query) {
+        var menu = row.querySelector('.prod-menu');
+        menu.innerHTML = '';
+        (results || []).forEach(function (p) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'prod-opt';
+          btn.innerHTML = '<b></b><small></small>';
+          btn.querySelector('b').textContent = p.label || p.name;
+          btn.querySelector('small').textContent = (p.sku || '') + ' · ' + (p.stock || '0') + ' ' + (p.unit || 'adet');
+          btn.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+            applyProduct(row, p);
+            menu.hidden = true;
+            menu.innerHTML = '';
+          });
+          menu.appendChild(btn);
+        });
+        if (!results || !results.length) {
+          var empty = document.createElement('p');
+          empty.className = 'prod-empty';
+          empty.textContent = query ? 'Depoda eşleşen ürün yok.' : 'Depoda ürün yok.';
+          menu.appendChild(empty);
+        }
+        var add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'prod-add';
+        add.textContent = 'Depoya ürün ekle';
+        add.addEventListener('mousedown', function (event) {
+          event.preventDefault();
+          menu.hidden = true;
+          openProductModal(row, query);
+        });
+        menu.appendChild(add);
+        menu.hidden = false;
+      }
+      function searchProducts(row, query) {
+        if (row._prodCtl) row._prodCtl.abort();
+        row._prodCtl = new AbortController();
+        fetch(stockUrl + '?q=' + encodeURIComponent(query) + '&page=1', {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          signal: row._prodCtl.signal
+        }).then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (data && data.ok) {
+              if (data.next_sku) nextSku = String(data.next_sku);
+              paintProdMenu(row, data.results || [], query);
+            }
+          }).catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+          });
+      }
+      function bindProductPick(row) {
+        var hid = row.querySelector('[name=product_id]');
+        var q = row.querySelector('.prod-q');
+        var menu = row.querySelector('.prod-menu');
+        q.addEventListener('focus', function () {
+          closeProdMenus(menu);
+          searchProducts(row, q.value.trim());
+        });
+        q.addEventListener('input', function () {
+          hid.value = '';
+          window.clearTimeout(row._prodTimer);
+          row._prodTimer = window.setTimeout(function () { searchProducts(row, q.value.trim()); }, 400);
+        });
+      }
+      document.addEventListener('mousedown', function (event) {
+        if (event.target && event.target.closest && event.target.closest('.prod-pick')) return;
+        closeProdMenus();
+      });
+      function bindLine(row) {
+        if (row.querySelector('.prod-q')) bindProductPick(row);
+        bindMoney(row.querySelector('[name=unit_price]'));
+        bindPriceTab(row.querySelector('[name=unit_price]'));
+        row.querySelectorAll('input[name=qty], input[name=vat_rate]').forEach(function (el) {
+          el.addEventListener('input', lineSum);
+        });
+        row.querySelector('[data-remove]').addEventListener('click', function () {
+          var block = row.closest('.line-block') || row;
+          block.remove();
+          lineSum();
+        });
+      }
+      function addLine(kind, data) {
+        if (!lines) return null;
+        var tpl = document.getElementById(kind === 'part' ? 'part-tpl' : 'labor-tpl');
+        var node = tpl.content.cloneNode(true);
+        lines.appendChild(node);
+        var row = lines.lastElementChild.querySelector('.line-row');
+        bindLine(row);
+        row.querySelector('[name=vat_rate]').value = vatRateForMode();
+        if (data) {
+          row.querySelector('[name=qty]').value = data.qty || '1';
+          row.querySelector('[name=unit_price]').value = moneyOrBlank(data.unit_price);
+          row.querySelector('[name=cost_price]').value = formatMoneyNumber(parseFloat(data.cost_price) || 0);
+          row.querySelector('[name=product_id]').value = data.product_id || '';
+          if (kind === 'labor') {
+            row.querySelector('[name=description]').value = data.description || '';
+          } else {
+            row.querySelector('.prod-q').value = data.product_name || data.description || '';
+            var desc = row.querySelector('[name=description]');
+            if (desc) desc.value = data.description || data.product_name || '';
+          }
+        }
+        lineSum();
+        return row;
+      }
+      var addLabor = document.getElementById('add-labor');
+      var addPart = document.getElementById('add-part');
+      if (addLabor) addLabor.addEventListener('click', function () { addLine('labor'); });
+      if (addPart) addPart.addEventListener('click', function () { addLine('part'); });
+      document.querySelectorAll('input[name=vat_mode]').forEach(function (el) {
+        el.addEventListener('change', function () {
+          applyVatRates();
+          lineSum();
+        });
+      });
+
+      var productModal = document.getElementById('product-modal');
+      function openProductModal(row, seed) {
+        productRow = row;
+        var form = document.getElementById('product-modal-form');
+        form.reset();
+        document.getElementById('product-error').hidden = true;
+        if (seed) document.getElementById('p_name').value = String(seed).replace(/i/g, 'İ').replace(/ı/g, 'I').toUpperCase();
+        if (nextSku) document.getElementById('p_sku').value = nextSku;
+        productModal.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { productModal.classList.add('is-on'); });
+        });
+      }
+      function closeProductModal() {
+        productModal.classList.remove('is-on');
+        productModal.hidden = true;
+        productRow = null;
+      }
+      document.getElementById('close-product').addEventListener('click', closeProductModal);
+      productModal.addEventListener('click', function (event) {
+        if (event.target === productModal) closeProductModal();
+      });
+      document.getElementById('product-modal-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        var err = document.getElementById('product-error');
+        if (!document.getElementById('p_name').value.trim()) {
+          err.textContent = 'Ürün adı zorunlu.';
+          err.hidden = false;
+          return;
+        }
+        fetch(stockUrl, {
+          method: 'POST',
+          body: new FormData(event.target),
+          headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json', 'X-CSRFToken': csrf },
+          credentials: 'same-origin'
+        }).then(function (r) { return r.json().then(function (data) { return { ok: r.ok && data.ok, data: data }; }); })
+          .then(function (result) {
+            if (!result.ok) {
+              err.textContent = (result.data && result.data.error) || 'Ürün kaydedilemedi.';
+              err.hidden = false;
+              return;
+            }
+            if (result.data.next_sku) nextSku = String(result.data.next_sku);
+            applyProduct(productRow, result.data);
+            closeProductModal();
+            if (window.takePortalToast) window.takePortalToast(result.data);
+          }).catch(function () {
+            err.textContent = 'Bağlantı kurulamadı.';
+            err.hidden = false;
+          });
+      });
+
+      var del = document.getElementById('delete-job');
+      if (del) {
+        del.addEventListener('click', function (event) {
+          if (!window.confirm('Açık iş silinecek. Onaylıyor musun?')) event.preventDefault();
+        });
+      }
+      document.getElementById('job-form').addEventListener('submit', function (event) {
+        var action = (event.submitter && event.submitter.value) || '';
+        if (action === 'delete') return;
+        if (!document.getElementById('party_id').value) {
+          event.preventDefault();
+          showStep(1);
+          alert('Müşteri seçin.');
+          return;
+        }
+        var dateEl = document.getElementById('service_date');
+        if (dateEl && !dateEl.value) {
+          event.preventDefault();
+          showStep(2);
+          alert('Servis günü seçin.');
+          return;
+        }
+        if (!assigneeId()) {
+          event.preventDefault();
+          showStep(2);
+          alert('Personel seçin.');
+          return;
+        }
+        if (!fromSale && deviceMode() === 'existing') {
+          var hid = document.getElementById('device_id');
+          if (!hid || !hid.value) {
+            event.preventDefault();
+            showStep(3);
+            alert('Kayıtlı cihaz seçin.');
+          }
+        }
+      });
+
+      document.querySelectorAll('input[name=device_mode]').forEach(function (el) {
+        el.addEventListener('change', function () { setDeviceMode(el.value); });
+      });
+      var clearDevice = document.getElementById('clear-device');
+      if (clearDevice) {
+        clearDevice.addEventListener('click', function () {
+          deviceId = '';
+          var hid = document.getElementById('device_id');
+          if (hid) hid.value = '';
+          hidePickedDevice();
+          paintDeviceList(deviceRows, '');
+        });
+      }
+      var nextStep = document.getElementById('next-step');
+      var prevStep = document.getElementById('prev-step');
+      if (nextStep) {
+        nextStep.addEventListener('click', function () {
+          if (step === 1 && !partyId) {
+            alert('Devam etmek için bir cari seçin veya yeni cari ekleyin.');
+            return;
+          }
+          if (step === 2) {
+            if (!assigneeId()) {
+              alert('Personel seçin.');
+              return;
+            }
+            var dateEl = document.getElementById('service_date');
+            if (dateEl && !dateEl.value) {
+              alert('Servis günü seçin.');
+              return;
+            }
+          }
+          showStep(step + 1);
+        });
+      }
+      if (prevStep) {
+        prevStep.addEventListener('click', function () {
+          showStep(Math.max(1, step - 1));
+        });
+      }
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          var n = Number(tab.getAttribute('data-go'));
+          if (n > 1 && !partyId) return;
+          if (n > 2 && !assigneeId()) return;
+          showStep(n);
+        });
+      });
+
+      var initialParty = readJson('initial-party');
+      var initialDevices = readJson('initial-devices') || [];
+      var initialLines = readJson('initial-lines') || [];
+      var initialDeviceId = readJson('initial-device-id') || '';
+      if (!fromSale) paintDeviceList(initialDevices, initialDeviceId);
+      if (initialParty && initialParty.id) {
+        partyId = String(initialParty.id);
+      } else if (!fromSale) {
+        loadParties(1, '');
+      }
+      if (!techMode && lines) {
+        if (initialLines.length) {
+          initialLines.forEach(function (row) { addLine(row.kind === 'part' ? 'part' : 'labor', row); });
+        }
+        applyVatRates();
+        lineSum();
+      }
+      var assigneeEl = document.getElementById('assignee_id');
+      if (assigneeEl) assigneeEl.addEventListener('change', syncContinue);
+      showStep(techMode ? 3 : 1);
+      var photoModal = document.getElementById('photo-modal');
+      var photoStage = document.getElementById('photo-stage-img');
+      var photoTimer = 0;
+      function showPhoto(src) {
+        if (!photoModal || !photoStage || !src) return;
+        window.clearTimeout(photoTimer);
+        photoStage.src = src;
+        photoModal.hidden = false;
+        window.requestAnimationFrame(function () { photoModal.classList.add('is-on'); });
+      }
+      function hidePhoto() {
+        if (!photoModal) return;
+        photoModal.classList.remove('is-on');
+        photoTimer = window.setTimeout(function () {
+          photoModal.hidden = true;
+          if (photoStage) photoStage.src = '';
+        }, 280);
+      }
+      var closePhoto = document.getElementById('close-photo');
+      if (closePhoto) closePhoto.addEventListener('click', hidePhoto);
+      if (photoModal) {
+        photoModal.addEventListener('click', function (event) {
+          if (event.target === photoModal) hidePhoto();
+        });
+      }
+      function addMonths(iso, months) {
+        var parts = String(iso || '').split('-').map(Number);
+        if (parts.length < 3 || !parts[0]) return '';
+        var year = parts[0];
+        var monthIndex = parts[1] - 1 + Number(months || 0);
+        var day = parts[2];
+        year += Math.floor(monthIndex / 12);
+        monthIndex = ((monthIndex % 12) + 12) % 12;
+        var last = new Date(year, monthIndex + 1, 0).getDate();
+        day = Math.min(day, last);
+        function pad(n) { return n < 10 ? '0' + n : String(n); }
+        return year + '-' + pad(monthIndex + 1) + '-' + pad(day);
+      }
+      document.querySelectorAll('[data-care]').forEach(function (row) {
+        var intervalEls = row.querySelectorAll('[data-care-interval]');
+        var last = row.querySelector('[data-care-last]');
+        var next = row.querySelector('[data-care-next]');
+        if (!intervalEls.length || !last || !next) return;
+        function intervalValue() {
+          var i, el;
+          for (i = 0; i < intervalEls.length; i += 1) {
+            el = intervalEls[i];
+            if (el.type === 'radio') {
+              if (el.checked) return el.value;
+            } else {
+              return el.value;
+            }
+          }
+          return '6';
+        }
+        function syncCare() {
+          next.value = last.value ? addMonths(last.value, intervalValue()) : '';
+        }
+        intervalEls.forEach(function (el) {
+          el.addEventListener('change', syncCare);
+        });
+        last.addEventListener('change', syncCare);
+        last.addEventListener('input', syncCare);
+      });
+      (function bindMount() {
+        var modal = document.getElementById('mount-modal');
+        var rowsEl = document.getElementById('mount-rows');
+        var tpl = document.getElementById('mount-row-tpl');
+        var errEl = document.getElementById('mount-error');
+        if (!modal || !rowsEl || !tpl) return;
+        var MOUNT_SLOTS = 5;
+        var activeRoot = null;
+        var mountTimer = 0;
+        function motionOff() {
+          return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        }
+        function digitsQty(raw) {
+          var text = String(raw || '').replace(/[^\d.,]/g, '').replace(',', '.');
+          var parts = text.split('.');
+          if (parts.length > 2) text = parts[0] + '.' + parts.slice(1).join('');
+          return text;
+        }
+        function formatQty(raw) {
+          var n = parseFloat(digitsQty(raw));
+          if (!isFinite(n)) return '1';
+          if (Math.abs(n - Math.round(n)) < 0.001) return String(Math.round(n));
+          return String(Math.round(n * 100) / 100).replace('.', ',');
+        }
+        function readItems(root) {
+          var pk = root.getAttribute('data-unit');
+          var box = root.querySelector('[data-mount-fields]');
+          if (!box) return [];
+          var products = box.querySelectorAll('[name="unit_mat_product_' + pk + '"]');
+          var qtys = box.querySelectorAll('[name="unit_mat_qty_' + pk + '"]');
+          var labels = box.querySelectorAll('[name="unit_mat_label_' + pk + '"]');
+          var units = box.querySelectorAll('[name="unit_mat_unit_' + pk + '"]');
+          var items = [];
+          products.forEach(function (el, index) {
+            if (!el.value) return;
+            items.push({
+              id: el.value,
+              qty: qtys[index] ? qtys[index].value : '1',
+              label: labels[index] ? labels[index].value : '',
+              unit: units[index] ? units[index].value : ''
+            });
+          });
+          return items;
+        }
+        function paintSheet(root, items) {
+          var list = root.querySelector('[data-mount-list]');
+          var box = root.querySelector('[data-mount-fields]');
+          var pk = root.getAttribute('data-unit');
+          if (!list || !box) return;
+          list.innerHTML = '';
+          box.innerHTML = '';
+          var present = document.createElement('input');
+          present.type = 'hidden';
+          present.name = 'unit_mat_present_' + pk;
+          present.value = '1';
+          box.appendChild(present);
+          if (!items.length) {
+            var empty = document.createElement('tr');
+            empty.setAttribute('data-mount-empty', '');
+            empty.innerHTML = '<td colspan="3">Malzeme girilmedi.</td>';
+            list.appendChild(empty);
+            return;
+          }
+          items.forEach(function (item) {
+            var row = document.createElement('tr');
+            var nameCell = document.createElement('td');
+            var unitCell = document.createElement('td');
+            var qtyCell = document.createElement('td');
+            nameCell.textContent = item.label || 'Ürün';
+            unitCell.textContent = item.unit || '';
+            qtyCell.textContent = formatQty(item.qty);
+            row.appendChild(nameCell);
+            row.appendChild(unitCell);
+            row.appendChild(qtyCell);
+            list.appendChild(row);
+            [['product', item.id], ['qty', item.qty], ['label', item.label || ''], ['unit', item.unit || '']].forEach(function (pair) {
+              var input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = 'unit_mat_' + pair[0] + '_' + pk;
+              input.value = pair[1];
+              box.appendChild(input);
+            });
+          });
+        }
+        function closeMountMenus(except) {
+          rowsEl.querySelectorAll('.prod-menu').forEach(function (menu) {
+            if (menu === except) return;
+            menu.hidden = true;
+            menu.innerHTML = '';
+          });
+        }
+        function applyMountProduct(row, p) {
+          row.querySelector('[data-mount-product]').value = p.id;
+          row.querySelector('[data-mount-label]').value = p.label || p.name || '';
+          row.querySelector('[data-mount-unit]').value = p.unit || '';
+          row.querySelector('.prod-q').value = p.label || p.name || '';
+        }
+        function takenMountIds(exceptRow) {
+          var taken = {};
+          rowsEl.querySelectorAll('[data-mount-row]').forEach(function (row) {
+            if (row === exceptRow) return;
+            var id = row.querySelector('[data-mount-product]').value;
+            if (id) taken[String(id)] = true;
+          });
+          return taken;
+        }
+        function paintMountMenu(row, results, query) {
+          var menu = row.querySelector('.prod-menu');
+          var taken = takenMountIds(row);
+          var list = (results || []).filter(function (p) {
+            return !taken[String(p.id)];
+          });
+          menu.innerHTML = '';
+          list.forEach(function (p) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'prod-opt';
+            btn.innerHTML = '<b></b><small></small>';
+            btn.querySelector('b').textContent = p.label || p.name;
+            btn.querySelector('small').textContent = (p.sku || '') + ' · ' + (p.stock || '0') + ' ' + (p.unit || 'adet');
+            btn.addEventListener('mousedown', function (event) {
+              event.preventDefault();
+              applyMountProduct(row, p);
+              menu.hidden = true;
+              menu.innerHTML = '';
+            });
+            menu.appendChild(btn);
+          });
+          if (!list.length) {
+            var empty = document.createElement('p');
+            empty.className = 'prod-empty';
+            empty.textContent = query ? 'Depoda eşleşen ürün yok.' : 'Depoda ürün yok.';
+            menu.appendChild(empty);
+          }
+          menu.hidden = false;
+        }
+        function searchMount(row, query) {
+          if (row._prodCtl) row._prodCtl.abort();
+          row._prodCtl = new AbortController();
+          fetch(stockUrl + '?q=' + encodeURIComponent(query) + '&page=1&mount=1', {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+            signal: row._prodCtl.signal
+          }).then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data && data.ok) paintMountMenu(row, data.results || [], query);
+            }).catch(function (err) {
+              if (err && err.name === 'AbortError') return;
+            });
+        }
+        function bindMountRow(row) {
+          var hid = row.querySelector('[data-mount-product]');
+          var q = row.querySelector('.prod-q');
+          var menu = row.querySelector('.prod-menu');
+          var qty = row.querySelector('[data-mount-qty]');
+          function openMountSearch() {
+            closeMountMenus(menu);
+            searchMount(row, q.value.trim());
+          }
+          q.addEventListener('focus', openMountSearch);
+          q.addEventListener('click', function () {
+            if (menu.hidden) openMountSearch();
+          });
+          q.addEventListener('input', function () {
+            hid.value = '';
+            row.querySelector('[data-mount-unit]').value = '';
+            window.clearTimeout(row._prodTimer);
+            row._prodTimer = window.setTimeout(function () { searchMount(row, q.value.trim()); }, 400);
+          });
+          qty.addEventListener('input', function () {
+            var next = digitsQty(qty.value).replace('.', ',');
+            if (qty.value !== next) qty.value = next;
+          });
+          row.querySelector('[data-remove]').addEventListener('click', function () {
+            function drop() {
+              row.remove();
+              if (!rowsEl.querySelector('[data-mount-row]')) addMountRow();
+            }
+            if (motionOff() || row.classList.contains('is-enter')) {
+              drop();
+              return;
+            }
+            row.classList.add('is-enter');
+            row.addEventListener('transitionend', function done(event) {
+              if (event.propertyName && event.propertyName !== 'max-height') return;
+              row.removeEventListener('transitionend', done);
+              drop();
+            });
+          });
+        }
+        function addMountRow(data, animate) {
+          var node = tpl.content.cloneNode(true);
+          rowsEl.appendChild(node);
+          var row = rowsEl.lastElementChild;
+          bindMountRow(row);
+          if (data) {
+            row.querySelector('[data-mount-product]').value = data.id || '';
+            row.querySelector('[data-mount-label]').value = data.label || '';
+            row.querySelector('[data-mount-unit]').value = data.unit || '';
+            row.querySelector('.prod-q').value = data.label || '';
+            row.querySelector('[data-mount-qty]').value = formatQty(data.qty);
+          }
+          if (animate && !motionOff()) {
+            row.classList.add('is-enter');
+            window.requestAnimationFrame(function () {
+              window.requestAnimationFrame(function () { row.classList.remove('is-enter'); });
+            });
+          }
+          return row;
+        }
+        function fillMountRows(items) {
+          rowsEl.innerHTML = '';
+          (items || []).forEach(function (item) { addMountRow(item); });
+          while (rowsEl.querySelectorAll('[data-mount-row]').length < MOUNT_SLOTS) addMountRow();
+        }
+        function collectMountRows() {
+          var items = [];
+          var seen = {};
+          rowsEl.querySelectorAll('[data-mount-row]').forEach(function (row) {
+            var id = row.querySelector('[data-mount-product]').value;
+            if (!id) return;
+            var qty = digitsQty(row.querySelector('[data-mount-qty]').value);
+            if (!qty || !parseFloat(qty)) return;
+            if (seen[id]) {
+              seen[id].qty = String((parseFloat(String(seen[id].qty).replace(',', '.')) || 0) + (parseFloat(qty) || 0));
+              return;
+            }
+            var item = {
+              id: id,
+              qty: qty,
+              label: row.querySelector('[data-mount-label]').value,
+              unit: row.querySelector('[data-mount-unit]').value
+            };
+            seen[id] = item;
+            items.push(item);
+          });
+          return items;
+        }
+        function showMount(root) {
+          activeRoot = root;
+          if (errEl) {
+            errEl.hidden = true;
+            errEl.textContent = '';
+          }
+          fillMountRows(readItems(root));
+          modal.hidden = false;
+          window.clearTimeout(mountTimer);
+          window.requestAnimationFrame(function () { modal.classList.add('is-on'); });
+        }
+        function hideMount() {
+          modal.classList.remove('is-on');
+          mountTimer = window.setTimeout(function () {
+            modal.hidden = true;
+            rowsEl.innerHTML = '';
+            activeRoot = null;
+          }, 280);
+        }
+        document.querySelectorAll('[data-mount-open]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var root = btn.closest('[data-mount]');
+            if (root) showMount(root);
+          });
+        });
+        var addBtn = document.getElementById('mount-add');
+        if (addBtn) addBtn.addEventListener('click', function () { addMountRow(null, true); });
+        var closeBtn = document.getElementById('close-mount');
+        if (closeBtn) closeBtn.addEventListener('click', hideMount);
+        var saveBtn = document.getElementById('save-mount');
+        if (saveBtn) {
+          saveBtn.addEventListener('click', function () {
+            if (!activeRoot) return;
+            var incomplete = false;
+            rowsEl.querySelectorAll('[data-mount-row]').forEach(function (row) {
+              var q = row.querySelector('.prod-q').value.trim();
+              var id = row.querySelector('[data-mount-product]').value;
+              var qty = digitsQty(row.querySelector('[data-mount-qty]').value);
+              if (q && !id) incomplete = 'Listeden ürün seçin.';
+              else if (id && !parseFloat(qty)) incomplete = 'Miktar rakam olmalı.';
+            });
+            if (incomplete) {
+              if (errEl) {
+                errEl.textContent = incomplete;
+                errEl.hidden = false;
+              }
+              return;
+            }
+            paintSheet(activeRoot, collectMountRows());
+            hideMount();
+            if (window.portalToast) window.portalToast('Malzeme eklendi.');
+          });
+        }
+        modal.addEventListener('click', function (event) {
+          if (event.target === modal) hideMount();
+        });
+        modal.addEventListener('mousedown', function (event) {
+          if (event.target && event.target.closest && event.target.closest('.prod-pick')) return;
+          closeMountMenus();
+        });
+        document.addEventListener('keydown', function (event) {
+          if (event.key !== 'Escape' || modal.hidden) return;
+          if (!rowsEl.querySelector('.prod-menu:not([hidden])')) return;
+          event.preventDefault();
+          closeMountMenus();
+        });
+      })();
+      (function bindCloseJob() {
+        var form = document.getElementById('job-form');
+        var closeBtn = document.getElementById('close-job');
+        var saveBtn = document.getElementById('save-job');
+        var deleteBtn = document.getElementById('delete-job');
+        var okModal = document.getElementById('job-ok-modal');
+        var flash = document.getElementById('job-error');
+        if (!form || !closeBtn || !okModal) return;
+        function setBusy(on) {
+          closeBtn.classList.toggle('is-busy', on);
+          closeBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+          if (saveBtn) saveBtn.disabled = !!on;
+          if (deleteBtn) deleteBtn.disabled = !!on;
+        }
+        function showError(text) {
+          if (!flash) return;
+          flash.textContent = text || '';
+          flash.hidden = !text;
+        }
+        function openOk() {
+          okModal.hidden = false;
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { okModal.classList.add('is-on'); });
+          });
+        }
+        form.addEventListener('submit', function (event) {
+          var submitter = event.submitter;
+          if (!submitter || submitter.getAttribute('value') !== 'close') return;
+          event.preventDefault();
+          if (closeBtn.classList.contains('is-busy')) return;
+          showError('');
+          var missingPrice = Array.prototype.some.call(form.querySelectorAll('#job-lines [name=unit_price]'), function (el) {
+            return !String(el.value || '').trim();
+          });
+          if (missingPrice) {
+            showError('Her kaleme satış fiyatı girin.');
+            return;
+          }
+          setBusy(true);
+          var mountModal = document.getElementById('mount-modal');
+          var saveMount = document.getElementById('save-mount');
+          if (mountModal && !mountModal.hidden && saveMount) saveMount.click();
+          var body = new FormData(form);
+          body.set('action', 'close');
+          var csrf = (form.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+          var started = Date.now();
+          var postUrl = form.getAttribute('action') || location.pathname;
+          fetch(postUrl, {
+            method: 'POST',
+            body: body,
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              Accept: 'application/json',
+              'X-CSRFToken': csrf
+            },
+            credentials: 'same-origin'
+          }).then(function (response) {
+            return response.json().then(function (data) {
+              return { ok: response.ok && data.ok, data: data };
+            }).catch(function () {
+              return { ok: false, data: { error: 'İş kapatılamadı.' } };
+            });
+          }).then(function (result) {
+            if (!result.ok) {
+              setBusy(false);
+              showError((result.data && result.data.error) || 'İş kapatılamadı.');
+              return;
+            }
+            var wait = Math.max(0, 2000 - (Date.now() - started));
+            window.setTimeout(function () {
+              openOk();
+              window.setTimeout(function () {
+                window.location = result.data.url;
+              }, 2000);
+            }, wait);
+          }).catch(function () {
+            setBusy(false);
+            showError('Bağlantı kurulamadı.');
+          });
+        });
+      })();
+      document.querySelectorAll('[data-device-album]').forEach(function (root) {
+        var input = root.querySelector('[data-album-input]');
+        var add = root.querySelector('[data-album-add]');
+        var list = root.querySelector('[data-album-list]');
+        var pack = root.querySelector('[data-album-pack]');
+        if (!input || !add || !list) return;
+        var kept = parseInt(root.getAttribute('data-kept'), 10) || 0;
+        var picked = [];
+        function paint() {
+          list.querySelectorAll('[data-album-new]').forEach(function (node) { node.remove(); });
+          var empty = list.querySelector('[data-album-empty]');
+          if (empty) empty.hidden = kept > 0 || picked.length > 0;
+          picked.forEach(function (file) {
+            var img = document.createElement('img');
+            img.className = 'device-album-shot';
+            img.setAttribute('data-album-new', '');
+            img.alt = '';
+            img.src = URL.createObjectURL(file);
+            list.appendChild(img);
+          });
+          if (pack) pack.hidden = kept === 0;
+        }
+        function syncInput() {
+          if (!window.DataTransfer) return;
+          var transfer = new DataTransfer();
+          picked.forEach(function (file) { transfer.items.add(file); });
+          input.files = transfer.files;
+        }
+        add.addEventListener('click', function () { input.click(); });
+        input.addEventListener('change', function () {
+          Array.prototype.slice.call(input.files || []).forEach(function (file) { picked.push(file); });
+          syncInput();
+          paint();
+        });
+        list.addEventListener('click', function (event) {
+          var img = event.target.closest('.device-album-shot');
+          if (!img || !img.src) return;
+          showPhoto(img.src);
+        });
+        paint();
+      });
+    })();
+  </script>
+{% endblock %}

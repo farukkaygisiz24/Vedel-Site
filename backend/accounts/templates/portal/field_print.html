@@ -1,0 +1,42 @@
+{% extends 'portal/field_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ number }} fiş | Vedel Servis{% endblock %}
+
+{% block top %}
+  <a class="app-back" href="{{ job.get_field_url }}" aria-label="İşe dön">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M15 5.8 8 12l7 6.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+  <img src="{% url 'portal-logo' %}" alt="Vedel Klima" />
+{% endblock %}
+
+{% block content %}
+  <h1>Fiş</h1>
+  <p class="lead">{{ number }} · 72 mm iMZ320. Bluetooth bu ekrandan gitmez; CPCL indirilir.</p>
+  <article class="field-slip">
+    <p class="field-slip-brand">VEDEL KLİMA</p>
+    <p class="field-slip-no">{{ number }}</p>
+    <p>{{ when }}</p>
+    <hr />
+    <p class="field-slip-kicker">Personel</p>
+    <p><b>{{ worker|default:'—' }}</b></p>
+    <p class="field-slip-kicker">Müşteri</p>
+    <p><b>{{ customer|default:'—' }}</b></p>
+    {% if lines %}
+    <hr />
+    {% for item in lines %}
+    <p>{{ item.name }}</p>
+    <p class="field-slip-sum">{{ item.qty }} · {{ item.total }} ₺</p>
+    {% endfor %}
+    <p class="field-slip-total">Toplam {{ grand }} ₺</p>
+    {% endif %}
+    {% if notes %}
+    <hr />
+    <p>{{ notes }}</p>
+    {% endif %}
+  </article>
+  <div class="btn-row">
+    <a class="btn is-ghost" href="{% url 'portal-field-print' job.number %}?format=zpl" download="{{ number }}.zpl">ZPL indir</a>
+    <a class="btn" href="{% url 'portal-field-print' job.number %}?format=cpcl" download="{{ number }}.cpcl">CPCL indir</a>
+  </div>
+{% endblock %}

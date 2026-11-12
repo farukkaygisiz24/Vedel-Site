@@ -1,0 +1,18 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Satış | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Satış</h1>
+      <p class="lead">Satış fişleri, tahsilat ve fatura takibi.</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn is-ghost" href="{% url 'portal-sales-archive' %}">Arşiv</a>
+      <a class="btn is-ghost" href="{% url 'portal-sales-customers' %}">Müşteriler</a>
+      <a class="btn" href="{% url 'portal-sales-new' %}">Yeni satış</a>
+    </div>
+  </div>
+  {% include 'portal/_sale_sheet.html' %}
+{% endblock %}

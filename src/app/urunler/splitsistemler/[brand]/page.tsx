@@ -65,7 +65,7 @@ export async function generateMetadata({ params }: { params: Promise<{ brand: st
 
   const brandNames: Record<string, { title: string; desc: string }> = {
     mhi: { title: 'MHI Split Klimalar | Mitsubishi Heavy Industries', desc: 'Mitsubishi Heavy Industries split klimalar. Trend, Plus, Diamond serileri. A++ enerji sınıfı.' },
-    euroform: { title: 'Euroform Split Klimalar | Wing Serisi', desc: 'Euroform Wing serisi split klimalar. Yüksek enerji verimliliği ve modern tasarım.' }
+    euroform: { title: 'Euroform Split Klimalar', desc: 'Euroform duvar tipi split klimalar. Yüksek enerji verimliliği ve modern tasarım.' }
   }
 
   const info = brandNames[brandKey] || { title: 'Split Klimalar', desc: 'Split klima modelleri' }

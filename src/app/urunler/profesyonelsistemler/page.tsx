@@ -212,8 +212,8 @@ export default function ProfesyonelSistemlerPage() {
               </div>
 
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Türkiye&apos;nin yerli markası Euroform, uygun fiyatlı profesyonel sistemleri ile
-                işletmelerinizde ekonomik ve güvenilir iklimlendirme sağlar.
+                Euroform, uygun fiyatlı profesyonel sistemleri ile işletmelerinizde
+                ekonomik ve güvenilir iklimlendirme sağlar.
               </p>
 
               <div className="space-y-3 mb-6">
@@ -221,7 +221,7 @@ export default function ProfesyonelSistemlerPage() {
                   <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center">
                     <Zap className="w-4 h-4 text-green-600" />
                   </div>
-                  <span>Türkiye&apos;nin yerli markası</span>
+                  <span>Ekonomik seçim</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-600">
                   <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">

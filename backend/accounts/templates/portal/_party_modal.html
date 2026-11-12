@@ -1,0 +1,563 @@
+<div class="modal" id="party-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <span class="fis-kicker">Müşteri</span>
+      <h2 id="party-modal-title">Yeni müşteri</h2>
+      <p class="step-copy" id="party-modal-copy">Gerçek kişi veya tüzel kişi kaydı.</p>
+    </div>
+    <form id="party-modal-form" method="post" action="{% url 'portal-sales-customers' %}" novalidate>
+      {% csrf_token %}
+      <div class="modal-seg">
+        <div class="seg">
+          <label><input type="radio" name="kind" value="real" checked /><span>Gerçek kişi</span></label>
+          <label><input type="radio" name="kind" value="legal" /><span>Tüzel kişi</span></label>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="kind-stage">
+          <div class="group kind-pane is-on" data-kind="real">
+            <div class="row">
+              <input id="m_first_name" name="first_name" placeholder=" " required data-upper autocomplete="off" />
+              <label for="m_first_name">Ad</label>
+            </div>
+            <div class="row">
+              <input id="m_last_name" name="last_name" placeholder=" " required data-upper autocomplete="off" />
+              <label for="m_last_name">Soyad</label>
+            </div>
+            <div class="row is-wide">
+              <input id="m_national_id" name="national_id" placeholder=" " inputmode="numeric" maxlength="11" data-digits="11" autocomplete="off" />
+              <label for="m_national_id">T.C. kimlik no</label>
+            </div>
+          </div>
+          <div class="group kind-pane" data-kind="legal">
+            <div class="row is-wide">
+              <input id="m_company_name" name="company_name" placeholder=" " required data-upper autocomplete="off" />
+              <label for="m_company_name">Unvan</label>
+            </div>
+            <div class="row">
+              <input id="m_tax_office" name="tax_office" placeholder=" " data-upper autocomplete="off" />
+              <label for="m_tax_office">Vergi dairesi</label>
+            </div>
+            <div class="row">
+              <input id="m_tax_no" name="tax_no" placeholder=" " inputmode="numeric" maxlength="11" data-digits="11" autocomplete="off" />
+              <label for="m_tax_no">Vergi kimlik no</label>
+            </div>
+            <div class="row">
+              <input id="m_contact_first" name="first_name" placeholder=" " required data-upper autocomplete="off" />
+              <label for="m_contact_first">Yetkili adı</label>
+            </div>
+            <div class="row">
+              <input id="m_contact_last" name="last_name" placeholder=" " required data-upper autocomplete="off" />
+              <label for="m_contact_last">Yetkili soyadı</label>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <div class="row">
+            <input id="m_phone" name="phone" placeholder=" " inputmode="tel" maxlength="17" data-phone required autocomplete="tel" />
+            <label for="m_phone">Telefon</label>
+          </div>
+          <div class="row">
+            <input id="m_email" name="email" type="email" placeholder=" " data-upper autocomplete="email" />
+            <label for="m_email">E-posta</label>
+          </div>
+        </div>
+        <div class="fold" data-fold>
+          <button class="fold-toggle" type="button" aria-expanded="false">2. ulaşım</button>
+          <div class="fold-body" hidden>
+            <div class="group">
+              <div class="row">
+                <input id="m_contact2_name" name="contact2_name" placeholder=" " data-upper autocomplete="off" />
+                <label for="m_contact2_name">Ad soyad</label>
+              </div>
+              <div class="row">
+                <input id="m_phone2" name="phone2" placeholder=" " inputmode="tel" maxlength="17" data-phone autocomplete="tel" />
+                <label for="m_phone2">Telefon</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          {% include 'portal/_city_district_picks.html' with city_id='m_city' district_id='m_district' %}
+          <div class="row is-wide">
+            <input id="m_address" name="address" placeholder=" " required data-upper autocomplete="off" />
+            <label for="m_address">Adres</label>
+          </div>
+          <div class="row is-wide">
+            <input id="m_party_notes" name="party_notes" placeholder=" " data-upper autocomplete="off" />
+            <label for="m_party_notes">Müşteri notu</label>
+          </div>
+        </div>
+      </div>
+      <p class="modal-alert" id="modal-error" hidden role="alert"></p>
+      <div class="wizard-nav modal-foot">
+        <button class="btn is-ghost" type="button" id="close-party">Vazgeç</button>
+        <button class="btn" type="submit" id="save-party">
+          <span class="btn-label">Müşteriyi kaydet</span>
+          <span class="btn-spin" aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if edit_party_payload %}{{ edit_party_payload|json_script:"party-edit-data" }}{% endif %}
+
+<script>
+  (function () {
+    var csrfEl = document.querySelector('#party-modal-form [name=csrfmiddlewaretoken]');
+    if (!csrfEl) return;
+    var csrf = csrfEl.value;
+    var customersUrl = '{% url "portal-sales-customers" %}';
+    var modal = document.getElementById('party-modal');
+    var form = document.getElementById('party-modal-form');
+    var saveBtn = document.getElementById('save-party');
+    var kindNow = 'real';
+    var kindTimer = 0;
+    var modalTimer = 0;
+    var MODAL_DISCARD_CONFIRM = 'Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?';
+
+    function reduceMotion() {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    function isIgnoredModalField(el) {
+      if (!el || el.disabled) return true;
+      var type = String(el.type || '').toLowerCase();
+      var name = String(el.name || '');
+      if (type === 'hidden') {
+        return name !== 'city' && name !== 'district';
+      }
+      if (type === 'button' || type === 'submit' || type === 'reset' || type === 'file') return true;
+      if (name === 'csrfmiddlewaretoken' || name === 'action') return true;
+      if (el.hasAttribute('data-pick-q')) return true;
+      return false;
+    }
+    function modalFieldKey(el) {
+      var type = String(el.type || '').toLowerCase();
+      if (el.id) return 'id:' + el.id;
+      if (type === 'radio') return 'radio:' + el.name + '=' + el.value;
+      return 'name:' + (el.name || el.tagName);
+    }
+    function normalizeModalValue(el) {
+      var type = String(el.type || '').toLowerCase();
+      if (type === 'checkbox' || type === 'radio') return el.checked ? '1' : '0';
+      if (el.hasAttribute && el.hasAttribute('data-phone')) {
+        var digits = String(el.value || '').replace(/\D/g, '');
+        return digits.length <= 1 ? '' : digits;
+      }
+      return String(el.value || '');
+    }
+    function snapshotModalForm(target) {
+      var snap = {};
+      if (!target) return;
+      target.querySelectorAll('input, select, textarea').forEach(function (el) {
+        if (isIgnoredModalField(el)) return;
+        snap[modalFieldKey(el)] = normalizeModalValue(el);
+      });
+      target._modalSnapshot = snap;
+    }
+    function isModalFormDirty(target) {
+      if (!target || !target._modalSnapshot) return false;
+      var snap = target._modalSnapshot;
+      var dirty = false;
+      target.querySelectorAll('input, select, textarea').forEach(function (el) {
+        if (dirty || isIgnoredModalField(el)) return;
+        var key = modalFieldKey(el);
+        var initial = Object.prototype.hasOwnProperty.call(snap, key) ? snap[key] : '';
+        if (normalizeModalValue(el) !== initial) dirty = true;
+      });
+      return dirty;
+    }
+    function requestCloseModal(target, closeFn) {
+      if (isModalFormDirty(target) && !window.confirm(MODAL_DISCARD_CONFIRM)) return false;
+      closeFn();
+      return true;
+    }
+    function paneOf(kind) {
+      return document.querySelector('#party-modal-form .kind-pane[data-kind="' + kind + '"]');
+    }
+    function enablePane(kind) {
+      document.querySelectorAll('#party-modal-form .kind-pane').forEach(function (pane) {
+        var on = pane.getAttribute('data-kind') === kind;
+        pane.querySelectorAll('input, select, textarea').forEach(function (el) {
+          el.disabled = !on;
+        });
+      });
+    }
+    function paneHeight(pane) {
+      if (!pane) return 0;
+      var top = pane.getBoundingClientRect().top;
+      var bottom = top;
+      pane.querySelectorAll('.row').forEach(function (row) {
+        var r = row.getBoundingClientRect();
+        if (r.bottom > bottom) bottom = r.bottom;
+      });
+      var h = bottom - top;
+      if (h <= 0) h = pane.getBoundingClientRect().height || pane.offsetHeight || 0;
+      return Math.ceil(h);
+    }
+    function measurePane(pane) {
+      pane.classList.add('is-enter');
+      pane.style.visibility = 'hidden';
+      pane.style.transform = 'none';
+      var h = paneHeight(pane);
+      pane.classList.remove('is-enter');
+      pane.style.visibility = '';
+      pane.style.transform = '';
+      return h;
+    }
+    function lockStage(stage, height) {
+      if (!height) {
+        stage.style.height = '';
+        return;
+      }
+      stage.style.height = Math.ceil(height) + 'px';
+    }
+    function showPane(kind) {
+      document.querySelectorAll('#party-modal-form .kind-pane').forEach(function (pane) {
+        var on = pane.getAttribute('data-kind') === kind;
+        pane.classList.toggle('is-on', on);
+        pane.classList.remove('is-enter', 'is-leave');
+        pane.style.transform = '';
+        pane.style.visibility = '';
+      });
+      var stage = document.querySelector('#party-modal-form .kind-stage');
+      if (stage) lockStage(stage, null);
+      enablePane(kind);
+      kindNow = kind;
+    }
+    function syncKind(animate) {
+      var kind = document.querySelector('#party-modal-form input[name=kind]:checked').value;
+      var from = paneOf(kindNow);
+      var to = paneOf(kind);
+      var stage = document.querySelector('#party-modal-form .kind-stage');
+      if (!from || !to || !stage) return;
+      if (!animate || kind === kindNow || reduceMotion()) {
+        showPane(kind);
+        return;
+      }
+      window.clearTimeout(kindTimer);
+      var dir = kind === 'legal' ? 1 : -1;
+      var startH = paneHeight(from);
+      var endH = measurePane(to);
+      lockStage(stage, startH);
+      from.offsetHeight;
+      to.classList.add('is-enter');
+      to.style.transform = 'translateX(' + (dir * 100) + '%)';
+      from.classList.add('is-leave');
+      enablePane(kind);
+      from.offsetHeight;
+      from.style.transform = 'translateX(' + (-dir * 100) + '%)';
+      to.style.transform = 'translateX(0)';
+      lockStage(stage, endH);
+      kindNow = kind;
+      kindTimer = window.setTimeout(function () {
+        from.classList.remove('is-on', 'is-leave');
+        from.style.transform = '';
+        to.classList.remove('is-enter');
+        to.classList.add('is-on');
+        to.style.transform = '';
+        lockStage(stage, null);
+      }, 360);
+    }
+    document.querySelectorAll('#party-modal-form input[name=kind]').forEach(function (el) {
+      el.addEventListener('change', function () { syncKind(true); });
+    });
+    function setSaveBusy(on) {
+      saveBtn.classList.toggle('is-busy', on);
+      saveBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+    }
+    function partyFieldEmpty(el) {
+      if (!el || el.disabled) return false;
+      if (el.hasAttribute('data-phone')) {
+        var digits = String(el.value || '').replace(/\D/g, '');
+        return digits.length <= 1;
+      }
+      return !String(el.value || '').trim();
+    }
+    function clearPartyInvalid() {
+      form.querySelectorAll('.row.is-invalid, [data-pick].is-invalid').forEach(function (row) {
+        row.classList.remove('is-invalid');
+      });
+    }
+    function showPartyAlert(text) {
+      var err = document.getElementById('modal-error');
+      err.textContent = text;
+      err.hidden = false;
+    }
+    function hidePartyAlert() {
+      var err = document.getElementById('modal-error');
+      err.hidden = true;
+      err.textContent = '';
+    }
+    function validatePartyForm() {
+      clearPartyInvalid();
+      var missing = [];
+      form.querySelectorAll('input[required]').forEach(function (el) {
+        if (el.disabled || !partyFieldEmpty(el)) return;
+        var row = el.closest('.row');
+        var pick = el.closest('[data-pick]');
+        if (row) row.classList.add('is-invalid');
+        if (pick) pick.classList.add('is-invalid');
+        missing.push(el);
+      });
+      if (!missing.length) {
+        hidePartyAlert();
+        return true;
+      }
+      showPartyAlert('Boş zorunlu alanlar var. Yıldızlı alanları doldurun.');
+      var first = missing[0];
+      var pick = first && first.closest('[data-pick]');
+      if (pick && pick._pickFocus) pick._pickFocus();
+      else if (first) first.focus();
+      try { (pick || first).scrollIntoView({ block: 'nearest' }); } catch (err) {}
+      return false;
+    }
+    function partyJumpFields() {
+      var fields = [];
+      form.querySelectorAll('input, select, textarea, button.date-trigger').forEach(function (el) {
+        if (el.tagName === 'BUTTON') {
+          if (el.disabled || el.closest('[hidden]') || el.closest('.kind-pane:not(.is-on)')) return;
+          if (el.offsetParent === null) return;
+          fields.push(el);
+          return;
+        }
+        if (isIgnoredModalField(el)) return;
+        var type = String(el.type || '').toLowerCase();
+        if (type === 'radio' || type === 'checkbox' || type === 'search') return;
+        if (el.tabIndex < 0) return;
+        if (el.closest('[hidden]') || el.closest('.kind-pane:not(.is-on)')) return;
+        if (el.offsetParent === null) return;
+        fields.push(el);
+      });
+      return fields;
+    }
+    function focusPartyField(el) {
+      if (!el) return;
+      el.focus();
+      try { el.select(); } catch (err) {}
+      try { el.scrollIntoView({ block: 'nearest' }); } catch (err2) {}
+    }
+    function setModalCopy(title, copy) {
+      document.getElementById('party-modal-title').textContent = title;
+      document.getElementById('party-modal-copy').textContent = copy;
+    }
+    function setVal(id, value) {
+      var el = document.getElementById(id);
+      if (el) el.value = value || '';
+    }
+    function readEditPayload() {
+      var node = document.getElementById('party-edit-data');
+      if (!node) return null;
+      try { return JSON.parse(node.textContent); } catch (err) { return null; }
+    }
+    function resetPartyModal() {
+      window.clearTimeout(kindTimer);
+      form.querySelectorAll('input, select, textarea').forEach(function (el) {
+        el.disabled = false;
+      });
+      form.reset();
+      form.action = customersUrl;
+      clearPartyInvalid();
+      hidePartyAlert();
+      setSaveBusy(false);
+      setModalCopy('Yeni müşteri', 'Gerçek kişi veya tüzel kişi kaydı.');
+      showPane('real');
+      if (window.setPortalFold) {
+        form.querySelectorAll('[data-fold]').forEach(function (fold) {
+          window.setPortalFold(fold, false, false);
+        });
+      }
+    }
+    function fillPartyForm(data) {
+      var kind = data.kind || 'real';
+      form.querySelectorAll('input[name=kind]').forEach(function (el) {
+        el.checked = el.value === kind;
+      });
+      showPane(kind);
+      if (kind === 'legal') {
+        setVal('m_company_name', data.company_name);
+        setVal('m_tax_office', data.tax_office);
+        setVal('m_tax_no', data.tax_no);
+        setVal('m_contact_first', data.first_name);
+        setVal('m_contact_last', data.last_name);
+      } else {
+        setVal('m_first_name', data.first_name);
+        setVal('m_last_name', data.last_name);
+        setVal('m_national_id', data.national_id);
+      }
+      setVal('m_phone', data.phone);
+      setVal('m_contact2_name', data.contact2_name);
+      setVal('m_phone2', data.phone2);
+      setVal('m_email', data.email);
+      setVal('m_address', data.address);
+      if (window.setCityDistrictValues) {
+        window.setCityDistrictValues('m_city', data.city, data.district, false);
+      } else {
+        setVal('m_city', data.city);
+        setVal('m_district', data.district);
+      }
+      setVal('m_party_notes', data.notes);
+      if (window.setPortalFold) {
+        var fold = form.querySelector('[data-fold]');
+        var open = Boolean(String(data.contact2_name || '').trim() || String(data.phone2 || '').trim());
+        window.setPortalFold(fold, open, false);
+      }
+    }
+    function revealModal() {
+      window.clearTimeout(modalTimer);
+      modal.hidden = false;
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          modal.classList.add('is-on');
+        });
+      });
+    }
+    function openCreateModal() {
+      resetPartyModal();
+      if (window.setCityDistrictValues) {
+        window.setCityDistrictValues('m_city', '', '', true);
+      }
+      snapshotModalForm(form);
+      revealModal();
+      var first = document.getElementById('m_first_name');
+      if (first) first.focus();
+    }
+    function openEditModal(data) {
+      if (!data || !data.id) return;
+      resetPartyModal();
+      form.action = data.url || (customersUrl + encodeURIComponent(String(data.number || data.id).toLowerCase()) + '/');
+      setModalCopy('Müşteri düzenle', 'Kayıtlı müşteri hesabını güncelle.');
+      fillPartyForm(data);
+      snapshotModalForm(form);
+      revealModal();
+      var first = kindNow === 'legal' ? document.getElementById('m_company_name') : document.getElementById('m_first_name');
+      if (first) first.focus();
+    }
+    function closeModal() {
+      window.clearTimeout(modalTimer);
+      modal._closing = true;
+      modal.classList.remove('is-on');
+      var hide = function () {
+        modal.hidden = true;
+        modal._closing = false;
+        resetPartyModal();
+      };
+      if (reduceMotion()) {
+        hide();
+        return;
+      }
+      modalTimer = window.setTimeout(hide, 280);
+    }
+
+    var openBtn = document.getElementById('open-party');
+    if (openBtn) openBtn.addEventListener('click', openCreateModal);
+    var editBtn = document.getElementById('open-edit');
+    if (editBtn) {
+      editBtn.addEventListener('click', function () {
+        openEditModal(readEditPayload());
+      });
+    }
+    modal._closeModal = closeModal;
+    document.getElementById('close-party').addEventListener('click', function () {
+      requestCloseModal(form, closeModal);
+    });
+    modal.addEventListener('click', function (event) {
+      if (event.target === modal) requestCloseModal(form, closeModal);
+    });
+    form.addEventListener('input', function (event) {
+      var el = event.target;
+      if (!el || !el.closest) return;
+      var row = el.closest('.row');
+      var pick = el.closest('[data-pick]');
+      if (row && row.classList.contains('is-invalid') && !partyFieldEmpty(el)) {
+        row.classList.remove('is-invalid');
+      }
+      if (pick && pick.classList.contains('is-invalid') && !partyFieldEmpty(el)) {
+        pick.classList.remove('is-invalid');
+      }
+      if (!form.querySelector('.row.is-invalid, [data-pick].is-invalid')) hidePartyAlert();
+    });
+    form.addEventListener('change', function (event) {
+      var el = event.target;
+      if (!el || !el.closest) return;
+      var pick = el.closest('[data-pick]');
+      if (pick && pick.classList.contains('is-invalid') && !partyFieldEmpty(el)) {
+        pick.classList.remove('is-invalid');
+      }
+      if (!form.querySelector('.row.is-invalid, [data-pick].is-invalid')) hidePartyAlert();
+    });
+    form.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+      var el = event.target;
+      if (!el || el.tagName === 'TEXTAREA') return;
+      if (el.tagName === 'BUTTON' && !el.classList.contains('date-trigger')) return;
+      var type = String(el.type || '').toLowerCase();
+      if (type === 'submit' || type === 'button' || type === 'radio' || type === 'checkbox') return;
+      if (el.closest && el.closest('.date-pop') && el.matches('[data-pick-q]')) return;
+      var fields = partyJumpFields();
+      var idx = fields.indexOf(el);
+      if (idx < 0) return;
+      event.preventDefault();
+      if (idx < fields.length - 1) {
+        focusPartyField(fields[idx + 1]);
+        return;
+      }
+      if (!validatePartyForm()) return;
+      if (typeof form.requestSubmit === 'function') form.requestSubmit(saveBtn);
+      else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    });
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      if (saveBtn.classList.contains('is-busy')) return;
+      if (!validatePartyForm()) return;
+      setSaveBusy(true);
+      fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json',
+          'X-CSRFToken': csrf
+        },
+        credentials: 'same-origin'
+      }).then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok && data.ok, data: data };
+        });
+      }).then(function (result) {
+        if (!result.ok) {
+          setSaveBusy(false);
+          showPartyAlert((result.data && result.data.error) || 'Müşteri kaydedilemedi.');
+          return;
+        }
+        if (typeof window.onPartySaved === 'function') {
+          setSaveBusy(false);
+          window.onPartySaved(result.data);
+          closeModal();
+          if (window.takePortalToast) window.takePortalToast(result.data);
+          return;
+        }
+        window.location = (result.data && result.data.url) || window.location.href;
+      }).catch(function () {
+        setSaveBusy(false);
+        showPartyAlert('Bağlantı kurulamadı.');
+      });
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape') return;
+      if (modal.hidden || modal._closing) return;
+      event.preventDefault();
+      requestCloseModal(form, closeModal);
+    });
+
+    function bootEdit() {
+      {% if party_modal_open %}
+      openEditModal(readEditPayload());
+      {% if error %}showPartyAlert('{{ error|escapejs }}');{% endif %}
+      {% endif %}
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootEdit);
+    else bootEdit();
+  })();
+</script>

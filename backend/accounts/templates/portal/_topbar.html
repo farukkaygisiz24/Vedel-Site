@@ -1,0 +1,54 @@
+<header class="topbar">
+  <button type="button" class="nav-toggle" data-nav-toggle aria-controls="portal-nav" aria-expanded="false" aria-label="Menü">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4.5 7h15M4.5 12h15M4.5 17h15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <form class="search" role="search" action="#" method="get">
+    <span class="search-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/>
+        <path d="M16 16.5 20 20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+    </span>
+    <input type="search" name="q" placeholder="Ara" autocomplete="off" />
+  </form>
+  <div class="profile" data-profile>
+    <button type="button" class="profile-btn" aria-expanded="false" aria-haspopup="true">
+      <span class="avatar" data-profile-avatar>{{ user.username|slice:":1"|upper|default:"V" }}</span>
+      <span class="profile-name" data-profile-name>{{ user.username|default:"" }}</span>
+    </button>
+    <div class="profile-pop" hidden>
+      <a href="{% url 'portal-settings' %}">Kullanıcı ayarları</a>
+      <a class="is-danger" href="{% url 'portal-logout' %}">Çıkış yap</a>
+    </div>
+  </div>
+</header>
+<script>
+  (function () {
+    var search = document.querySelector('.topbar .search');
+    if (search) {
+      search.addEventListener('submit', function (event) {
+        event.preventDefault();
+      });
+    }
+    var root = document.querySelector('[data-profile]');
+    if (!root) return;
+    var btn = root.querySelector('.profile-btn');
+    var pop = root.querySelector('.profile-pop');
+    function close() {
+      pop.hidden = true;
+      btn.setAttribute('aria-expanded', 'false');
+    }
+    btn.addEventListener('click', function (event) {
+      event.stopPropagation();
+      var open = pop.hidden;
+      pop.hidden = !open;
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    document.addEventListener('click', close);
+    pop.addEventListener('click', function (event) {
+      event.stopPropagation();
+    });
+  })();
+</script>

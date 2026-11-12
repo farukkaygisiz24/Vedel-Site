@@ -1,0 +1,51 @@
+{% load portal_fmt %}
+<div>
+  <dt>Telefon</dt>
+  <dd>{% if party.phone %}{{ party.phone|tel_link }}{% else %}—{% endif %}</dd>
+</div>
+<div>
+  <dt>2. ulaşım</dt>
+  <dd>
+    {% if party.contact2_parts %}
+      {% if party.contact2_name %}{{ party.contact2_name }}{% if party.phone2 %}<br>{% endif %}{% endif %}
+      {% if party.phone2 %}{{ party.phone2|tel_link }}{% endif %}
+    {% else %}—{% endif %}
+  </dd>
+</div>
+<div>
+  <dt>E-posta</dt>
+  <dd>{{ party.email|default:'—' }}</dd>
+</div>
+{% if party.kind == 'legal' %}
+<div>
+  <dt>Yetkili</dt>
+  <dd>{% if party.first_name or party.last_name %}{{ party.first_name }} {{ party.last_name }}{% else %}—{% endif %}</dd>
+</div>
+<div>
+  <dt>Vergi dairesi</dt>
+  <dd>{{ party.tax_office|default:'—' }}</dd>
+</div>
+<div>
+  <dt>Vergi no</dt>
+  <dd>{{ party.tax_no|default:'—' }}</dd>
+</div>
+{% else %}
+<div>
+  <dt>T.C. kimlik no</dt>
+  <dd>{{ party.national_id|default:'—' }}</dd>
+</div>
+{% endif %}
+<div>
+  <dt>İl</dt>
+  <dd>{% if party.district and party.city %}{{ party.district }} / {{ party.city }}{% elif party.city %}{{ party.city }}{% elif party.district %}{{ party.district }}{% else %}—{% endif %}</dd>
+</div>
+<div class="is-wide">
+  <dt>Adres</dt>
+  <dd>{{ party.address|default:'—' }}</dd>
+</div>
+{% if party.notes.strip %}
+<div class="is-wide">
+  <dt>Müşteri notu</dt>
+  <dd>{{ party.notes }}</dd>
+</div>
+{% endif %}

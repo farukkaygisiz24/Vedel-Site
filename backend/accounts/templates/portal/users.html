@@ -1,0 +1,69 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Sistem kullanıcıları | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Sistem kullanıcıları</h1>
+      <p class="lead">Panele giriş hesapları. Yeni atama buradan açılır.</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn" href="{% url 'portal-users-new' %}">Yeni kullanıcı</a>
+    </div>
+  </div>
+
+  <div class="party-stats">
+    <div class="party-stat">
+      <span>Kullanıcı</span>
+      <b>{{ user_count }}</b>
+    </div>
+    <div class="party-stat">
+      <span>Yetkili</span>
+      <b>{{ staff_count }}</b>
+    </div>
+    <div class="party-stat">
+      <span>Aktif</span>
+      <b>{{ active_count }}</b>
+    </div>
+    <div class="party-stat">
+      <span>Pasif</span>
+      <b{% if inactive_count %} class="is-over"{% endif %}>{{ inactive_count }}</b>
+    </div>
+  </div>
+
+  <div class="user-list">
+    <p class="field-label">Kullanıcılar</p>
+    <form class="sale-filters" method="get" data-sale-filters>
+      <div class="sale-filters-top">
+        <input type="search" name="q" value="{{ query }}" placeholder="Kullanıcı adı, ad, e-posta veya telefon" autocomplete="off" />
+      </div>
+    </form>
+
+    <div class="sheet-wrap sale-sheet">
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>Kullanıcı</th>
+            <th>Ad</th>
+            <th>Yetki</th>
+            <th>Durum</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in users %}
+          <tr class="sale-row">
+            <td><a class="sale-row-go" href="{{ item.get_absolute_url }}">{{ item.username }}</a></td>
+            <td>{{ item.display_name }}</td>
+            <td>{{ item.role_label }}</td>
+            <td class="money{% if not item.is_active %} is-over{% endif %}">{% if item.is_active %}Aktif{% else %}Pasif{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="empty">{{ empty_copy }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'portal/_pager.html' %}
+  </div>
+{% endblock %}

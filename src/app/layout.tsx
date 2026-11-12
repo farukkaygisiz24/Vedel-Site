@@ -1,16 +1,24 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import CookieConsent from "@/components/legal/CookieConsent";
 import PhoneClickTracker from "@/components/legal/PhoneClickTracker";
+import ViewportZoom from "@/components/ViewportZoom";
 import Script from "next/script";
 import { GOOGLE_ADS_ID } from "@/lib/googleTag";
 
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+});
+
+const electroharmonix = localFont({
+  src: "../fonts/Electroharmonix.otf",
+  variable: "--font-electroharmonix",
+  display: "swap",
 });
 
 export const viewport: Viewport = {
@@ -25,28 +33,24 @@ export const metadata: Metadata = {
     default: "Bursa Mitsubishi Heavy Industries Yetkili Bayi | VEDEL Klima",
     template: "%s | VEDEL Klima",
   },
-  description: "Bursa'da Mitusbishi Heavy Industries ve Euroform klima yetkili satış ve servis noktası. Profesyonel montaj hizmeti, VRF Sistem çözümleri. Hemen teklif alın: (0224) 413 23 16",
+  description: "Bursa'da Mitsubishi Heavy Industries ve Euroform klima yetkili bayisi. Split, multi, profesyonel ve VRF sistemlerde satış, montaj, bakım ve servis. Özlüce & Kayapa: (0224) 413 23 16",
   keywords: [
-    "klima",
-    "mitsubishi heavy bursa",
     "bursa mitsubishi klima yetkili bayi",
-    "vedel klima",
+    "mitsubishi heavy industries bursa",
     "vedel klima bursa",
-    "mitsubishi klima servis",
-    "bursa",
-    "özlüce klima bursa",
-    "salon tipi klima",
-    "kaset tipi klima",
-    "klima bakım",
+    "euroform klima bursa",
+    "split klima bursa",
+    "multi split klima",
+    "vrf sistemleri bursa",
+    "klima montaj bursa",
     "klima servis bursa",
-    "klima arıza bursa",
+    "klima bakım bursa",
+    "kaset tipi klima",
+    "salon tipi klima",
+    "kanal tipi klima",
+    "özlüce klima",
     "kayapa klima",
-    "mitsubishi kayapa",
-    "euroform",
-    "euroform bursa",
     "mitsubishi klima fiyatları",
-    "ev tipi klima",
-    "vrf sistemleri"
   ],
   authors: [{ name: "VEDEL" }],
   icons: {
@@ -69,7 +73,7 @@ export const metadata: Metadata = {
     url: "https://vedel.com.tr",
     siteName: "VEDEL Klima",
     title: "VEDEL - Klima Yetkili Satış ve Bayi",
-    description: "VEDEL klima yetkili satış ve bayisi. MHI ve Euroform klimalar, montaj, bakım ve servis hizmetleri.",
+    description: "Bursa'da MHI ve Euroform yetkili bayisi. Split, multi, profesyonel ve VRF sistemlerde satış, montaj, bakım ve servis.",
     images: [
       {
         url: "/vedel-logo.png",
@@ -82,7 +86,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "VEDEL - Klima Yetkili Satış ve Bayi",
-    description: "VEDEL klima yetkili satış ve bayisi. MHI ve Euroform klimalar, montaj, bakım ve servis hizmetleri.",
+    description: "Bursa'da MHI ve Euroform yetkili bayisi. Split, multi, profesyonel ve VRF sistemlerde satış, montaj, bakım ve servis.",
     images: ["/vedel-logo.png"],
   },
   robots: {
@@ -170,7 +174,8 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className={`${inter.variable} antialiased`}>
+      <body className={`${inter.variable} ${electroharmonix.variable} antialiased`}>
+        <ViewportZoom />
         <Header />
         <main>{children}</main>
         <Footer />

@@ -1,0 +1,42 @@
+<div class="day-cal-row" data-service-cal data-service-url="{% url 'portal-service' %}"{% if hours_optional %} data-hours-optional{% endif %}>
+  <div class="day-cal">
+    <input type="hidden" name="{{ cal_date_name|default:'date' }}" id="service_date" value="{{ cal_date_value|default:'' }}" />
+    <div class="day-cal-head">
+      <button type="button" data-cal-prev aria-label="Önceki ay">‹</button>
+      <b data-cal-month></b>
+      <button type="button" data-cal-next aria-label="Sonraki ay">›</button>
+    </div>
+    <div class="date-dow">
+      <span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span>
+    </div>
+    <div class="date-grid" data-cal-grid></div>
+    <div class="day-hours-clip" data-cal-hours-clip hidden>
+      <div class="seg is-mini day-hours" data-cal-hours>
+        {% for hour in service_hours %}
+        <label style="--i: {{ forloop.counter0 }}">
+          <input type="radio" name="service_time" value="{{ hour }}"{% if hour == job_time %} checked{% endif %} />
+          <span>{{ hour }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <p class="day-cal-warn" data-cal-warn hidden>Kapasite dolu. Taşeron veya ikinci personel için saat yine seçilebilir.</p>
+    <div class="day-cal-foot">
+      <div class="day-cal-key">
+        <span><i></i>Boş</span>
+        <span><i class="is-busy"></i>Dolu</span>
+        <span><i class="is-full"></i>Kapasite dolu</span>
+      </div>
+      <span class="hint" data-cal-meta>Gün seçilmedi.</span>
+    </div>
+  </div>
+  <aside class="day-jobs">
+    <div class="day-jobs-head">
+      <b data-cal-jobs-title>Gün seçilmedi</b>
+      <small data-cal-jobs-count></small>
+    </div>
+    <div class="day-jobs-list" data-cal-jobs-list>
+      <p class="day-jobs-empty">Takvimden gün seçin. Atanan işler ve saatleri burada.</p>
+    </div>
+  </aside>
+</div>

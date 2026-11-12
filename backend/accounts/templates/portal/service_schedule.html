@@ -1,0 +1,90 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}Servis | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Servis</h1>
+      <p class="lead">{% if tech_mode %}Size atanan işler.{% else %}Saha teslim edince iş burada fiyatlanır. Kapatınca fiş oluşur.{% endif %}</p>
+    </div>
+    <div class="toolbar-actions">
+      {% if not tech_mode %}
+      <a class="btn is-ghost" href="{% url 'portal-service-clients' %}">Müşteriler</a>
+      {% endif %}
+      <a class="btn is-ghost" href="{% url 'portal-service-jobs' %}">İşler</a>
+      {% if not tech_mode %}
+      <a class="btn is-ghost" href="{% url 'portal-service-reminders' %}">Bakımlar</a>
+      <a class="btn" href="{% url 'portal-service-job-new' %}">Yeni iş</a>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if waiting %}
+  <p class="field-label">Bekleyen</p>
+  <div class="wait-list">
+    {% for item in waiting %}
+    <div class="wait-card">
+      <div>
+        <b>{{ item.party.display_name }}</b>
+        <small>
+          {{ item.date|date:'d.m.Y' }}{% if item.time %} · {{ item.time|time:'H:i' }}{% endif %}
+          {% if item.sale %} · {{ item.sale.get_work_type_display }} · {{ item.sale.number }}{% endif %}
+        </small>
+        <small>{{ item.party.phone|tel_link }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
+      </div>
+      <a class="btn" href="{{ item.get_absolute_url }}">Güne al</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <p class="field-label">Gün</p>
+  {% include 'portal/_service_day_cal.html' %}
+  {% include 'portal/_service_week_board.html' %}
+
+  {% if not tech_mode %}
+  <p class="field-label">Teslim edilen işler</p>
+  <div class="wait-list">
+    {% for item in submitted %}
+    <div class="wait-card">
+      <div>
+        <b>{{ item.party.display_name }}</b>
+        <small>
+          Teslim
+          {% if item.submitted_at %} · {{ item.submitted_at|date:'d.m.Y H:i' }}{% elif item.date %} · {{ item.date|date:'d.m.Y' }}{% endif %}
+          {% if item.assignee_label %} · {{ item.assignee_label }}{% endif %}
+          · {{ item.number }}
+        </small>
+        <small>{{ item.party.phone|tel_link }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
+      </div>
+      <a class="btn" href="{{ item.get_absolute_url }}">Kontrol et</a>
+    </div>
+    {% empty %}
+    <p class="hint">Saha teslimi bekleyen iş yok.</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if missed %}
+  <p class="field-label">Gidilmeyen işler</p>
+  <div class="wait-list">
+    {% for item in missed %}
+    <div class="wait-card">
+      <div>
+        <b>{{ item.party.display_name }}</b>
+        <small>
+          Gidilmedi · {{ item.date|date:'d.m.Y' }}{% if item.time %} · {{ item.time|time:'H:i' }}{% endif %}
+          · <span data-assign-label>{{ assign_label }}</span> gününe alınır
+          {% if item.sale %} · {{ item.sale.get_work_type_display }} · {{ item.sale.number }}{% endif %}
+        </small>
+        <small>{{ item.party.phone|tel_link }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
+      </div>
+      <a class="btn" href="{{ item.get_absolute_url }}">Güne al</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% include 'portal/_service_day_swap.html' %}
+{% endblock %}

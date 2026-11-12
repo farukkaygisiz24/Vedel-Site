@@ -1,15 +1,14 @@
 /**
  * Kampanya hero anahtarı.
  *
- * Aktif:  varsayılan (açık)
- * Kapat:  NEXT_PUBLIC_CAMPAIGN=off
+ * Kapalı: varsayılan
+ * Açmak:  NEXT_PUBLIC_CAMPAIGN=on  veya aşağıdaki sabiti true yap
  *
  * Video: private/campaign/ (API üzerinden stream)
  * Poster: public/campaign/mhi-yaz-kampanya.png
  */
-const campaignExplicitlyOff = process.env.NEXT_PUBLIC_CAMPAIGN === 'off'
-
-export const CAMPAIGN_HERO_ENABLED = !campaignExplicitlyOff
+export const CAMPAIGN_HERO_ENABLED =
+  process.env.NEXT_PUBLIC_CAMPAIGN === 'on' ? true : false
 
 export const CAMPAIGN_HERO_IMAGE = '/campaign/mhi-yaz-kampanya.png'
 export const CAMPAIGN_HERO_VIDEO = '/api/campaign/video'

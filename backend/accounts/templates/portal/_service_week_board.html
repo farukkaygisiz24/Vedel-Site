@@ -1,0 +1,28 @@
+<p class="field-label">Hafta</p>
+<div class="week-board">
+  <div class="day-jobs-head">
+    <b>{{ week_label }}</b>
+  </div>
+  <div class="week-board-grid">
+    {% for group in week_rows %}
+    <div class="week-col">
+      <p class="week-day-label{% if group.today %} is-today{% endif %}{% if group.past %} is-past{% endif %}">{{ group.dow }} {{ group.date.day }}</p>
+      {% for item in group.jobs %}
+      <a class="day-job{% if item.status == 'closed' %} is-done{% elif item.status == 'submitted' %} is-submitted{% endif %}" href="{% if field_board %}{{ item.get_field_url }}{% else %}{{ item.get_absolute_url }}{% endif %}">
+        {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
+        <div>
+          <b>{{ item.party.display_name }}</b>
+          <small>
+            {{ item.kind_label }}
+            · {% if item.status == 'closed' %}Gidildi{% elif item.status == 'submitted' %}Teslim{% else %}{{ item.display_number }}{% endif %}
+            {% if item.assignee_label %} · {{ item.assignee_label }}{% endif %}
+          </small>
+        </div>
+      </a>
+      {% empty %}
+      <p class="week-day-empty">—</p>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>

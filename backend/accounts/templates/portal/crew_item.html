@@ -1,0 +1,333 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ member.number }} | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="fis">
+    <div class="toolbar">
+      <div>
+        <h1>{{ member.number }}</h1>
+        <div class="fis-meta">
+          {% if member.title %}<span class="fis-chip">{{ member.title }}</span>{% endif %}
+          <span class="fis-chip">{{ member.phone|tel_link }}</span>
+          {% if member.national_id %}<span class="fis-chip">{{ member.national_id }}</span>{% endif %}
+        </div>
+      </div>
+      <div class="fis-toolbar-actions">
+        <button class="btn" type="button" data-open-crew-edit>Düzenle</button>
+        <a class="btn is-ghost" href="{% url 'portal-crew' %}">Listeye dön</a>
+      </div>
+    </div>
+    {% if error and not edit_open %}<p class="flash is-err" role="alert">{{ error }}</p>{% endif %}
+
+    <section class="fis-letter">
+      <div class="fis-letter-head">
+        <div>
+          <span class="fis-kicker">Personel kartı</span>
+          <div class="fis-name">{{ member.display_name }}</div>
+          <p>{{ member.title|default:member.number }}</p>
+        </div>
+        <button class="btn is-ghost" type="button" data-open-crew-edit>Düzenle</button>
+      </div>
+      <dl class="fis-facts">
+        <div>
+          <dt>T.C. kimlik no</dt>
+          <dd>{{ member.national_id|default:'—' }}</dd>
+        </div>
+        <div>
+          <dt>Telefon</dt>
+          <dd>{{ member.phone|tel_link }}</dd>
+        </div>
+        {% if member.phone2 %}
+        <div>
+          <dt>2. telefon</dt>
+          <dd>{{ member.phone2|tel_link }}</dd>
+        </div>
+        {% endif %}
+        {% if member.email %}
+        <div>
+          <dt>E-posta</dt>
+          <dd>{{ member.email }}</dd>
+        </div>
+        {% endif %}
+        {% if member.place_line %}
+        <div>
+          <dt>İl / ilçe</dt>
+          <dd>{{ member.place_line }}</dd>
+        </div>
+        {% endif %}
+        {% if member.address %}
+        <div class="is-wide">
+          <dt>Ev adresi</dt>
+          <dd>{{ member.address }}</dd>
+        </div>
+        {% endif %}
+        {% if member.notes.strip %}
+        <div class="is-wide">
+          <dt>Not</dt>
+          <dd>{{ member.notes }}</dd>
+        </div>
+        {% endif %}
+        <div>
+          <dt>Sistem kullanıcısı</dt>
+          <dd>
+            {% if member.user %}
+            <a href="{{ member.user.get_absolute_url }}">{{ member.user.username }}</a>
+            {% else %}
+            Atanmadı
+            {% endif %}
+          </dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="fis-block">
+      <p class="field-label">Yazıcı</p>
+      <form method="post" action="{{ member.get_absolute_url }}" autocomplete="off">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_access" />
+        <div class="group">
+          <div class="row">
+            <input id="crew_printer_mac" name="printer_mac" placeholder=" " autocomplete="off" value="{{ member.printer_mac }}" />
+            <label for="crew_printer_mac">Yazıcı MAC</label>
+          </div>
+          <div class="row">
+            <input id="crew_printer_ip" name="printer_ip" placeholder=" " inputmode="decimal" autocomplete="off" value="{{ member.printer_ip }}" />
+            <label for="crew_printer_ip">Yazıcı IP</label>
+          </div>
+        </div>
+        <div class="wizard-nav" style="margin-top:12px">
+          <button class="btn is-ghost" type="submit">Yazıcıyı kaydet</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="fis-settle">
+      <section class="fis-card">
+        <p class="field-label">Evrak</p>
+        <div class="fis-flag{% if expired_count %} is-due{% elif soon_count %} is-issued{% endif %}">
+          <div>
+            <b>{{ documents|length }} kayıt</b>
+            <small>{{ window_days }} gün hatırlatma</small>
+          </div>
+          <span class="money">{% if expired_count %}{{ expired_count }} geçen{% elif soon_count %}{{ soon_count }} yaklaşan{% else %}Güncel{% endif %}</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="fis-block">
+      <p class="field-label">Evraklar</p>
+      <div class="sheet-wrap">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th>Evrak</th>
+              <th>Dosya</th>
+              <th>Son tarih</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in documents %}
+            <tr>
+              <td>{{ item.title }}</td>
+              <td>
+                {% if item.file %}
+                <a class="sheet-edit" href="{{ item.get_file_url }}" download>{{ item.original_name|default:'İndir' }}</a>
+                {% else %}—
+                {% endif %}
+              </td>
+              <td class="money{% if item.expires_on < today %} is-over{% elif item.expires_on <= horizon %} is-due{% endif %}">{{ item.expires_on|date:'d.m.Y' }}</td>
+              <td class="num">
+                <form method="post" action="{{ member.get_absolute_url }}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_doc" />
+                  <input type="hidden" name="document_id" value="{{ item.pk }}" />
+                  <button class="sheet-edit" type="submit">Sil</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="empty">Evrak yok.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <form class="crew-add" method="post" action="{{ member.get_absolute_url }}" autocomplete="off" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_doc" />
+        <div class="group">
+          <div class="row">
+            <input id="d_title" name="title" placeholder=" " required data-title autocomplete="off" />
+            <label for="d_title">Evrak adı</label>
+          </div>
+        </div>
+        <div class="crew-doc-add">
+          <label class="file-pick">
+            <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,application/pdf,image/*" />
+            <span data-file-label>Dosya seç</span>
+          </label>
+          {% include 'portal/_datepicker.html' with date_name='expires_on' date_value=today_iso date_kicker='Son tarih' %}
+          <button class="btn" type="submit">Ekle</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="modal" id="crew-edit-modal"{% if not edit_open %} hidden{% endif %}>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Personel</span>
+        <h2>Kartı düzenle</h2>
+        <p class="step-copy">Kimlik, iletişim ve ev adresi.</p>
+      </div>
+      <form id="crew-edit-form" method="post" action="{{ member.get_absolute_url }}" autocomplete="off">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save" />
+        <div class="modal-body">
+          <div class="group">
+            <div class="row">
+              <input id="c_first_name" name="first_name" placeholder=" " required data-title autocomplete="off" value="{{ form.first_name }}" />
+              <label for="c_first_name">Ad</label>
+            </div>
+            <div class="row">
+              <input id="c_last_name" name="last_name" placeholder=" " required data-title autocomplete="off" value="{{ form.last_name }}" />
+              <label for="c_last_name">Soyad</label>
+            </div>
+            <div class="row">
+              <input id="c_national_id" name="national_id" placeholder=" " required inputmode="numeric" maxlength="11" data-digits="11" autocomplete="off" value="{{ form.national_id }}" />
+              <label for="c_national_id">T.C. kimlik no</label>
+            </div>
+            <div class="row">
+              <input id="c_title" name="title" placeholder=" " data-title autocomplete="off" value="{{ form.title }}" />
+              <label for="c_title">Unvan</label>
+            </div>
+          </div>
+          <div class="group">
+            <div class="row">
+              <input id="c_phone" name="phone" placeholder=" " required inputmode="tel" maxlength="17" data-phone autocomplete="tel" value="{{ form.phone }}" />
+              <label for="c_phone">Telefon</label>
+            </div>
+          </div>
+          <div class="fold{% if form.phone2 or form.email %} is-open{% endif %}" data-fold>
+            <button class="fold-toggle" type="button" aria-expanded="{% if form.phone2 or form.email %}true{% else %}false{% endif %}">İletişim ekleri</button>
+            <div class="fold-body"{% if not form.phone2 and not form.email %} hidden{% endif %}>
+              <div class="group">
+                <div class="row">
+                  <input id="c_phone2" name="phone2" placeholder=" " inputmode="tel" maxlength="17" data-phone autocomplete="tel" value="{{ form.phone2 }}" />
+                  <label for="c_phone2">2. telefon</label>
+                </div>
+                <div class="row">
+                  <input id="c_email" name="email" type="email" placeholder=" " autocomplete="email" value="{{ form.email }}" />
+                  <label for="c_email">E-posta</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="group">
+            <div class="row">
+              <input id="c_address" name="address" placeholder=" " required data-upper autocomplete="street-address" value="{{ form.address }}" />
+              <label for="c_address">Adres</label>
+            </div>
+            <div class="row">
+              <input id="c_city" name="city" placeholder=" " data-upper autocomplete="address-level1" value="{{ form.city }}" />
+              <label for="c_city">İl</label>
+            </div>
+            <div class="row">
+              <input id="c_district" name="district" placeholder=" " data-upper autocomplete="address-level2" value="{{ form.district }}" />
+              <label for="c_district">İlçe</label>
+            </div>
+          </div>
+          <div class="fold{% if form.notes %} is-open{% endif %}" data-fold>
+            <button class="fold-toggle" type="button" aria-expanded="{% if form.notes %}true{% else %}false{% endif %}">Not</button>
+            <div class="fold-body"{% if not form.notes %} hidden{% endif %}>
+              <div class="group">
+                <div class="row">
+                  <input id="c_notes" name="notes" placeholder=" " value="{{ form.notes }}" />
+                  <label for="c_notes">Personel notu</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="modal-alert" id="crew-edit-error"{% if not edit_open or not error %} hidden{% endif %} role="alert">{% if edit_open %}{{ error }}{% endif %}</p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-crew-edit">Vazgeç</button>
+          <button class="btn" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var modal = document.getElementById('crew-edit-modal');
+      var form = document.getElementById('crew-edit-form');
+      var openBtns = document.querySelectorAll('[data-open-crew-edit]');
+      var closeBtn = document.getElementById('close-crew-edit');
+      var addForm = document.querySelector('.crew-add');
+      if (addForm) {
+        addForm.addEventListener('change', function (event) {
+          var input = event.target.closest && event.target.closest('input[type="file"]');
+          if (!input) return;
+          var pick = input.closest('.file-pick');
+          var label = pick && pick.querySelector('[data-file-label]');
+          var name = input.files && input.files[0] ? input.files[0].name : '';
+          if (label) label.textContent = name || 'Dosya seç';
+          if (pick) pick.classList.toggle('has-file', Boolean(name));
+        });
+      }
+      if (!modal || !form || !openBtns.length) return;
+      function reduceMotion() {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+      function snapshot() {
+        var snap = {};
+        form.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (el.disabled || el.type === 'hidden' || el.type === 'submit') return;
+          snap[el.name || el.id] = el.value;
+        });
+        form._snap = snap;
+      }
+      function dirty() {
+        if (!form._snap) return false;
+        var changed = false;
+        form.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (changed || el.disabled || el.type === 'hidden' || el.type === 'submit') return;
+          if ((form._snap[el.name || el.id] || '') !== el.value) changed = true;
+        });
+        return changed;
+      }
+      function reveal() {
+        modal.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { modal.classList.add('is-on'); });
+        });
+        snapshot();
+      }
+      function hide() {
+        modal.classList.remove('is-on');
+        var done = function () { modal.hidden = true; };
+        if (reduceMotion()) { done(); return; }
+        window.setTimeout(done, 280);
+      }
+      function requestHide() {
+        if (dirty() && !window.confirm('Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?')) return;
+        hide();
+      }
+      openBtns.forEach(function (btn) { btn.addEventListener('click', reveal); });
+      if (closeBtn) closeBtn.addEventListener('click', requestHide);
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) requestHide();
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !modal.hidden) requestHide();
+      });
+      if (!modal.hidden) {
+        requestAnimationFrame(function () { modal.classList.add('is-on'); });
+        snapshot();
+      }
+    })();
+  </script>
+{% endblock %}

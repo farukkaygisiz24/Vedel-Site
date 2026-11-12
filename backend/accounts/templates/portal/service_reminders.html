@@ -1,0 +1,46 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Bakımlar | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Bakımlar</h1>
+      <p class="lead">Vadesi gelen ve geçen cihazlar. 14 günlük pencere.</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn is-ghost" href="{% url 'portal-service' %}">Hafta</a>
+      <a class="btn" href="{% url 'portal-service-job-new' %}">Yeni iş</a>
+    </div>
+  </div>
+
+  <div class="sheet-wrap sale-sheet">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>Cihaz</th>
+          <th>Müşteri</th>
+          <th>Aralık</th>
+          <th>Son bakım</th>
+          <th>Sonraki</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in devices %}
+        <tr class="sale-row">
+          <td>{{ item.name }}{% if item.place %}<div class="hint">{{ item.place }}</div>{% endif %}</td>
+          <td><a href="{{ item.party.get_absolute_url }}">{{ item.party.display_name }}</a></td>
+          <td>{{ item.get_interval_months_display }}</td>
+          <td>{% if item.last_serviced_on %}{{ item.last_serviced_on|date:'d.m.Y' }}{% else %}—{% endif %}</td>
+          <td class="money{% if item.next_due < today %} is-over{% endif %}">{{ item.next_due|date:'d.m.Y' }}</td>
+          <td class="num"><a class="sheet-edit" href="{% url 'portal-service-job-new' %}?party={{ item.party_id }}&device={{ item.pk }}">İş aç</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="empty">{{ empty_copy }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'portal/_pager.html' %}
+{% endblock %}

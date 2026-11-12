@@ -1,0 +1,100 @@
+<script>
+  (function () {
+    var body = document.body;
+    var nav = document.getElementById('portal-nav');
+    var toggle = document.querySelector('[data-nav-toggle]');
+    var scrim = document.querySelector('[data-nav-scrim]');
+    var phone = window.matchMedia ? window.matchMedia('(max-width: 860px)') : null;
+
+    function isPhone() {
+      return Boolean(phone && phone.matches);
+    }
+
+    function setNav(open) {
+      if (!nav || !toggle) return;
+      open = Boolean(open && isPhone());
+      body.classList.toggle('nav-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        var first = nav.querySelector('.side-link.is-active') || nav.querySelector('.side-link');
+        if (first) first.focus({ preventScroll: true });
+      }
+    }
+
+    function closeNav() {
+      if (!body.classList.contains('nav-open')) return;
+      setNav(false);
+      if (toggle) toggle.focus({ preventScroll: true });
+    }
+    window.portalCloseNav = closeNav;
+
+    if (toggle) {
+      toggle.addEventListener('click', function (event) {
+        event.stopPropagation();
+        setNav(!body.classList.contains('nav-open'));
+      });
+    }
+    if (scrim) scrim.addEventListener('click', closeNav);
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') closeNav();
+    });
+    if (phone) {
+      var onChange = function () { if (!isPhone()) setNav(false); };
+      if (phone.addEventListener) phone.addEventListener('change', onChange);
+      else if (phone.addListener) phone.addListener(onChange);
+    }
+
+    function syncModalLock() {
+      body.classList.toggle('has-modal', Boolean(document.querySelector('.modal:not([hidden])')));
+    }
+
+    function labelSheet(table) {
+      var heads = table.querySelectorAll('thead th');
+      if (!heads.length) return;
+      var names = Array.prototype.map.call(heads, function (th) {
+        return (th.getAttribute('data-label') || th.textContent || '').replace(/\s+/g, ' ').trim();
+      });
+      table.querySelectorAll('tbody tr').forEach(function (row) {
+        var col = 0;
+        Array.prototype.forEach.call(row.children, function (cell) {
+          if (cell.tagName !== 'TD' && cell.tagName !== 'TH') return;
+          if (!cell.hasAttribute('data-label') || cell.hasAttribute('data-auto-label')) {
+            cell.setAttribute('data-label', names[col] || '');
+            cell.setAttribute('data-auto-label', '');
+          }
+          col += Math.max(1, parseInt(cell.getAttribute('colspan') || '1', 10));
+        });
+      });
+    }
+
+    function labelSheets(root) {
+      (root || document).querySelectorAll('table.sheet').forEach(labelSheet);
+    }
+    window.portalLabelSheets = labelSheets;
+
+    var queued = false;
+    function refresh() {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(function () {
+        queued = false;
+        labelSheets(document);
+        syncModalLock();
+      });
+    }
+
+    labelSheets(document);
+    syncModalLock();
+    if (window.MutationObserver) {
+      new MutationObserver(function (records) {
+        for (var i = 0; i < records.length; i++) {
+          var rec = records[i];
+          if (rec.type === 'childList') return refresh();
+          if (rec.attributeName === 'hidden' && rec.target.classList && rec.target.classList.contains('modal')) {
+            return refresh();
+          }
+        }
+      }).observe(body, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    }
+  })();
+</script>

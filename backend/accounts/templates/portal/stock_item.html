@@ -1,0 +1,653 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ product.sku }} | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="fis">
+    <div class="toolbar">
+      <div>
+        <h1>{{ product.sku }}</h1>
+        <div class="fis-meta">
+          {% if product.brand %}<span class="fis-chip">{{ product.brand }}</span>{% endif %}
+          <span class="fis-chip">{{ product.category.name }}</span>
+          <span class="fis-chip">{{ product.unit }}</span>
+        </div>
+      </div>
+      <div class="fis-toolbar-actions">
+        {% if can_stock_manage %}
+        <button class="btn" type="button" data-open-product-edit>Düzenle</button>
+        <button class="btn" type="button" id="open-stock-in">Stok girişi</button>
+        {% endif %}
+        <a class="btn is-ghost" href="{{ back_href }}">Listeye dön</a>
+      </div>
+    </div>
+    {% if error and not stock_modal %}<p class="flash is-err" role="alert">{{ error }}</p>{% endif %}
+
+    <section class="fis-letter">
+      <div class="fis-letter-head">
+        <div>
+          <span class="fis-kicker">Ürün kartı</span>
+          <div class="fis-name">{% if product.brand %}{{ product.brand }}{% else %}{{ product.name }}{% endif %}</div>
+          <p>{% if product.brand %}{{ product.name }}{% else %}{{ product.sku }}{% endif %}</p>
+        </div>
+        {% if can_stock_manage %}
+        <button class="btn is-ghost" type="button" id="open-alert">Kritik eşik</button>
+        {% endif %}
+      </div>
+      <dl class="fis-facts">
+        <div>
+          <dt>Kategori</dt>
+          <dd>{{ product.category.name }} · {{ product.category.sku_prefix }}</dd>
+        </div>
+        <div>
+          <dt>Birim</dt>
+          <dd>{{ product.unit }}</dd>
+        </div>
+        <div>
+          <dt>Kritik eşik</dt>
+          <dd>{% if product.alert_on %}{% if product.alert_qty is not None %}{{ product.alert_qty|tr_qty }} {{ product.unit }}{% else %}0 {{ product.unit }}{% endif %}{% else %}Kapalı{% endif %}</dd>
+        </div>
+        <div>
+          <dt>KDV</dt>
+          <dd>{{ product.vat_rate|tr_qty }}%</dd>
+        </div>
+        <div>
+          <dt>Cihaz</dt>
+          <dd>{% if product.device_kind == 'split' %}Split{% elif product.device_kind == 'multi_indoor' %}Multi iç ünite{% elif product.device_kind == 'multi_outdoor' %}Multi dış ünite{% elif product.is_device %}Evet{% else %}Hayır{% endif %}</dd>
+        </div>
+        {% if product.device_kind == 'split' %}
+        <div>
+          <dt>Dış ünite</dt>
+          <dd>{{ product.outdoor_name|default:'—' }}</dd>
+        </div>
+        {% endif %}
+        <div>
+          <dt>Son alış</dt>
+          <dd>{% if last_buy and last_buy.buy_price %}{{ last_buy.buy_price|tr_money }} ₺{% elif product.buy_price %}{{ product.buy_price|tr_money }} ₺{% else %}—{% endif %}</dd>
+        </div>
+        <div>
+          <dt>Son tedarikçi</dt>
+          <dd>{% if last_buy and last_buy.supplier %}{{ last_buy.supplier.display_name }}{% else %}—{% endif %}</dd>
+        </div>
+        {% if last_buy %}
+        <div>
+          <dt>Son giriş</dt>
+          <dd>{{ last_buy.created_at|date:'d.m.Y H:i' }}</dd>
+        </div>
+        {% endif %}
+      </dl>
+    </section>
+
+    <div class="fis-settle is-quad">
+      <section class="fis-card">
+        <p class="field-label">Elde</p>
+        <div class="fis-flag{% if product.is_low %} is-due{% endif %}">
+          <div>
+            <b>{{ product.stock_qty|tr_qty }} {{ product.unit }}</b>
+            <small>{% if product.is_low %}Yenilemek gerekiyor{% else %}Stok bakiyesi{% endif %}</small>
+          </div>
+        </div>
+      </section>
+      <section class="fis-card">
+        <p class="field-label">Alış</p>
+        <div class="fis-flag">
+          <div>
+            <b>{{ product.buy_price|tr_money }} ₺</b>
+            <small>Kart alış fiyatı</small>
+          </div>
+        </div>
+      </section>
+      <section class="fis-card">
+        <p class="field-label">Satış</p>
+        <div class="fis-flag">
+          <div>
+            <b>{{ product.sale_price|tr_money }} ₺</b>
+            <small>Kart satış fiyatı</small>
+          </div>
+        </div>
+      </section>
+      <section class="fis-card">
+        <p class="field-label">Kar marjı</p>
+        <div class="fis-flag">
+          <div>
+            <b>{{ product.profit|tr_money }} ₺</b>
+            <small>Satış − alış</small>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="fis-block">
+      <p class="field-label">Hareket defteri</p>
+      <div class="sheet-wrap">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th>Tarih</th>
+              <th>Hareket</th>
+              <th>Adet</th>
+              <th>Alış</th>
+              <th>Tedarikçi</th>
+              <th>İşleyen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for move in movements %}
+            <tr>
+              <td>{{ move.created_at|date:'d.m.Y H:i' }}</td>
+              <td>
+                {% if move.reason == 'job' and move.qty > 0 %}Montaj iade{% else %}{{ move.get_reason_display }}{% endif %}
+                {% if move.sale_line_id and move.sale_line.sale_id %}
+                <div class="hint"><a href="{{ move.sale_line.sale.get_absolute_url }}">{{ move.sale_line.sale.number }}</a></div>
+                {% elif move.job_id %}
+                <div class="hint"><a href="{{ move.job.get_absolute_url }}">{% firstof move.note move.job.number %}</a></div>
+                {% elif move.note %}
+                <div class="hint">{{ move.note }}</div>
+                {% endif %}
+              </td>
+              <td class="num">{{ move.qty|tr_qty }}</td>
+              <td class="money">{% if move.reason == 'in' and move.buy_price %}{{ move.buy_price|tr_money }} ₺{% else %}—{% endif %}</td>
+              <td>{% if move.supplier %}{{ move.supplier.display_name }}{% else %}—{% endif %}</td>
+              <td>{{ move.created_by.username }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="empty">Hareket yok.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal" id="stock-in-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Depo</span>
+        <h2>Stok girişi</h2>
+        <p class="step-copy">Alış ve tedarikçi bu karta işlenir.</p>
+      </div>
+      <form id="stock-in-form" method="post" action="{{ product.get_absolute_url }}" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="in" />
+        <input type="hidden" name="supplier_id" id="supplier_id" />
+        <div class="modal-body">
+          <div class="group">
+            <div class="row">
+              <input id="id_qty" name="qty" inputmode="decimal" placeholder=" " required />
+              <label for="id_qty">Giriş adedi</label>
+            </div>
+            <div class="row">
+              <input id="id_in_buy_price" name="buy_price" inputmode="decimal" placeholder=" " value="{% if product.buy_price %}{{ product.buy_price }}{% endif %}" />
+              <label for="id_in_buy_price">Alış fiyatı</label>
+            </div>
+            <div class="row prod-pick">
+              <input id="supplier_q" placeholder=" " autocomplete="off" />
+              <label for="supplier_q">Tedarikçi cari</label>
+              <div class="prod-menu" id="supplier-menu" hidden></div>
+            </div>
+            <div class="row">
+              <input id="id_note" name="note" placeholder=" " data-upper />
+              <label for="id_note">Not</label>
+            </div>
+          </div>
+        </div>
+        <p class="modal-alert" id="stock-in-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-stock-in">Vazgeç</button>
+          <button class="btn" type="submit" id="save-stock-in">
+            <span class="btn-label">Stoka ekle</span>
+            <span class="btn-spin" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="alert-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Depo</span>
+        <h2>Kritik eşik</h2>
+        <p class="step-copy">Hatırlatmayı açınca bu birim kalınca tükenmiş sayılır.</p>
+      </div>
+      <form id="alert-form" method="post" action="{{ product.get_absolute_url }}" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="alert" />
+        <div class="modal-body">
+          <div class="pay-card" id="alert-qty-card">
+            <div class="pay-head">
+              <span class="pay-kicker">Kritik eşik · {{ product.unit }}</span>
+              <span class="toggle">
+                <input type="checkbox" name="alert_on" id="alert_on" value="1"{% if product.alert_on %} checked{% endif %} />
+                <i></i>
+              </span>
+            </div>
+            <input id="alert_qty" name="alert_qty" inputmode="decimal" placeholder="0" value="{% if product.alert_qty is not None %}{{ product.alert_qty }}{% endif %}" />
+          </div>
+          <p class="hint">Anahtar bu eşiğe bağlı. Kapalıysa Tükenen’e girmez.</p>
+        </div>
+        <p class="modal-alert" id="alert-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-alert">Vazgeç</button>
+          <button class="btn" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if can_stock_manage %}
+  <div class="modal" id="product-edit-modal"{% if stock_modal != 'edit' %} hidden{% endif %}>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Depo</span>
+        <h2>Kartı düzenle</h2>
+        <p class="step-copy">Marka, model, birim ve fiyat. Stok kodu değişmez.</p>
+      </div>
+      <form id="product-edit-form" method="post" action="{{ product.get_absolute_url }}" autocomplete="off" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save" />
+        <div class="modal-body">
+          <div class="group">
+            <div class="row">
+              <input id="p_brand" name="brand" placeholder=" " data-title autocomplete="off" value="{{ product.brand }}" />
+              <label for="p_brand">Marka</label>
+            </div>
+            <div class="row">
+              <input id="p_name" name="name" placeholder=" " required data-upper autocomplete="off" value="{{ product.name }}" />
+              <label for="p_name">Ürün adı</label>
+            </div>
+            <div class="row">
+              <input id="p_unit" name="unit" placeholder=" " data-upper autocomplete="off" value="{{ product.unit }}" />
+              <label for="p_unit">Birim</label>
+            </div>
+          </div>
+          {% include 'portal/_product_klima.html' with category_is_klima=product.category.is_klima form_device_kind=product.device_kind outdoor_name=product.outdoor_name %}
+          <p class="field-label">Fiyat</p>
+          <div class="pay-grid">
+            <label class="pay-card">
+              <span class="pay-kicker">Alış</span>
+              <input id="p_buy_price" name="buy_price" inputmode="decimal" placeholder="0,00" autocomplete="off" value="{% if product.buy_price %}{{ product.buy_price }}{% endif %}" />
+            </label>
+            <label class="pay-card">
+              <span class="pay-kicker">Satış</span>
+              <input id="p_sale_price" name="sale_price" inputmode="decimal" placeholder="0,00" autocomplete="off" value="{% if product.sale_price %}{{ product.sale_price }}{% endif %}" />
+            </label>
+            <label class="pay-card">
+              <span class="pay-kicker">KDV %</span>
+              <input id="p_vat_rate" name="vat_rate" inputmode="decimal" placeholder="20" value="{{ product.vat_rate }}" />
+            </label>
+          </div>
+        </div>
+        <p class="modal-alert" id="product-edit-error"{% if stock_modal != 'edit' or not error %} hidden{% endif %} role="alert">{% if stock_modal == 'edit' %}{{ error }}{% endif %}</p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-product-edit">Vazgeç</button>
+          <button class="btn" type="submit" id="save-product-edit">
+            <span class="btn-label">Kaydet</span>
+            <span class="btn-spin" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <script>
+    (function () {
+      var csrfEl = document.querySelector('#stock-in-form [name=csrfmiddlewaretoken]')
+        || document.querySelector('#product-edit-form [name=csrfmiddlewaretoken]');
+      if (!csrfEl) return;
+      var csrf = csrfEl.value;
+      var itemUrl = '{{ product.get_absolute_url }}';
+      var customersUrl = '{% url "portal-sales-customers" %}';
+      var inModal = document.getElementById('stock-in-modal');
+      var inForm = document.getElementById('stock-in-form');
+      var inErr = document.getElementById('stock-in-error');
+      var saveInBtn = document.getElementById('save-stock-in');
+      var supplierId = document.getElementById('supplier_id');
+      var supplierQ = document.getElementById('supplier_q');
+      var supplierMenu = document.getElementById('supplier-menu');
+      var supplierCtl = null;
+      var MODAL_DISCARD_CONFIRM = 'Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?';
+
+      function reduceMotion() {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+      function isIgnoredModalField(el) {
+        if (!el || el.disabled) return true;
+        var type = String(el.type || '').toLowerCase();
+        if (type === 'hidden' || type === 'button' || type === 'submit' || type === 'reset') return true;
+        var name = String(el.name || '');
+        return name === 'csrfmiddlewaretoken' || name === 'action';
+      }
+      function modalFieldKey(el) {
+        if (el.id) return 'id:' + el.id;
+        return 'name:' + (el.name || el.tagName);
+      }
+      function modalFieldValue(el) {
+        var type = String(el.type || '').toLowerCase();
+        if (type === 'checkbox' || type === 'radio') return el.checked ? String(el.value || '1') : '';
+        return String(el.value || '');
+      }
+      function snapshotModalForm(target) {
+        var snap = {};
+        if (!target) return;
+        target.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (isIgnoredModalField(el)) return;
+          snap[modalFieldKey(el)] = modalFieldValue(el);
+        });
+        target._modalSnapshot = snap;
+      }
+      function isModalFormDirty(target) {
+        if (!target || !target._modalSnapshot) return false;
+        var snap = target._modalSnapshot;
+        var dirty = false;
+        target.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (dirty || isIgnoredModalField(el)) return;
+          var key = modalFieldKey(el);
+          var initial = Object.prototype.hasOwnProperty.call(snap, key) ? snap[key] : '';
+          if (modalFieldValue(el) !== initial) dirty = true;
+        });
+        return dirty;
+      }
+      function requestCloseModal(target, closeFn) {
+        if (isModalFormDirty(target) && !window.confirm(MODAL_DISCARD_CONFIRM)) return false;
+        closeFn();
+        return true;
+      }
+      function revealModal(modal) {
+        modal.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { modal.classList.add('is-on'); });
+        });
+      }
+      function hideModal(modal, timerName, after) {
+        window.clearTimeout(modal[timerName]);
+        modal._closing = true;
+        modal.classList.remove('is-on');
+        var hide = function () {
+          modal.hidden = true;
+          modal._closing = false;
+          if (after) after();
+        };
+        if (reduceMotion()) { hide(); return; }
+        modal[timerName] = window.setTimeout(hide, 280);
+      }
+      function setBusy(btn, on) {
+        if (!btn) return;
+        btn.classList.toggle('is-busy', on);
+        btn.setAttribute('aria-busy', on ? 'true' : 'false');
+      }
+      function showAlert(node, text) {
+        if (!node) return;
+        if (!text) {
+          node.hidden = true;
+          node.textContent = '';
+          return;
+        }
+        node.textContent = text;
+        node.hidden = false;
+      }
+      function closeSupplierMenu() {
+        supplierMenu.hidden = true;
+        supplierMenu.innerHTML = '';
+      }
+      function pickSupplier(p) {
+        supplierId.value = p && p.id ? String(p.id) : '';
+        supplierQ.value = (p && p.name) || '';
+        closeSupplierMenu();
+      }
+      function paintSupplierMenu(results, query) {
+        supplierMenu.innerHTML = '';
+        (results || []).forEach(function (p) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'prod-opt';
+          btn.innerHTML = '<b></b><small></small>';
+          btn.querySelector('b').textContent = p.name || '';
+          btn.querySelector('small').textContent = (p.number || '') + (p.phone ? ' · ' + p.phone : '');
+          btn.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+            pickSupplier(p);
+          });
+          supplierMenu.appendChild(btn);
+        });
+        if (!results || !results.length) {
+          var empty = document.createElement('p');
+          empty.className = 'prod-empty';
+          empty.textContent = query ? 'Eşleşen müşteri yok.' : 'Müşteri yok.';
+          supplierMenu.appendChild(empty);
+        }
+        supplierMenu.hidden = false;
+      }
+      function searchSuppliers(query) {
+        if (supplierCtl) supplierCtl.abort();
+        supplierCtl = new AbortController();
+        fetch(customersUrl + '?q=' + encodeURIComponent(query) + '&page=1', {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          signal: supplierCtl.signal
+        }).then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (data && data.ok) paintSupplierMenu(data.results || [], query);
+          }).catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+          });
+      }
+      supplierQ.addEventListener('focus', function () {
+        searchSuppliers(supplierQ.value.trim());
+      });
+      supplierQ.addEventListener('input', function () {
+        supplierId.value = '';
+        window.clearTimeout(supplierQ._timer);
+        supplierQ._timer = window.setTimeout(function () {
+          searchSuppliers(supplierQ.value.trim());
+        }, 400);
+      });
+      document.addEventListener('mousedown', function (event) {
+        if (event.target && event.target.closest && event.target.closest('.prod-pick')) return;
+        closeSupplierMenu();
+      });
+
+      function resetInForm() {
+        inForm.reset();
+        supplierId.value = '';
+        closeSupplierMenu();
+        showAlert(inErr, '');
+        setBusy(saveInBtn, false);
+      }
+      function openInModal() {
+        resetInForm();
+        snapshotModalForm(inForm);
+        revealModal(inModal);
+        document.getElementById('id_qty').focus();
+      }
+      function closeInModal() {
+        hideModal(inModal, '_inTimer', resetInForm);
+      }
+
+      document.getElementById('open-stock-in').addEventListener('click', openInModal);
+      document.getElementById('close-stock-in').addEventListener('click', function () {
+        requestCloseModal(inForm, closeInModal);
+      });
+      inModal.addEventListener('click', function (event) {
+        if (event.target === inModal) requestCloseModal(inForm, closeInModal);
+      });
+      inForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (saveInBtn.classList.contains('is-busy')) return;
+        if (!document.getElementById('id_qty').value.trim()) {
+          showAlert(inErr, 'Giriş adedi zorunlu.');
+          return;
+        }
+        setBusy(saveInBtn, true);
+        showAlert(inErr, '');
+        fetch(itemUrl, {
+          method: 'POST',
+          body: new FormData(inForm),
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+            'X-CSRFToken': csrf
+          },
+          credentials: 'same-origin'
+        }).then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok && data.ok, data: data };
+          });
+        }).then(function (result) {
+          if (!result.ok) {
+            setBusy(saveInBtn, false);
+            showAlert(inErr, (result.data && result.data.error) || 'Kayıt alınamadı.');
+            return;
+          }
+          if (window.takePortalToast) window.takePortalToast(result.data);
+          window.location.reload();
+        }).catch(function () {
+          setBusy(saveInBtn, false);
+          showAlert(inErr, 'Bağlantı kurulamadı.');
+        });
+      });
+      inModal._closeModal = function () {
+        requestCloseModal(inForm, closeInModal);
+      };
+
+      var alertModal = document.getElementById('alert-modal');
+      var alertForm = document.getElementById('alert-form');
+      var alertErr = document.getElementById('alert-error');
+      var alertOnEl = document.getElementById('alert_on');
+      var alertQtyCard = document.getElementById('alert-qty-card');
+      function applyAlertOn() {
+        var on = !!(alertOnEl && alertOnEl.checked);
+        if (alertQtyCard) alertQtyCard.classList.toggle('is-off', !on);
+      }
+      if (alertOnEl) alertOnEl.addEventListener('change', applyAlertOn);
+      function openAlertModal() {
+        showAlert(alertErr, '');
+        applyAlertOn();
+        snapshotModalForm(alertForm);
+        revealModal(alertModal);
+        window.setTimeout(function () {
+          try { (alertOnEl && alertOnEl.checked ? document.getElementById('alert_qty') : alertOnEl).focus(); } catch (e) {}
+        }, 40);
+      }
+      function closeAlertModal() {
+        hideModal(alertModal, '_alertTimer', function () { showAlert(alertErr, ''); });
+      }
+      var openAlertBtn = document.getElementById('open-alert');
+      if (openAlertBtn) openAlertBtn.addEventListener('click', openAlertModal);
+      document.getElementById('close-alert').addEventListener('click', function () {
+        requestCloseModal(alertForm, closeAlertModal);
+      });
+      alertModal.addEventListener('click', function (event) {
+        if (event.target === alertModal) requestCloseModal(alertForm, closeAlertModal);
+      });
+      alertModal._closeModal = function () {
+        requestCloseModal(alertForm, closeAlertModal);
+      };
+
+      var editModal = document.getElementById('product-edit-modal');
+      var editForm = document.getElementById('product-edit-form');
+      var editErr = document.getElementById('product-edit-error');
+      var saveEditBtn = document.getElementById('save-product-edit');
+      var openEditBtns = document.querySelectorAll('[data-open-product-edit]');
+      var closeEditBtn = document.getElementById('close-product-edit');
+      function resetEditForm() {
+        if (editForm) editForm.reset();
+        showAlert(editErr, '');
+        setBusy(saveEditBtn, false);
+      }
+      function openEditModal() {
+        resetEditForm();
+        if (window.syncKlimaFields) window.syncKlimaFields({{ product.category.is_klima|yesno:'true,false' }});
+        snapshotModalForm(editForm);
+        revealModal(editModal);
+        window.setTimeout(function () {
+          try { document.getElementById('p_brand').focus(); } catch (e) {}
+        }, 40);
+      }
+      function closeEditModal() {
+        hideModal(editModal, '_editTimer', resetEditForm);
+      }
+      if (openEditBtns.length && editModal && editForm) {
+        openEditBtns.forEach(function (btn) { btn.addEventListener('click', openEditModal); });
+        if (closeEditBtn) closeEditBtn.addEventListener('click', function () {
+          requestCloseModal(editForm, closeEditModal);
+        });
+        editModal.addEventListener('click', function (event) {
+          if (event.target === editModal) requestCloseModal(editForm, closeEditModal);
+        });
+        editModal._closeModal = function () {
+          requestCloseModal(editForm, closeEditModal);
+        };
+        editForm.addEventListener('submit', function (event) {
+          event.preventDefault();
+          if (saveEditBtn && saveEditBtn.classList.contains('is-busy')) return;
+          if (!document.getElementById('p_name').value.trim()) {
+            showAlert(editErr, 'Ürün adı zorunlu.');
+            return;
+          }
+          setBusy(saveEditBtn, true);
+          showAlert(editErr, '');
+          fetch(itemUrl, {
+            method: 'POST',
+            body: new FormData(editForm),
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              Accept: 'application/json',
+              'X-CSRFToken': csrf
+            },
+            credentials: 'same-origin'
+          }).then(function (response) {
+            return response.json().then(function (data) {
+              return { ok: response.ok && data.ok, data: data };
+            });
+          }).then(function (result) {
+            if (!result.ok) {
+              setBusy(saveEditBtn, false);
+              showAlert(editErr, (result.data && result.data.error) || 'Kayıt alınamadı.');
+              return;
+            }
+            if (window.takePortalToast) window.takePortalToast(result.data);
+            window.location.reload();
+          }).catch(function () {
+            setBusy(saveEditBtn, false);
+            showAlert(editErr, 'Bağlantı kurulamadı.');
+          });
+        });
+      }
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        if (!inModal.hidden && !inModal._closing) {
+          event.preventDefault();
+          requestCloseModal(inForm, closeInModal);
+        }
+        if (!alertModal.hidden && !alertModal._closing) {
+          event.preventDefault();
+          requestCloseModal(alertForm, closeAlertModal);
+        }
+        if (editModal && !editModal.hidden && !editModal._closing) {
+          event.preventDefault();
+          requestCloseModal(editForm, closeEditModal);
+        }
+      });
+
+      {% if stock_modal == 'in' %}
+      openInModal();
+      showAlert(inErr, '{{ error|escapejs }}');
+      {% endif %}
+      {% if stock_modal == 'alert' %}
+      openAlertModal();
+      showAlert(alertErr, '{{ error|escapejs }}');
+      {% endif %}
+      {% if stock_modal == 'edit' %}
+      if (editModal) {
+        revealModal(editModal);
+        snapshotModalForm(editForm);
+        if (window.syncKlimaFields) window.syncKlimaFields({{ product.category.is_klima|yesno:'true,false' }});
+      }
+      {% endif %}
+    })();
+  </script>
+{% endblock %}

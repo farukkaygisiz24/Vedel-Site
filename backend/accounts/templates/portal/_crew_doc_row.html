@@ -1,0 +1,14 @@
+<div class="crew-doc" data-doc-row>
+  <div class="group">
+    <div class="row">
+      <input name="doc_title" placeholder=" " data-title autocomplete="off" value="{{ row.title }}" />
+      <label>Evrak adı</label>
+    </div>
+  </div>
+  <label class="file-pick">
+    <input type="file" name="doc_file" accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,application/pdf,image/*" />
+    <span data-file-label>Dosya seç</span>
+  </label>
+  {% include 'portal/_datepicker.html' with date_name='doc_expires_on' date_value=row.expires_on date_kicker='Son tarih' %}
+  <button class="icon-btn" type="button" data-doc-remove aria-label="Evrak satırını sil">×</button>
+</div>

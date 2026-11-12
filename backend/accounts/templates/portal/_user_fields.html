@@ -1,0 +1,168 @@
+{% if creating %}
+<p class="field-label">Hesap</p>
+<div class="group">
+  <div class="row">
+    <input id="u_username" name="username" placeholder=" " required autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off" data-lower value="{{ form.username }}" />
+    <label for="u_username">Kullanıcı adı</label>
+  </div>
+  <div class="row">
+    <input id="u_first_name" name="first_name" placeholder=" " data-title autocomplete="off" value="{{ form.first_name }}" />
+    <label for="u_first_name">Ad</label>
+  </div>
+  <div class="row">
+    <input id="u_last_name" name="last_name" placeholder=" " data-title autocomplete="off" value="{{ form.last_name }}" />
+    <label for="u_last_name">Soyad</label>
+  </div>
+</div>
+
+<p class="field-label">İletişim</p>
+<div class="group">
+  <div class="row">
+    <input id="u_email" name="email" type="email" placeholder=" " autocomplete="off" value="{{ form.email }}" />
+    <label for="u_email">E-posta</label>
+  </div>
+  <div class="row">
+    <input id="u_phone" name="phone" placeholder=" " inputmode="tel" maxlength="17" data-phone autocomplete="off" value="{{ form.phone }}" />
+    <label for="u_phone">Telefon</label>
+  </div>
+</div>
+
+<p class="field-label">Şifre</p>
+<div class="group">
+  <div class="row">
+    <input id="u_password" name="password" type="password" placeholder=" " autocomplete="new-password" required />
+    <label for="u_password">Şifre</label>
+  </div>
+  <div class="row">
+    <input id="u_password_confirm" name="password_confirm" type="password" placeholder=" " autocomplete="new-password" required />
+    <label for="u_password_confirm">Şifre tekrar</label>
+  </div>
+</div>
+<p class="hint">En az 8 karakter. Panele bu bilgilerle giriş yapılır.</p>
+{% else %}
+<div class="group">
+  <div class="row">
+    <input id="u_first_name" name="first_name" placeholder=" " data-title autocomplete="off" value="{{ form.first_name }}" />
+    <label for="u_first_name">Ad</label>
+  </div>
+  <div class="row">
+    <input id="u_last_name" name="last_name" placeholder=" " data-title autocomplete="off" value="{{ form.last_name }}" />
+    <label for="u_last_name">Soyad</label>
+  </div>
+  <div class="row">
+    <input id="u_email" name="email" type="email" placeholder=" " autocomplete="off" value="{{ form.email }}" />
+    <label for="u_email">E-posta</label>
+  </div>
+  <div class="row">
+    <input id="u_phone" name="phone" placeholder=" " inputmode="tel" maxlength="17" data-phone autocomplete="off" value="{{ form.phone }}" />
+    <label for="u_phone">Telefon</label>
+  </div>
+</div>
+
+<div class="fold{% if password_open %} is-open{% endif %}" data-fold>
+  <button class="fold-toggle" type="button" aria-expanded="{% if password_open %}true{% else %}false{% endif %}">Şifre değiştir</button>
+  <div class="fold-body"{% if not password_open %} hidden{% endif %}>
+    <div class="group">
+      <div class="row">
+        <input id="u_password" name="password" type="password" placeholder=" " autocomplete="new-password" />
+        <label for="u_password">Yeni şifre</label>
+      </div>
+      <div class="row">
+        <input id="u_password_confirm" name="password_confirm" type="password" placeholder=" " autocomplete="new-password" />
+        <label for="u_password_confirm">Şifre tekrar</label>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<p class="field-label">Rol</p>
+<div class="seg" id="user-role-seg">
+  {% for value, label in role_choices %}
+  <label>
+    <input
+      type="radio"
+      name="role"
+      value="{{ value }}"
+      {% if form.role == value %} checked{% endif %}
+      {% if lock_role %} disabled{% else %} required{% endif %}
+    />
+    <span>{{ label }}</span>
+  </label>
+  {% endfor %}
+</div>
+{% if lock_role %}<input type="hidden" name="role" value="{{ form.role }}" />{% endif %}
+
+<div id="user-crew-fields"{% if form.role != 'service' and form.role != 'service_lead' %} hidden{% endif %}>
+  <p class="field-label">Personel kartı</p>
+  <div class="group">
+    <div class="row">
+      <select id="u_crew_id" name="crew_id">
+        <option value="">Personel seçin</option>
+        {% for item in crew_choices %}
+        <option value="{{ item.pk }}"{% if form.crew_id == item.pk|stringformat:'s' %} selected{% endif %}>{{ item.display_name }} · {{ item.number }}</option>
+        {% endfor %}
+      </select>
+      <label for="u_crew_id">Personel</label>
+    </div>
+  </div>
+  <p class="hint">Saha işleri bu karta düşer. Servis hesabında zorunlu, servis yetkilisinde isteğe bağlı.</p>
+</div>
+
+<div id="user-stock-fields"{% if form.role != 'service' %} hidden{% endif %}>
+  <p class="field-label">Depo kategorileri</p>
+  {% if stock_category_choices %}
+  <div class="user-stock-list">
+    {% for item in stock_category_choices %}
+    <label class="switch" for="u_stock_{{ item.pk }}">
+      <span>
+        <b>{{ item.name }}</b>
+      </span>
+      <span class="toggle">
+        <input
+          type="checkbox"
+          name="stock_category"
+          id="u_stock_{{ item.pk }}"
+          value="{{ item.pk }}"
+          {% if item.pk in form.stock_category_ids %} checked{% endif %}
+          {% if lock_role %} disabled{% endif %}
+        />
+        <i></i>
+      </span>
+    </label>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="hint">Henüz kategori yok.</p>
+  {% endif %}
+</div>
+
+{% if creating %}
+<label class="switch" for="u_is_active">
+  <span>
+    <b>Aktif hesap</b>
+    <small class="hint">Kapalı hesap panele giriş yapamaz.</small>
+  </span>
+  <span class="toggle">
+    <input type="checkbox" name="is_active" id="u_is_active" value="1"{% if form.is_active %} checked{% endif %} />
+    <i></i>
+  </span>
+</label>
+{% endif %}
+
+<script>
+  (function () {
+    var seg = document.getElementById('user-role-seg');
+    var crew = document.getElementById('user-crew-fields');
+    var stock = document.getElementById('user-stock-fields');
+    if (!seg) return;
+    function sync() {
+      var chosen = seg.querySelector('input[name="role"]:checked');
+      var role = chosen ? chosen.value : '';
+      if (crew) crew.hidden = role !== 'service' && role !== 'service_lead';
+      if (stock) stock.hidden = role !== 'service';
+    }
+    seg.addEventListener('change', sync);
+    sync();
+  })();
+</script>

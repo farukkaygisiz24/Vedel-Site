@@ -1,0 +1,230 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ job.number }} | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="fis">
+    <div class="toolbar">
+      <div>
+        <h1>{{ job.number }}</h1>
+        <div class="fis-meta">
+          <span class="fis-chip">{{ job.date|date:'d.m.Y' }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}</span>
+          <span class="fis-chip">Bekleyen</span>
+          <span class="fis-chip">{{ job.kind_label }}</span>
+          {% if job.sale %}<a class="fis-chip" href="{{ job.sale.get_absolute_url }}">{{ job.sale.number }}</a>{% endif %}
+        </div>
+      </div>
+      <div class="fis-toolbar-actions">
+        {% if job.sale %}
+        <a class="btn is-ghost" href="{{ job.sale.get_absolute_url }}">Satış fişi</a>
+        {% endif %}
+        <a class="btn is-ghost" href="{% url 'portal-service' %}">Listeye dön</a>
+      </div>
+    </div>
+    <p class="flash is-err" id="pending-error"{% if not error %} hidden{% endif %}>{% if error %}{{ error }}{% endif %}</p>
+
+    <section class="fis-letter">
+      <div class="fis-letter-head">
+        <div>
+          <span class="fis-kicker">Müşteri</span>
+          <div class="fis-name">{{ job.party.display_name }}</div>
+          <p>{{ job.party.get_kind_display }}</p>
+        </div>
+        <a class="btn is-ghost" href="{{ job.party.get_absolute_url }}">Müşteri</a>
+      </div>
+      <dl class="fis-facts">
+        {% include 'portal/_party_facts.html' with party=job.party %}
+      </dl>
+    </section>
+
+    <form method="post" action="{{ job.get_absolute_url }}" id="pending-job-form" autocomplete="off">
+      {% csrf_token %}
+
+      <section class="fis-block">
+        <p class="field-label">Personel</p>
+        <div class="pick-chip" data-pick data-pick-empty="Eşleşen personel yok." data-pick-blank="Personel seç">
+          <button type="button" class="date-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="assignee-list">
+            <span data-pick-label{% if not assignee_id %} class="is-empty"{% endif %}>{% if assignee_name %}{{ assignee_name }}{% else %}Personel seç{% endif %}</span>
+          </button>
+          <input type="hidden" name="assignee_id" id="assignee_id" value="{{ assignee_id|default_if_none:'' }}" />
+          <div class="date-pop" id="assignee-list">
+            <div class="pick-search">
+              <span class="pick-search-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M16 16.5 20 20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </span>
+              <input type="search" data-pick-q placeholder="Personel ara" autocomplete="off" aria-autocomplete="list" aria-controls="assignee-opts" />
+            </div>
+            <div class="pick-list" data-pick-list role="listbox" aria-label="Görevli seç" id="assignee-opts">
+              <button type="button" class="pick-opt{% if assignee_id == 'all' %} is-on{% endif %}" role="option" data-pick-id="all" data-pick-label="Hepsi" data-pick-hay="Hepsi tüm personel"><span>Hepsi</span><small>Tüm personel</small></button>
+              {% for item in crew %}
+              <button type="button" class="pick-opt{% if assignee_id == item.pk %} is-on{% endif %}" role="option" data-pick-id="{{ item.pk }}" data-pick-label="{{ item.display_name }}" data-pick-hay="{{ item.display_name }} {{ item.number }} {{ item.title }}"><span>{{ item.display_name }}</span>{% if item.title %}<small>{{ item.title }}</small>{% endif %}</button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {% if job.sale %}
+      <section class="fis-block">
+        <p class="field-label">Depodan alınacak</p>
+        {% if sold_items %}
+        <div class="sheet-wrap">
+          <table class="sheet">
+            <thead>
+              <tr>
+                <th>Marka</th>
+                <th>Model</th>
+                <th>Dış ünite</th>
+                <th>Adet</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in sold_items %}
+              <tr>
+                <td>{{ item.brand }}</td>
+                <td>{{ item.model }}</td>
+                <td>{{ item.outdoor|default:'—' }}</td>
+                <td class="money">{{ item.qty|tr_qty }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <p class="hint">Sahaya çıkmadan bu klimaları depodan alın. Seri ve görsel sahada girilir.</p>
+        {% else %}
+        <div class="fis-note">Bu satışta cihaz kalemi yok.</div>
+        {% endif %}
+      </section>
+      {% elif job.device %}
+      <section class="fis-block">
+        <p class="field-label">Cihaz</p>
+        <div class="fis-note">{{ job.device.name }}{% if job.device.place %} · {{ job.device.place }}{% endif %}</div>
+      </section>
+      {% endif %}
+
+      {% if job.notes %}
+      <section class="fis-block">
+        <p class="field-label">İşlem notu</p>
+        <div class="fis-note">{{ job.notes }}</div>
+      </section>
+      {% endif %}
+
+      <section class="fis-block">
+        <p class="field-label">Gün ve saat</p>
+        <div class="fis-note">{{ slot_ask }}</div>
+        {% include 'portal/_service_day_cal.html' with cal_date_name='service_date' show_hours=True %}
+        {% include 'portal/_service_week_board.html' %}
+      </section>
+
+      <div class="wizard-nav">
+        <button class="btn is-ghost" type="submit" name="action" value="delete" id="pending-delete">Talebi sil</button>
+        <button class="btn" type="submit" name="action" value="confirm" id="confirm-day"{% if not assignee_id %} disabled{% endif %}>
+          <span class="btn-label">Günü kabul et</span>
+          <span class="btn-spin" aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+  <div class="modal" id="pending-ok-modal" hidden>
+    <div class="modal-card is-status">
+      <div class="modal-head">
+        <span class="fis-kicker">Servis</span>
+        <h2>Gün kabul edildi</h2>
+        <p class="step-copy">Servis takvimine yönlendiriliyorsunuz.</p>
+      </div>
+    </div>
+  </div>
+  {% include 'portal/_service_day_swap.html' %}
+  <script>
+    (function () {
+      var form = document.getElementById('pending-job-form');
+      var confirmBtn = document.getElementById('confirm-day');
+      var deleteBtn = document.getElementById('pending-delete');
+      var okModal = document.getElementById('pending-ok-modal');
+      var flash = document.getElementById('pending-error');
+      if (!form || !confirmBtn) return;
+      var assigneeEl = document.getElementById('assignee_id');
+      function assigneeId() {
+        return String((assigneeEl && assigneeEl.value) || '').trim();
+      }
+      function syncConfirm() {
+        confirmBtn.disabled = !assigneeId() || confirmBtn.classList.contains('is-busy');
+      }
+      function setBusy(on) {
+        confirmBtn.classList.toggle('is-busy', on);
+        confirmBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+        if (deleteBtn) deleteBtn.disabled = !!on;
+        syncConfirm();
+      }
+      function showError(text) {
+        if (!flash) return;
+        flash.textContent = text;
+        flash.hidden = !text;
+      }
+      function openOk() {
+        okModal.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { okModal.classList.add('is-on'); });
+        });
+      }
+      function confirmDay() {
+        if (confirmBtn.classList.contains('is-busy')) return;
+        if (!assigneeId()) {
+          showError('Personel seçin.');
+          syncConfirm();
+          return;
+        }
+        showError('');
+        setBusy(true);
+        var body = new FormData(form);
+        body.set('action', 'confirm');
+        var csrf = (form.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+        var started = Date.now();
+        var postUrl = form.getAttribute('action') || location.pathname;
+        fetch(postUrl, {
+          method: 'POST',
+          body: body,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+            'X-CSRFToken': csrf
+          },
+          credentials: 'same-origin'
+        }).then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok && data.ok, data: data };
+          }).catch(function () {
+            return { ok: false, data: { error: 'Gün kabul edilemedi.' } };
+          });
+        }).then(function (result) {
+          if (!result.ok) {
+            setBusy(false);
+            showError((result.data && result.data.error) || 'Gün kabul edilemedi.');
+            return;
+          }
+          var wait = Math.max(0, 2000 - (Date.now() - started));
+          window.setTimeout(function () {
+            openOk();
+            window.setTimeout(function () {
+              window.location = result.data.url;
+            }, 2000);
+          }, wait);
+        }).catch(function () {
+          setBusy(false);
+          showError('Bağlantı kurulamadı.');
+        });
+      }
+      if (assigneeEl) {
+        assigneeEl.addEventListener('change', syncConfirm);
+      }
+      syncConfirm();
+      form.addEventListener('submit', function (event) {
+        var submitter = event.submitter;
+        if (!submitter || submitter.getAttribute('value') !== 'confirm') return;
+        event.preventDefault();
+        confirmDay();
+      });
+    })();
+  </script>
+{% endblock %}

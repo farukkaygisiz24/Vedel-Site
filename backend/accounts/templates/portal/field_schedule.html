@@ -1,0 +1,37 @@
+{% extends 'portal/field_base.html' %}
+
+{% block title %}Haftalık program | Vedel Servis{% endblock %}
+
+{% block content %}
+  <h1>Haftalık program</h1>
+  <p class="lead">{% if member %}{{ week_label }}{% else %}Personel kartınız bağlı değil.{% endif %}</p>
+
+  {% if not member %}
+  <p class="day-jobs-empty">Saha işleri personel kartına bağlı hesaba düşer.{% if can_crew %} Kendinize iş atamak için bu hesabı bir personel kartına bağlayın.{% else %} Ofis bu hesabı bir personel kartına bağlamalı.{% endif %}</p>
+  {% else %}
+  <section class="week-board">
+    <div class="day-jobs-head">
+      <b>Bu hafta</b>
+      <small>{{ week_label }}</small>
+    </div>
+    <div class="week-board-grid">
+      {% for group in week_rows %}
+      <div class="week-col{% if group.today %} is-today{% endif %}">
+        <p class="week-day-label{% if group.today %} is-today{% endif %}{% if group.past %} is-past{% endif %}">{{ group.dow }} · {{ group.label }}</p>
+        {% for item in group.jobs %}
+        <a class="day-job" href="{{ item.get_field_url }}">
+          {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
+          <div>
+            <b>{{ item.party.display_name }}</b>
+            <small>{{ item.number }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
+          </div>
+        </a>
+        {% empty %}
+        <p class="week-day-empty">İş yok</p>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+{% endblock %}

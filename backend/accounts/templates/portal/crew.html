@@ -1,0 +1,101 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}Personel | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Personel</h1>
+      <p class="lead">Kimlik, adres ve evraklar. {{ window_days }} günlük hatırlatma penceresi.</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn" href="{% url 'portal-crew-new' %}">Yeni kart</a>
+    </div>
+  </div>
+
+  <div class="party-stats">
+    <div class="party-stat">
+      <span>Personel</span>
+      <b>{{ member_count }}</b>
+    </div>
+    <div class="party-stat">
+      <span>Yaklaşan</span>
+      <b{% if soon_count %} class="is-over"{% endif %}>{{ soon_count }}</b>
+    </div>
+    <div class="party-stat">
+      <span>Süresi geçen</span>
+      <b{% if expired_count %} class="is-over"{% endif %}>{{ expired_count }}</b>
+    </div>
+    <div class="party-stat">
+      <span>Pencere</span>
+      <b>{{ window_days }} gün</b>
+    </div>
+  </div>
+
+  {% if expired or soon %}
+  <p class="field-label">Evrak hatırlatma</p>
+  <div class="sheet-wrap sale-sheet">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>Personel</th>
+          <th>Evrak</th>
+          <th>Son tarih</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in expired %}
+        <tr class="sale-row">
+          <td><a class="sale-row-go" href="{{ item.member.get_absolute_url }}">{{ item.member.display_name }}</a></td>
+          <td>{{ item.title }}</td>
+          <td class="money is-over">{{ item.expires_on|date:'d.m.Y' }}</td>
+        </tr>
+        {% endfor %}
+        {% for item in soon %}
+        <tr class="sale-row">
+          <td><a class="sale-row-go" href="{{ item.member.get_absolute_url }}">{{ item.member.display_name }}</a></td>
+          <td>{{ item.title }}</td>
+          <td class="money">{{ item.expires_on|date:'d.m.Y' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <div class="crew-list">
+    <p class="field-label">Personel</p>
+    <form class="sale-filters" method="get" data-sale-filters>
+      <div class="sale-filters-top">
+        <input type="search" name="q" value="{{ query }}" placeholder="Kod, ad, T.C. veya telefon" autocomplete="off" />
+      </div>
+    </form>
+
+    <div class="sheet-wrap sale-sheet">
+      <table class="sheet">
+        <thead>
+          <tr>
+            <th>Kod</th>
+            <th>Ad</th>
+            <th>Unvan</th>
+            <th>Telefon</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in members %}
+          <tr class="sale-row">
+            <td><a class="sale-row-go" href="{{ item.get_absolute_url }}">{{ item.number }}</a></td>
+            <td>{{ item.display_name }}</td>
+            <td>{{ item.title|default:'—' }}</td>
+            <td>{{ item.phone|tel_link }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="empty">{{ empty_copy }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'portal/_pager.html' %}
+  </div>
+{% endblock %}

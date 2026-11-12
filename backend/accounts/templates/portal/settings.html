@@ -1,0 +1,38 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Kullanıcı ayarları | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <h1>Kullanıcı ayarları</h1>
+  <p class="lead">Hesap bilgilerinizi bu panelden güncelleyebilirsiniz.</p>
+  <form class="panel" method="post" action="{% url 'portal-settings' %}">
+    {% csrf_token %}
+    {% if error %}<p class="flash is-err">{{ error }}</p>{% endif %}
+    <div class="group">
+      <div class="row">
+        <input id="id_username" value="{{ user.username }}" placeholder=" " disabled />
+        <label for="id_username">Kullanıcı adı</label>
+      </div>
+      <div class="row">
+        <input id="id_email" name="email" type="email" value="{{ email }}" placeholder=" " autocomplete="email" />
+        <label for="id_email">E-posta</label>
+      </div>
+      <div class="row">
+        <input id="id_phone" name="phone" value="{{ phone }}" placeholder=" " autocomplete="tel" />
+        <label for="id_phone">Telefon</label>
+      </div>
+    </div>
+    <div class="group">
+      <div class="row">
+        <input id="id_current_password" name="current_password" type="password" placeholder=" " autocomplete="current-password" />
+        <label for="id_current_password">Mevcut şifre</label>
+      </div>
+      <div class="row">
+        <input id="id_new_password" name="new_password" type="password" placeholder=" " autocomplete="new-password" />
+        <label for="id_new_password">Yeni şifre</label>
+      </div>
+    </div>
+    <p class="hint">Şifreyi değiştirmek istemiyorsanız bu alanları boş bırakın.</p>
+    <button class="save" type="submit">Kaydet</button>
+  </form>
+{% endblock %}

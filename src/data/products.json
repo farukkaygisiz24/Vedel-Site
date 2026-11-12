@@ -956,12 +956,12 @@
   "euroform": {
     "brand": "Euroform",
     "logo": "/euroform.png",
-    "description": "Türkiye'nin yerli klima markası Euroform, uygun fiyat ve güvenilir performans ile her eve konfor getiriyor.",
+    "description": "Euroform, uygun fiyat ve güvenilir performans ile her eve konfor getiriyor.",
     "split": [
       {
         "id": "euroform-split-09",
         "model": "EF2WTI091-SET",
-        "name": "Wing Serisi",
+        "name": "Euroform Split",
         "btu": 9000,
         "coolingCapacity": "8.530 BTU/h",
         "heatingCapacity": "9.554 BTU/h",
@@ -984,7 +984,7 @@
       {
         "id": "euroform-split-12",
         "model": "EF2WTI121-SET",
-        "name": "Wing Serisi",
+        "name": "Euroform Split",
         "btu": 12000,
         "coolingCapacity": "11.000 BTU/h",
         "heatingCapacity": "11.600 BTU/h",
@@ -1007,7 +1007,7 @@
       {
         "id": "euroform-split-18",
         "model": "EF2WTI181-SET",
-        "name": "Wing Serisi",
+        "name": "Euroform Split",
         "btu": 18000,
         "coolingCapacity": "15.700 BTU/h",
         "heatingCapacity": "17.742 BTU/h",
@@ -1030,7 +1030,7 @@
       {
         "id": "euroform-split-24",
         "model": "EF2WTI241-SET",
-        "name": "Wing Serisi",
+        "name": "Euroform Split",
         "btu": 24000,
         "coolingCapacity": "21.154 BTU/h",
         "heatingCapacity": "22.715 BTU/h",

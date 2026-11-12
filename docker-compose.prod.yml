@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: vedel_b2c
+      POSTGRES_USER: vedel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - vedel_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U vedel -d vedel_b2c']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://vedel:${POSTGRES_PASSWORD}@db:5432/vedel_b2c
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-servis.vedel.com.tr,127.0.0.1}
+      DJANGO_CORS_ORIGINS: ${DJANGO_CORS_ORIGINS:-https://vedel.com.tr,https://www.vedel.com.tr}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://servis.vedel.com.tr,https://vedel.com.tr,https://www.vedel.com.tr}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+    volumes:
+      - ./backend:/app
+      - ./media:/app/media
+    ports:
+      - '127.0.0.1:8020:8000'
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  vedel_pgdata:

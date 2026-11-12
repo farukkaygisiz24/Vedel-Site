@@ -1,0 +1,121 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}Servis işleri | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>İşler</h1>
+      <p class="lead">{% if tech_mode %}Size atanan servis işleri.{% else %}Bekleyen, açık, teslim ve kapanmış servis işleri.{% endif %}</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn is-ghost" href="{% url 'portal-service' %}">Hafta</a>
+      {% if not tech_mode %}
+      <a class="btn" href="{% url 'portal-service-job-new' %}">Yeni iş</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <form class="sale-filters" method="get" data-sale-filters>
+    <div class="sale-filters-top">
+      <input type="search" name="q" value="{{ query }}" placeholder="Kod, cari veya cihaz" autocomplete="off" />
+    </div>
+    <div class="sale-filters-bar">
+      <div class="sale-filter">
+        <span class="sale-filter-kicker">Durum</span>
+        <div class="sale-filter-opts">
+          <label>
+            <input type="radio" name="status" value=""{% if not status %} checked{% endif %} />
+            <span>Tümü</span>
+          </label>
+          {% if not tech_mode %}
+          <label>
+            <input type="radio" name="status" value="pending"{% if status == 'pending' %} checked{% endif %} />
+            <span>Bekleyen</span>
+          </label>
+          {% endif %}
+          <label>
+            <input type="radio" name="status" value="open"{% if status == 'open' %} checked{% endif %} />
+            <span>Açık</span>
+          </label>
+          <label>
+            <input type="radio" name="status" value="submitted"{% if status == 'submitted' %} checked{% endif %} />
+            <span>Teslim</span>
+          </label>
+          <label>
+            <input type="radio" name="status" value="closed"{% if status == 'closed' %} checked{% endif %} />
+            <span>Kapalı</span>
+          </label>
+        </div>
+      </div>
+      <div class="sale-filter">
+        <span class="sale-filter-kicker">Tür</span>
+        <div class="sale-filter-opts">
+          <label>
+            <input type="radio" name="kind" value=""{% if not kind %} checked{% endif %} />
+            <span>Tümü</span>
+          </label>
+          <label>
+            <input type="radio" name="kind" value="service"{% if kind == 'service' %} checked{% endif %} />
+            <span>Servis</span>
+          </label>
+          <label>
+            <input type="radio" name="kind" value="mount"{% if kind == 'mount' %} checked{% endif %} />
+            <span>Montaj</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="sheet-wrap sale-sheet">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>Tarih</th>
+          <th>No</th>
+          <th>Tür</th>
+          <th>Müşteri</th>
+          <th>Cihaz</th>
+          <th>Durum</th>
+          {% if not tech_mode %}<th>Tutar</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in jobs %}
+        <tr class="sale-row">
+          <td>{{ item.date|date:'d.m.Y' }}{% if item.time %} · {{ item.time|time:'H:i' }}{% endif %}</td>
+          <td><a class="sale-row-go" href="{{ item.get_absolute_url }}">{{ item.display_number }}</a></td>
+          <td>{{ item.kind_label }}</td>
+          <td>{{ item.party.display_name }}</td>
+          <td>{{ item.device_summary }}</td>
+          <td>{{ item.get_status_display }}</td>
+          {% if not tech_mode %}<td class="money">{{ item.grand_total|tr_money }} ₺</td>{% endif %}
+        </tr>
+        {% empty %}
+            <tr><td colspan="{% if tech_mode %}6{% else %}7{% endif %}" class="empty">{{ empty_copy }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'portal/_pager.html' %}
+  <script>
+    (function () {
+      var form = document.querySelector('[data-sale-filters]');
+      if (!form) return;
+      form.addEventListener('submit', function () {
+        form.querySelectorAll('input').forEach(function (el) {
+          if (el.disabled) return;
+          if (!String(el.value || '').trim()) el.disabled = true;
+        });
+      });
+      form.querySelectorAll('.sale-filter input').forEach(function (el) {
+        el.addEventListener('change', function () {
+          if (typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form.submit();
+        });
+      });
+    })();
+  </script>
+{% endblock %}

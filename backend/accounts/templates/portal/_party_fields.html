@@ -1,0 +1,79 @@
+<div class="choice">
+  <span class="choice-kicker">Müşteri türü</span>
+  <label><input type="radio" name="kind" value="real"{% if not party or party.kind == 'real' %} checked{% endif %} /> Gerçek kişi</label>
+  <label><input type="radio" name="kind" value="legal"{% if party.kind == 'legal' %} checked{% endif %} /> Tüzel kişi</label>
+</div>
+<div class="group" data-kind="real">
+  <div class="row">
+    <input id="id_first_name" name="first_name" value="{{ party.first_name|default:'' }}" placeholder=" " required data-upper autocomplete="off" />
+    <label for="id_first_name">Ad</label>
+  </div>
+  <div class="row">
+    <input id="id_last_name" name="last_name" value="{{ party.last_name|default:'' }}" placeholder=" " required data-upper autocomplete="off" />
+    <label for="id_last_name">Soyad</label>
+  </div>
+  <div class="row">
+    <input id="id_national_id" name="national_id" value="{{ party.national_id|default:'' }}" placeholder=" " inputmode="numeric" maxlength="11" data-digits="11" autocomplete="off" />
+    <label for="id_national_id">T.C. kimlik no</label>
+  </div>
+</div>
+<div class="group" data-kind="legal">
+  <div class="row">
+    <input id="id_company_name" name="company_name" value="{{ party.company_name|default:'' }}" placeholder=" " required data-upper autocomplete="off" />
+    <label for="id_company_name">Unvan</label>
+  </div>
+  <div class="row">
+    <input id="id_tax_office" name="tax_office" value="{{ party.tax_office|default:'' }}" placeholder=" " data-upper autocomplete="off" />
+    <label for="id_tax_office">Vergi dairesi</label>
+  </div>
+  <div class="row">
+    <input id="id_tax_no" name="tax_no" value="{{ party.tax_no|default:'' }}" placeholder=" " inputmode="numeric" maxlength="11" data-digits="11" autocomplete="off" />
+    <label for="id_tax_no">Vergi kimlik no</label>
+  </div>
+</div>
+<div class="group" data-kind="legal">
+  <div class="row">
+    <input id="id_contact_first" name="first_name" value="{{ party.first_name|default:'' }}" placeholder=" " required data-upper autocomplete="off" />
+    <label for="id_contact_first">Yetkili adı</label>
+  </div>
+  <div class="row">
+    <input id="id_contact_last" name="last_name" value="{{ party.last_name|default:'' }}" placeholder=" " required data-upper autocomplete="off" />
+    <label for="id_contact_last">Yetkili soyadı</label>
+  </div>
+</div>
+<div class="group">
+  <div class="row">
+    <input id="id_phone" name="phone" value="{{ party.phone|default:'' }}" placeholder=" " inputmode="tel" maxlength="17" data-phone required autocomplete="tel" />
+    <label for="id_phone">Telefon</label>
+  </div>
+</div>
+<div class="fold{% if party.contact2_name or party.phone2 %} is-open{% endif %}" data-fold>
+  <button class="fold-toggle" type="button" aria-expanded="{% if party.contact2_name or party.phone2 %}true{% else %}false{% endif %}">2. ulaşım</button>
+  <div class="fold-body"{% if not party.contact2_name and not party.phone2 %} hidden{% endif %}>
+    <div class="group">
+      <div class="row">
+        <input id="id_contact2_name" name="contact2_name" value="{{ party.contact2_name|default:'' }}" placeholder=" " data-upper autocomplete="off" />
+        <label for="id_contact2_name">Ad soyad</label>
+      </div>
+      <div class="row">
+        <input id="id_phone2" name="phone2" value="{{ party.phone2|default:'' }}" placeholder=" " inputmode="tel" maxlength="17" data-phone autocomplete="tel" />
+        <label for="id_phone2">Telefon</label>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="group">
+  <div class="row">
+    <input id="id_email" name="email" type="email" value="{{ party.email|default:'' }}" placeholder=" " data-upper autocomplete="email" />
+    <label for="id_email">E-posta</label>
+  </div>
+  {% include 'portal/_city_district_picks.html' with city_id='id_city' district_id='id_district' city_value=party.city district_value=party.district %}
+  <div class="row">
+    <input id="id_address" name="address" value="{{ party.address|default:'' }}" placeholder=" " required data-upper autocomplete="off" />
+    <label for="id_address">Adres</label>
+  </div>
+  <div class="row">
+    <input id="id_party_notes" name="party_notes" value="{{ party.notes|default:'' }}" placeholder=" " data-upper autocomplete="off" />
+    <label for="id_party_notes">Müşteri notu</label>
+  </div>
+</div>

@@ -1,0 +1,2197 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Yeni satış | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Yeni satış</h1>
+      <p class="lead">Müşteri, kalem ve tahsilat aynı satış fişinde.</p>
+    </div>
+    <a class="btn is-ghost" href="{% url 'portal-sales' %}">Listeye dön</a>
+  </div>
+  <p class="flash is-err" id="sale-error"{% if not error %} hidden{% endif %} role="alert">{{ error }}</p>
+
+  <form class="wizard" method="post" action="{% url 'portal-sales-new' %}" id="sale-form" autocomplete="off" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="party_mode" value="existing" />
+    <input type="hidden" name="party_id" id="party_id" />
+    <input type="hidden" name="invoice_status" id="invoice_status" value="not_issued" />
+    <input type="hidden" name="work_type" value="device_sale" />
+
+    <div class="wizard-head">
+      <div class="steps" role="tablist">
+        <button type="button" class="is-on" data-go="1">1 · Müşteri</button>
+        <button type="button" data-go="2">2 · Kalemler</button>
+        <button type="button" data-go="3">3 · Tahsilat</button>
+      </div>
+      {% include 'portal/_datepicker.html' with date_name='date' date_value=today date_kicker='Tarih' %}
+    </div>
+
+    <section class="step-pane is-on" data-step="1">
+      <p class="step-copy">Satışın bağlandığı müşteri. Kayıtlı müşteriler listede.</p>
+      <div class="party-tools" id="party-tools">
+        <input type="search" id="party-search" placeholder="Kod, isim, unvan veya telefon ara" autocomplete="off" />
+        <button class="btn" type="button" id="open-party">Yeni müşteri</button>
+      </div>
+      <div class="picked" id="picked-party" hidden>
+        <div>
+          <b id="picked-name"></b>
+          <small id="picked-meta"></small>
+        </div>
+        <button class="btn is-ghost" type="button" id="clear-party">Değiştir</button>
+      </div>
+      <div class="party-list" id="party-list"></div>
+      <div class="pager" id="party-pager" hidden></div>
+      <p class="pager-meta" id="party-meta"></p>
+    </section>
+
+    <section class="step-pane" data-step="2">
+      <p class="step-copy">Önce Split veya Multi seçin. Kategori ve ürün kalemleri ardından açılır. KDV satırda; fiyat girişi +KDV, KDV dahil veya KDV yok.</p>
+      <p class="field-label">Cihaz tipi</p>
+      <div class="seg" id="sale-family-seg">
+        <label>
+          <input type="radio" name="sale_family" value="split" />
+          <span>Split</span>
+        </label>
+        <label>
+          <input type="radio" name="sale_family" value="multi" />
+          <span>Multi</span>
+        </label>
+      </div>
+      <div id="sale-catalog-panel" aria-hidden="true" inert>
+        <div id="sale-catalog-inner">
+          {% if sale_categories %}
+          <p class="field-label">Kategori</p>
+          <div class="seg" id="sale-category-seg">
+            {% for cat in sale_categories %}
+            <label>
+              <input type="radio" name="sale_category" value="{{ cat.pk }}"{% if sale_categories|length == 1 %} checked{% endif %} />
+              <span>{{ cat.name }}</span>
+            </label>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div id="sale-lines-panel">
+            <div class="line-table" id="sale-lines">
+              <div class="line-head">
+                <span>Ürün</span>
+                <span>Adet</span>
+                <span>Birim fiyat</span>
+                <span>KDV %</span>
+                <span>Satır tutarı</span>
+                <span></span>
+              </div>
+            </div>
+            <div class="line-actions">
+              <button class="btn is-ghost" type="button" id="add-line">Kalem ekle</button>
+            </div>
+          </div>
+          <div class="totals-bar">
+            <div>
+              <div class="seg is-mini">
+                {% for value, label in vat_choices %}
+                <label>
+                  <input type="radio" name="vat_mode" value="{{ value }}" />
+                  <span>{{ label }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            <div class="totals">
+              <span>Ara <b id="sum-net">0,00 ₺</b></span>
+              <span>KDV <b id="sum-vat">0,00 ₺</b></span>
+              <span>Genel <b id="sum-grand">0,00 ₺</b></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step-pane" data-step="3">
+      <p class="step-copy">İlk tahsilat, fatura, servis günü-saati ve işlem notu. Nakit, kart ve havale aynı fişte.</p>
+      <div id="klima-group-wrap" hidden>
+        <p class="field-label">Multi gruplar</p>
+        <p class="step-copy">Her iç üniteyi bir dış ünite grubuna bağlayın. Gruplar otomatik dolmaz. En fazla 7 iç ünite.</p>
+        <div class="sheet-wrap device-group-wrap">
+          <table class="sheet device-group-sheet">
+            <thead>
+              <tr>
+                <th>İç ünite</th>
+                <th>Grup</th>
+              </tr>
+            </thead>
+            <tbody id="klima-group-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="field-label">İlk tahsilat</p>
+      <div class="pay-grid" id="pay-lines">
+        {% for value, label in pay_choices %}
+        <div class="pay-card" data-pay-method="{{ value }}">
+          <label>
+            <span class="pay-kicker">{{ label }}</span>
+            <input type="hidden" name="pay_method" value="{{ value }}" />
+            <input name="pay_amount" inputmode="decimal" placeholder="0,00" autocomplete="off" />
+          </label>
+          {% if value == 'card' %}
+          <div class="pay-card-extra" hidden>
+            <div class="pay-card-extra-inner">
+              <span class="pay-kicker">Kart üzerindeki ad soyad</span>
+              <input name="card_holder" placeholder="Ad soyad" data-upper autocomplete="off" />
+              <span class="pay-kicker">Taksit</span>
+              {% include 'portal/_card_installments.html' %}
+            </div>
+          </div>
+          {% elif value == 'transfer' %}
+          <div class="pay-card-extra" hidden>
+            <div class="pay-card-extra-inner">
+              <span class="pay-kicker">Havale eden ad soyad</span>
+              <input name="transfer_sender" placeholder="Ad soyad" data-upper autocomplete="off" />
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <p class="hint">Boş tutar kayda girmez. Kart ve havalede ad soyad gerekir.</p>
+      <div class="totals">
+        <span>Genel <b id="pay-grand">0,00 ₺</b></span>
+        <span>Tahsil <b id="pay-paid">0,00 ₺</b></span>
+        <span>Kalan <b id="pay-rest">0,00 ₺</b></span>
+      </div>
+      <label class="switch" for="invoice_issued" style="margin-top:22px">
+        <span>
+          <b>Fatura kesildi</b>
+          <small class="hint">Kapalı kayıt faturasız kalır.</small>
+        </span>
+        <span class="toggle">
+          <input type="checkbox" name="invoice_issued" id="invoice_issued" />
+          <i></i>
+        </span>
+      </label>
+      <div class="group" id="invoice-no-wrap" hidden>
+        <div class="row">
+          <input id="id_invoice_no" name="invoice_no" placeholder=" " data-upper autocomplete="off" />
+          <label for="id_invoice_no">Fatura no</label>
+        </div>
+      </div>
+      <p class="field-label">Servis günü ve saati</p>
+      <div class="day-cal-row" data-service-cal>
+        <div class="day-cal">
+          <input type="hidden" name="service_date" id="service_date" value="" />
+          <div class="day-cal-head">
+            <button type="button" data-cal-prev aria-label="Önceki ay">‹</button>
+            <b data-cal-month></b>
+            <button type="button" data-cal-next aria-label="Sonraki ay">›</button>
+          </div>
+          <div class="date-dow">
+            <span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span>
+          </div>
+          <div class="date-grid" data-cal-grid></div>
+          <div class="day-hours-clip" data-cal-hours-clip hidden>
+            <div class="seg is-mini day-hours" data-cal-hours>
+              {% for hour in service_hours %}
+              <label style="--i: {{ forloop.counter0 }}">
+                <input type="radio" name="service_time" value="{{ hour }}" />
+                <span>{{ hour }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          <p class="day-cal-warn" data-cal-warn hidden>Kapasite dolu. Taşeron veya ikinci personel için saat yine seçilebilir.</p>
+          <div class="day-cal-foot">
+            <div class="day-cal-key">
+              <span><i></i>Boş</span>
+              <span><i class="is-busy"></i>Dolu</span>
+              <span><i class="is-full"></i>Kapasite dolu</span>
+            </div>
+            <span class="hint" data-cal-meta>Gün seçilmedi.</span>
+          </div>
+        </div>
+        <aside class="day-jobs">
+          <div class="day-jobs-head">
+            <b data-cal-jobs-title>Gün seçilmedi</b>
+            <small data-cal-jobs-count></small>
+          </div>
+          <div class="day-jobs-list" data-cal-jobs-list>
+            <p class="day-jobs-empty">Takvimden gün seçin. Atanan işler ve saatleri burada.</p>
+          </div>
+        </aside>
+      </div>
+      <div class="group">
+        <div class="row">
+          <input id="id_notes" name="notes" placeholder=" " />
+          <label for="id_notes">İşlem notu</label>
+        </div>
+      </div>
+    </section>
+
+    <div class="wizard-nav">
+      <button class="btn is-ghost" type="button" id="prev-step" hidden>Geri</button>
+      <button class="btn" type="button" id="next-step" disabled>Devam</button>
+      <button class="btn" type="submit" id="save-sale" hidden>
+        <span class="btn-label">Satışı kaydet</span>
+        <span class="btn-spin" aria-hidden="true"></span>
+      </button>
+    </div>
+  </form>
+
+  <div class="modal" id="party-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Müşteri</span>
+        <h2>Yeni müşteri</h2>
+        <p class="step-copy">Gerçek kişi veya tüzel kişi kaydı.</p>
+      </div>
+      <form id="party-modal-form" novalidate>
+        {% csrf_token %}
+        <div class="modal-seg">
+          <div class="seg">
+            <label><input type="radio" name="kind" value="real" checked /><span>Gerçek kişi</span></label>
+            <label><input type="radio" name="kind" value="legal" /><span>Tüzel kişi</span></label>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="kind-stage">
+            <div class="group kind-pane is-on" data-kind="real">
+              <div class="row">
+                <input id="m_first_name" name="first_name" placeholder=" " required data-upper autocomplete="off" />
+                <label for="m_first_name">Ad</label>
+              </div>
+              <div class="row">
+                <input id="m_last_name" name="last_name" placeholder=" " required data-upper autocomplete="off" />
+                <label for="m_last_name">Soyad</label>
+              </div>
+              <div class="row is-wide">
+                <input id="m_national_id" name="national_id" placeholder=" " inputmode="numeric" maxlength="11" data-digits="11" autocomplete="off" />
+                <label for="m_national_id">T.C. kimlik no</label>
+              </div>
+            </div>
+            <div class="group kind-pane" data-kind="legal">
+              <div class="row is-wide">
+                <input id="m_company_name" name="company_name" placeholder=" " required data-upper autocomplete="off" />
+                <label for="m_company_name">Unvan</label>
+              </div>
+              <div class="row">
+                <input id="m_tax_office" name="tax_office" placeholder=" " data-upper autocomplete="off" />
+                <label for="m_tax_office">Vergi dairesi</label>
+              </div>
+              <div class="row">
+                <input id="m_tax_no" name="tax_no" placeholder=" " inputmode="numeric" maxlength="11" data-digits="11" autocomplete="off" />
+                <label for="m_tax_no">Vergi kimlik no</label>
+              </div>
+              <div class="row">
+                <input id="m_contact_first" name="first_name" placeholder=" " required data-upper autocomplete="off" />
+                <label for="m_contact_first">Yetkili adı</label>
+              </div>
+              <div class="row">
+                <input id="m_contact_last" name="last_name" placeholder=" " required data-upper autocomplete="off" />
+                <label for="m_contact_last">Yetkili soyadı</label>
+              </div>
+            </div>
+          </div>
+          <div class="group">
+            <div class="row">
+              <input id="m_phone" name="phone" placeholder=" " inputmode="tel" maxlength="17" data-phone required autocomplete="tel" />
+              <label for="m_phone">Telefon</label>
+            </div>
+            <div class="row">
+              <input id="m_email" name="email" type="email" placeholder=" " data-upper autocomplete="email" />
+              <label for="m_email">E-posta</label>
+            </div>
+          </div>
+          <div class="fold" data-fold>
+            <button class="fold-toggle" type="button" aria-expanded="false">2. ulaşım</button>
+            <div class="fold-body" hidden>
+              <div class="group">
+                <div class="row">
+                  <input id="m_contact2_name" name="contact2_name" placeholder=" " data-upper autocomplete="off" />
+                  <label for="m_contact2_name">Ad soyad</label>
+                </div>
+                <div class="row">
+                  <input id="m_phone2" name="phone2" placeholder=" " inputmode="tel" maxlength="17" data-phone autocomplete="tel" />
+                  <label for="m_phone2">Telefon</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="group">
+            {% include 'portal/_city_district_picks.html' with city_id='m_city' district_id='m_district' %}
+            <div class="row is-wide">
+              <input id="m_address" name="address" placeholder=" " required data-upper autocomplete="off" />
+              <label for="m_address">Adres</label>
+            </div>
+          </div>
+        </div>
+        <p class="modal-alert" id="modal-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-party">Vazgeç</button>
+          <button class="btn" type="submit" id="save-party">
+            <span class="btn-label">Müşteriyi kaydet</span>
+            <span class="btn-spin" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <template id="line-tpl">
+    <div class="line-block">
+      <div class="line-row">
+        <div class="prod-pick">
+          <input type="hidden" name="product_id" />
+          <input type="search" class="prod-q" placeholder="Ürün veya stok kodu" autocomplete="off" />
+          <div class="prod-menu" hidden></div>
+        </div>
+        <input name="qty" inputmode="decimal" value="1" required />
+        <input name="unit_price" inputmode="decimal" placeholder="0,00" required />
+        <input name="vat_rate" inputmode="decimal" placeholder="%" tabindex="-1" />
+        <span class="money" data-line-total>0,00 ₺</span>
+        <button class="icon-btn" type="button" data-remove aria-label="Kalemi sil" tabindex="-1">×</button>
+      </div>
+      <div class="line-stock" hidden>
+        <div class="line-stock-inner">
+          <p class="line-stock-count" data-stock-count></p>
+          <p class="line-stock-alert" data-stock-alert hidden></p>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <div class="modal" id="product-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Depo</span>
+        <h2>Depoya ürün</h2>
+        <p class="step-copy">Yeni stok kartı. Satış kalemine seçili gelir.</p>
+      </div>
+      <form id="product-modal-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="product" />
+        <div class="modal-body">
+          <div class="group">
+            <div class="row">
+              <input id="p_sku" name="sku" placeholder=" " readonly tabindex="-1" />
+              <label for="p_sku">Stok kodu</label>
+            </div>
+            <div class="row">
+              <input id="p_brand" name="brand" placeholder=" " data-title autocomplete="off" />
+              <label for="p_brand">Marka</label>
+            </div>
+            <div class="row">
+              <input id="p_name" name="name" placeholder=" " required data-upper autocomplete="off" />
+              <label for="p_name">Ürün adı</label>
+            </div>
+            <div class="row">
+              <input id="p_sale_price" name="sale_price" inputmode="decimal" placeholder=" " autocomplete="off" />
+              <label for="p_sale_price">Satış fiyatı</label>
+            </div>
+            <div class="row">
+              <input id="p_vat_rate" name="vat_rate" value="20" placeholder=" " inputmode="decimal" />
+              <label for="p_vat_rate">KDV %</label>
+            </div>
+            <div class="row">
+              <input id="p_qty" name="qty" inputmode="decimal" placeholder=" " />
+              <label for="p_qty">Elde stok</label>
+            </div>
+          </div>
+        </div>
+        <p class="modal-alert" id="product-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-product">Vazgeç</button>
+          <button class="btn" type="submit" id="save-product">
+            <span class="btn-label">Ürünü kaydet</span>
+            <span class="btn-spin" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="sale-ok-modal" hidden>
+    <div class="modal-card is-status">
+      <div class="modal-head">
+        <span class="fis-kicker">Satış</span>
+        <h2>Satış onaylandı</h2>
+        <p class="step-copy">Satış fişine yönlendiriliyorsunuz.</p>
+      </div>
+    </div>
+  </div>
+
+  {{ service_load|json_script:"service-load" }}
+  <script>
+    (function () {
+      var csrf = document.querySelector('#sale-form [name=csrfmiddlewaretoken]').value;
+      var customersUrl = '{% url "portal-sales-customers" %}';
+      var stockUrl = '{% url "portal-stock" %}';
+      var serviceUrl = '{% url "portal-service" %}';
+      var step = 1;
+      var partyId = '';
+      var partyPage = 1;
+      var partyQuery = '';
+      var partyPages = 1;
+      var partyCount = 0;
+      var searchTimer = 0;
+      var fetchCtl = null;
+      var pageCache = {};
+      var panes = document.querySelectorAll('.step-pane');
+      var tabs = document.querySelectorAll('.steps button');
+      var list = document.getElementById('party-list');
+      var pager = document.getElementById('party-pager');
+      var meta = document.getElementById('party-meta');
+      var picked = document.getElementById('picked-party');
+      var tools = document.getElementById('party-tools');
+      var lines = document.getElementById('sale-lines');
+      var pays = document.getElementById('pay-lines');
+      var modal = document.getElementById('party-modal');
+      var MODAL_DISCARD_CONFIRM = 'Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?';
+
+      function isIgnoredModalField(el) {
+        if (!el || el.disabled) return true;
+        var type = String(el.type || '').toLowerCase();
+        var name = String(el.name || '');
+        if (type === 'hidden') {
+          return name !== 'city' && name !== 'district';
+        }
+        if (type === 'button' || type === 'submit' || type === 'reset' || type === 'file') return true;
+        if (name === 'csrfmiddlewaretoken' || name === 'action') return true;
+        if (el.hasAttribute('data-pick-q')) return true;
+        return false;
+      }
+      function modalFieldKey(el) {
+        var type = String(el.type || '').toLowerCase();
+        if (el.id) return 'id:' + el.id;
+        if (type === 'radio') return 'radio:' + el.name + '=' + el.value;
+        return 'name:' + (el.name || el.tagName);
+      }
+      function normalizeModalValue(el) {
+        var type = String(el.type || '').toLowerCase();
+        if (type === 'checkbox' || type === 'radio') return el.checked ? '1' : '0';
+        if (el.hasAttribute && el.hasAttribute('data-phone')) {
+          var digits = String(el.value || '').replace(/\D/g, '');
+          return digits.length <= 1 ? '' : digits;
+        }
+        return String(el.value || '');
+      }
+      function snapshotModalForm(form) {
+        var snap = {};
+        if (!form) return;
+        form.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (isIgnoredModalField(el)) return;
+          snap[modalFieldKey(el)] = normalizeModalValue(el);
+        });
+        form._modalSnapshot = snap;
+      }
+      function updateModalSnapshotField(form, el) {
+        if (!form || !el) return;
+        if (!form._modalSnapshot) snapshotModalForm(form);
+        if (isIgnoredModalField(el)) return;
+        form._modalSnapshot[modalFieldKey(el)] = normalizeModalValue(el);
+      }
+      function isModalFormDirty(form) {
+        if (!form || !form._modalSnapshot) return false;
+        var snap = form._modalSnapshot;
+        var dirty = false;
+        form.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (dirty || isIgnoredModalField(el)) return;
+          var key = modalFieldKey(el);
+          var initial = Object.prototype.hasOwnProperty.call(snap, key) ? snap[key] : '';
+          if (normalizeModalValue(el) !== initial) dirty = true;
+        });
+        return dirty;
+      }
+      function requestCloseModal(form, closeFn) {
+        if (isModalFormDirty(form) && !window.confirm(MODAL_DISCARD_CONFIRM)) return false;
+        closeFn();
+        return true;
+      }
+      function topPortalModal() {
+        var nodes = document.querySelectorAll('.modal:not([hidden])');
+        var i;
+        for (i = nodes.length - 1; i >= 0; i -= 1) {
+          if (!nodes[i]._closing) return nodes[i];
+        }
+        return null;
+      }
+
+      function money(n) {
+        return (Math.round(n * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2 }) + ' ₺';
+      }
+      function parseMoney(raw) {
+        var text = String(raw || '').trim().replace(/\s/g, '');
+        if (!text) return 0;
+        if (text.indexOf(',') >= 0) {
+          return parseFloat(text.replace(/\./g, '').replace(',', '.')) || 0;
+        }
+        var parts = text.split('.');
+        if (parts.length > 1 && parts.slice(1).every(function (part) { return part.length === 3; })) {
+          return parseFloat(parts.join('')) || 0;
+        }
+        return parseFloat(text) || 0;
+      }
+      function formatMoneyNumber(n) {
+        if (!isFinite(n)) return '';
+        return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      function formatMoneyInput(raw, complete) {
+        var text = String(raw || '');
+        if (!text.trim()) return '';
+        if (text.indexOf(',') < 0 && /^\d+\.\d{1,2}$/.test(text.trim())) {
+          text = text.trim().replace('.', ',');
+        }
+        text = text.replace(/[^\d,]/g, '');
+        var comma = text.indexOf(',');
+        var intPart;
+        var decPart;
+        var hasComma = comma >= 0;
+        if (hasComma) {
+          intPart = text.slice(0, comma).replace(/\D/g, '');
+          decPart = text.slice(comma + 1).replace(/\D/g, '').slice(0, 2);
+        } else {
+          intPart = text.replace(/\D/g, '');
+          decPart = '';
+        }
+        if (!intPart && !decPart && !hasComma) return '';
+        intPart = intPart.replace(/^0+(?=\d)/, '').slice(0, 10);
+        if (!intPart) intPart = '0';
+        var grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        if (complete) return grouped + ',' + (decPart + '00').slice(0, 2);
+        return hasComma ? grouped + ',' + decPart : grouped;
+      }
+      function caretAfterDigits(value, count) {
+        var pos = 0;
+        var seen = 0;
+        while (pos < value.length && seen < count) {
+          if (/\d/.test(value.charAt(pos))) seen += 1;
+          pos += 1;
+        }
+        return pos;
+      }
+      function bindMoneyInput(el) {
+        el.addEventListener('keydown', function (event) {
+          if (event.key !== '.' && event.key !== ',') return;
+          if (String(el.value).indexOf(',') >= 0) {
+            event.preventDefault();
+            return;
+          }
+          if (event.key !== '.') return;
+          event.preventDefault();
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = el.value.slice(0, start) + ',' + el.value.slice(end);
+          el.setSelectionRange(start + 1, start + 1);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        el.addEventListener('input', function () {
+          var start = el.selectionStart;
+          var old = el.value;
+          var typedComma = start > 0 && old.charAt(start - 1) === ',';
+          var digitsBefore = old.slice(0, start).replace(/\D/g, '').length;
+          var next = formatMoneyInput(old);
+          el.value = next;
+          if (typedComma && next.indexOf(',') >= 0) {
+            var commaAt = next.indexOf(',');
+            el.setSelectionRange(commaAt + 1, commaAt + 1);
+          } else {
+            var pos = caretAfterDigits(next, digitsBefore);
+            el.setSelectionRange(pos, pos);
+          }
+        });
+        el.addEventListener('blur', function () {
+          var next = formatMoneyInput(el.value, true);
+          if (el.value !== next) el.value = next;
+        });
+      }
+      function vatMode() {
+        var el = document.querySelector('input[name="vat_mode"]:checked');
+        return el ? el.value : '';
+      }
+      function saleVatReady() {
+        return Boolean(vatMode());
+      }
+      function formatStockQty(n) {
+        if (!isFinite(n)) return '0';
+        if (Math.abs(n - Math.round(n)) < 0.001) return String(Math.round(n));
+        return n.toLocaleString('tr-TR', { maximumFractionDigits: 2 });
+      }
+      function setLineStockOpen(wrap, open, fromHeight) {
+        window.clearTimeout(wrap._stockTimer);
+        if (!open) {
+          if (!wrap.classList.contains('is-open') && wrap.hidden) return;
+          if (reduceMotion()) {
+            wrap.classList.remove('is-open');
+            wrap.hidden = true;
+            wrap.style.height = '';
+            return;
+          }
+          wrap.style.height = (fromHeight || wrap.scrollHeight) + 'px';
+          wrap.offsetHeight;
+          wrap.classList.remove('is-open');
+          wrap.style.height = '0px';
+          wrap._stockTimer = window.setTimeout(function () {
+            wrap.hidden = true;
+            wrap.style.height = '';
+          }, 360);
+          return;
+        }
+        wrap.hidden = false;
+        if (reduceMotion()) {
+          wrap.classList.add('is-open');
+          wrap.style.height = '';
+          return;
+        }
+        var start = typeof fromHeight === 'number' ? fromHeight : (wrap.classList.contains('is-open') ? wrap.getBoundingClientRect().height : 0);
+        wrap.style.height = start + 'px';
+        wrap.offsetHeight;
+        wrap.classList.add('is-open');
+        wrap.style.height = wrap.scrollHeight + 'px';
+        wrap._stockTimer = window.setTimeout(function () {
+          if (wrap.classList.contains('is-open')) wrap.style.height = '';
+        }, 360);
+      }
+      function paintLineStock(row) {
+        var block = row.closest('.line-block');
+        if (!block) return;
+        var wrap = block.querySelector('.line-stock');
+        if (!wrap) return;
+        var countEl = wrap.querySelector('[data-stock-count]');
+        var alertEl = wrap.querySelector('[data-stock-alert]');
+        var fromH = wrap.hidden ? 0 : wrap.getBoundingClientRect().height;
+        var pid = row.querySelector('[name=product_id]');
+        var hasProduct = Boolean(pid && pid.value && row.hasAttribute('data-stock'));
+        if (!hasProduct) {
+          countEl.hidden = true;
+          countEl.textContent = '';
+          alertEl.hidden = true;
+          alertEl.textContent = '';
+          wrap.classList.remove('is-low');
+          setLineStockOpen(wrap, false, fromH);
+          return;
+        }
+        var qty = parseFloat(String(row.querySelector('[name=qty]').value).replace(',', '.')) || 0;
+        var stock = parseFloat(row.getAttribute('data-stock') || '0') || 0;
+        var empty = stock <= 0;
+        var low = stock <= 3;
+        var over = qty > stock;
+        wrap.classList.toggle('is-low', low);
+        if (empty) {
+          countEl.hidden = true;
+          countEl.textContent = '';
+        } else {
+          countEl.hidden = false;
+          countEl.textContent = 'Elde ' + formatStockQty(stock) + ' var';
+        }
+        if (empty) {
+          alertEl.hidden = false;
+          alertEl.textContent = 'Stok kaleminden elde yoktur. Siparişe istinaden hareket ediniz.';
+        } else if (over) {
+          alertEl.hidden = false;
+          alertEl.textContent = 'Elde yetmez. Siparişe istinaden hareket ediniz.';
+        } else {
+          alertEl.hidden = true;
+          alertEl.textContent = '';
+        }
+        setLineStockOpen(wrap, true, fromH);
+      }
+      function lineSum() {
+        var net = 0, vat = 0, grand = 0;
+        lines.querySelectorAll('.line-row').forEach(function (row) {
+          var qty = parseFloat(String(row.querySelector('[name=qty]').value).replace(',', '.')) || 0;
+          var price = parseMoney(row.querySelector('[name=unit_price]').value);
+          var rate = parseFloat(String(row.querySelector('[name=vat_rate]').value).replace(',', '.')) || 0;
+          var pid = row.querySelector('[name=product_id]');
+          var stock = parseFloat(row.getAttribute('data-stock') || '0') || 0;
+          row.classList.toggle('is-warn', Boolean(pid && pid.value && qty > stock));
+          paintLineStock(row);
+          var base = qty * price;
+          var n, v, t;
+          var mode = vatMode();
+          if (mode === 'included') {
+            t = base;
+            n = t / (1 + rate / 100);
+            v = t - n;
+          } else if (mode === 'plus') {
+            n = base;
+            v = n * rate / 100;
+            t = n + v;
+          } else {
+            n = base;
+            v = 0;
+            t = base;
+          }
+          net += n; vat += v; grand += t;
+          row.querySelector('[data-line-total]').textContent = money(t);
+        });
+        document.getElementById('sum-net').textContent = money(net);
+        document.getElementById('sum-vat').textContent = money(vat);
+        document.getElementById('sum-grand').textContent = money(grand);
+        document.getElementById('pay-grand').textContent = money(grand);
+        var paid = 0;
+        pays.querySelectorAll('[name=pay_amount]').forEach(function (el) {
+          paid += parseMoney(el.value);
+        });
+        document.getElementById('pay-paid').textContent = money(paid);
+        document.getElementById('pay-rest').textContent = money(Math.max(0, grand - paid));
+        document.getElementById('pay-rest').classList.toggle('is-over', paid > grand + 0.001);
+        paintKlimaGroups();
+        return grand;
+      }
+      function paintKlimaGroups() {
+        var wrap = document.getElementById('klima-group-wrap');
+        var body = document.getElementById('klima-group-body');
+        if (!wrap || !body) return;
+        var prev = Array.prototype.map.call(body.querySelectorAll('input[name=indoor_group]'), function (el) {
+          return el.value;
+        });
+        var outdoors = [];
+        var indoors = [];
+        lines.querySelectorAll('.line-row').forEach(function (row) {
+          var pid = row.querySelector('[name=product_id]');
+          if (!pid || !pid.value) return;
+          var kind = row.getAttribute('data-kind') || '';
+          var label = row.getAttribute('data-label') || (row.querySelector('.prod-q') && row.querySelector('.prod-q').value) || 'Ünite';
+          var qty = parseFloat(String(row.querySelector('[name=qty]').value).replace(',', '.')) || 0;
+          var count = qty > 0 ? Math.ceil(qty) : 0;
+          var i;
+          if (kind === 'multi_outdoor') {
+            for (i = 0; i < count; i += 1) outdoors.push(label);
+          } else if (kind === 'multi_indoor') {
+            for (i = 0; i < count; i += 1) indoors.push(label);
+          }
+        });
+        if (saleFamily() !== 'multi' || !outdoors.length || !indoors.length) {
+          wrap.hidden = true;
+          body.innerHTML = '';
+          wrap.removeAttribute('data-outdoors');
+          return;
+        }
+        wrap.hidden = false;
+        wrap.setAttribute('data-outdoors', String(outdoors.length));
+        body.innerHTML = '';
+        indoors.forEach(function (label, index) {
+          var tr = document.createElement('tr');
+          var tdModel = document.createElement('td');
+          tdModel.textContent = indoors.length > 1 ? label + ' · ' + (index + 1) : label;
+          var tdSel = document.createElement('td');
+          var selected = prev[index] || '';
+          var chip = document.createElement('div');
+          chip.className = 'pick-chip';
+          chip.setAttribute('data-pick', '');
+          chip.setAttribute('data-pick-empty', 'Eşleşen grup yok.');
+          chip.setAttribute('data-pick-blank', 'Grup seç');
+          var trigger = document.createElement('button');
+          trigger.type = 'button';
+          trigger.className = 'date-trigger';
+          trigger.setAttribute('aria-haspopup', 'listbox');
+          trigger.setAttribute('aria-expanded', 'false');
+          trigger.setAttribute('aria-label', 'Grup');
+          var triggerLabel = document.createElement('span');
+          triggerLabel.setAttribute('data-pick-label', '');
+          triggerLabel.textContent = 'Grup seç';
+          triggerLabel.classList.toggle('is-empty', !selected);
+          trigger.appendChild(triggerLabel);
+          var hid = document.createElement('input');
+          hid.type = 'hidden';
+          hid.name = 'indoor_group';
+          hid.value = selected;
+          var pop = document.createElement('div');
+          pop.className = 'date-pop';
+          var queryWrap = document.createElement('div');
+          queryWrap.className = 'pick-search';
+          var queryIcon = document.createElement('span');
+          queryIcon.className = 'pick-search-icon';
+          queryIcon.setAttribute('aria-hidden', 'true');
+          queryIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M16 16.5 20 20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+          var query = document.createElement('input');
+          query.type = 'search';
+          query.setAttribute('data-pick-q', '');
+          query.placeholder = 'Grup ara';
+          query.autocomplete = 'off';
+          queryWrap.appendChild(queryIcon);
+          queryWrap.appendChild(query);
+          var list = document.createElement('div');
+          list.className = 'pick-list';
+          list.setAttribute('data-pick-list', '');
+          list.setAttribute('role', 'listbox');
+          list.setAttribute('aria-label', 'Grup seç');
+          function addOpt(id, text) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pick-opt' + (String(id) === String(selected) ? ' is-on' : '');
+            btn.setAttribute('data-pick-id', id);
+            btn.setAttribute('data-pick-label', text);
+            btn.setAttribute('data-pick-hay', text);
+            btn.textContent = text;
+            if (String(id) === String(selected)) triggerLabel.textContent = text;
+            list.appendChild(btn);
+          }
+          addOpt('', 'Grup seç');
+          outdoors.forEach(function (outLabel, oi) {
+            addOpt(String(oi), 'Grup ' + (oi + 1) + ' · ' + outLabel);
+          });
+          pop.appendChild(queryWrap);
+          pop.appendChild(list);
+          chip.appendChild(trigger);
+          chip.appendChild(hid);
+          chip.appendChild(pop);
+          tdSel.appendChild(chip);
+          tr.appendChild(tdModel);
+          tr.appendChild(tdSel);
+          body.appendChild(tr);
+        });
+        if (window.initPortalPicks) window.initPortalPicks(body);
+      }
+      function klimaGroupError() {
+        var wrap = document.getElementById('klima-group-wrap');
+        var dateEl = document.getElementById('service_date');
+        if (!wrap || wrap.hidden || !dateEl || !dateEl.value) return '';
+        var selects = wrap.querySelectorAll('input[name=indoor_group]');
+        var counts = {};
+        var outdoorN = Number(wrap.getAttribute('data-outdoors') || '0');
+        var i;
+        for (i = 0; i < selects.length; i += 1) {
+          if (!selects[i].value) return 'Her iç üniteyi bir dış ünite grubuna bağlayın.';
+          counts[selects[i].value] = (counts[selects[i].value] || 0) + 1;
+        }
+        for (i = 0; i < outdoorN; i += 1) {
+          var n = counts[String(i)] || 0;
+          if (n < 1) return 'Her dış ünite grubuna en az bir iç ünite bağlayın.';
+          if (n > 7) return 'Bir dış üniteye en fazla 7 iç ünite bağlanır.';
+        }
+        return '';
+      }
+      function showStep(n) {
+        step = n;
+        panes.forEach(function (pane) {
+          pane.classList.toggle('is-on', Number(pane.getAttribute('data-step')) === n);
+        });
+        tabs.forEach(function (tab, i) {
+          tab.classList.toggle('is-on', i === n - 1);
+          tab.classList.toggle('is-done', i < n - 1);
+        });
+        document.getElementById('prev-step').hidden = n === 1;
+        document.getElementById('next-step').hidden = n === 3;
+        document.getElementById('save-sale').hidden = n !== 3;
+        syncContinue();
+        if (n >= 2) lineSum();
+      }
+      function cacheKey(query, page) {
+        return query + '|' + page;
+      }
+      function syncContinue() {
+        var next = document.getElementById('next-step');
+        if (step === 2) next.disabled = !partyId || !saleVatReady();
+        else next.disabled = !partyId;
+        tabs.forEach(function (tab, i) {
+          if (i === 0) return;
+          if (i === 2) tab.disabled = !partyId || !saleVatReady();
+          else tab.disabled = !partyId;
+        });
+      }
+      function showSkeletons() {
+        list.innerHTML = '';
+        for (var i = 0; i < 3; i += 1) {
+          var skel = document.createElement('div');
+          skel.className = 'party-card is-skel';
+          list.appendChild(skel);
+        }
+      }
+      function drawPager() {
+        pager.innerHTML = '';
+        if (partyPages <= 1) {
+          pager.hidden = true;
+          return;
+        }
+        pager.hidden = false;
+        var start = Math.max(1, partyPage - 2);
+        var end = Math.min(partyPages, start + 4);
+        start = Math.max(1, end - 4);
+        function addBtn(label, page, opts) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = label;
+          if (opts && opts.on) btn.className = 'is-on';
+          btn.disabled = Boolean(opts && opts.disabled);
+          btn.addEventListener('click', function () {
+            loadParties(page, partyQuery);
+          });
+          pager.appendChild(btn);
+        }
+        addBtn('‹', Math.max(1, partyPage - 1), { disabled: partyPage === 1 });
+        for (var i = start; i <= end; i += 1) {
+          addBtn(String(i), i, { on: i === partyPage });
+        }
+        addBtn('›', Math.min(partyPages, partyPage + 1), { disabled: partyPage === partyPages });
+      }
+      function paintParties(rows) {
+        list.innerHTML = '';
+        rows.forEach(function (p) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'party-card' + (String(p.id) === String(partyId) ? ' is-on' : '');
+          btn.innerHTML = '<div><b></b><small></small></div><span class="pill"></span>';
+          btn.querySelector('b').textContent = p.name;
+          btn.querySelector('small').textContent = [p.number, p.phone, p.city].filter(Boolean).join(' · ');
+          btn.querySelector('.pill').textContent = p.kind_label;
+          btn.addEventListener('click', function () { selectParty(p); });
+          list.appendChild(btn);
+        });
+        if (!rows.length) {
+          var empty = document.createElement('p');
+          empty.className = 'empty';
+          empty.textContent = partyQuery ? 'Eşleşen müşteri yok.' : 'Kayıtlı müşteri yok. Yeni müşteri ile ekleyin.';
+          list.appendChild(empty);
+        }
+        if (partyCount && partyPages > 1) {
+          meta.textContent = partyCount + ' cari · sayfa ' + partyPage + ' / ' + partyPages;
+        } else if (partyCount) {
+          meta.textContent = partyCount + ' cari';
+        } else {
+          meta.textContent = partyQuery ? 'Eşleşen kayıt yok.' : '';
+        }
+        drawPager();
+      }
+      function prefetch(page, query) {
+        var key = cacheKey(query, page);
+        if (pageCache[key]) return;
+        fetch(customersUrl + '?page=' + page + '&q=' + encodeURIComponent(query), {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (data && data.ok) pageCache[key] = data;
+          })
+          .catch(function () {});
+      }
+      function applyPartyPage(data, query, page) {
+        partyPage = data.page || page;
+        partyPages = data.pages || 1;
+        partyCount = data.count || 0;
+        partyQuery = query;
+        paintParties(data.results || []);
+        list.classList.remove('is-loading');
+        if (data.has_next) prefetch(partyPage + 1, query);
+      }
+      function loadParties(page, query) {
+        partyPage = page;
+        partyQuery = query || '';
+        var key = cacheKey(partyQuery, page);
+        if (pageCache[key]) {
+          applyPartyPage(pageCache[key], partyQuery, page);
+          return;
+        }
+        if (fetchCtl) fetchCtl.abort();
+        fetchCtl = new AbortController();
+        list.classList.add('is-loading');
+        showSkeletons();
+        fetch(customersUrl + '?page=' + page + '&q=' + encodeURIComponent(partyQuery), {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          signal: fetchCtl.signal
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (!data || !data.ok) throw new Error('party');
+            pageCache[key] = data;
+            applyPartyPage(data, partyQuery, page);
+          })
+          .catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+            list.classList.remove('is-loading');
+            list.innerHTML = '<p class="empty">Müşteriler yüklenemedi. Yeniden deneyin.</p>';
+            pager.hidden = true;
+            meta.textContent = '';
+          });
+      }
+      function selectParty(p) {
+        partyId = String(p.id);
+        document.getElementById('party_id').value = partyId;
+        document.getElementById('picked-name').textContent = p.name;
+        document.getElementById('picked-meta').textContent = p.kind_label + ' · ' + p.phone;
+        picked.hidden = false;
+        list.hidden = true;
+        pager.hidden = true;
+        meta.hidden = true;
+        tools.hidden = true;
+        syncContinue();
+      }
+      document.getElementById('clear-party').addEventListener('click', function () {
+        partyId = '';
+        document.getElementById('party_id').value = '';
+        picked.hidden = true;
+        list.hidden = false;
+        meta.hidden = false;
+        tools.hidden = false;
+        syncContinue();
+        loadParties(partyPage, document.getElementById('party-search').value.trim());
+      });
+      document.getElementById('party-search').addEventListener('input', function (event) {
+        var value = event.target.value.trim();
+        window.clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(function () {
+          pageCache = {};
+          loadParties(1, value);
+        }, 400);
+      });
+      var productRow = null;
+      var productModal = document.getElementById('product-modal');
+      var productTimer = 0;
+      var saveProductBtn = document.getElementById('save-product');
+      var nextSku = '';
+      function cacheNextSku(data) {
+        if (data && data.next_sku) nextSku = String(data.next_sku);
+      }
+      function fillProductSku() {
+        var el = document.getElementById('p_sku');
+        if (el && nextSku) el.value = nextSku;
+      }
+      function focusProductModal(seed) {
+        var el = document.getElementById(seed ? 'p_sale_price' : 'p_name');
+        if (el) el.focus();
+      }
+      function ensureNextSku() {
+        if (nextSku) return Promise.resolve(nextSku);
+        return fetch(stockUrl, {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        }).then(function (response) { return response.json(); })
+          .then(function (data) {
+            cacheNextSku(data);
+            return nextSku;
+          });
+      }
+      function closeProdMenus(except) {
+        lines.querySelectorAll('.prod-menu').forEach(function (menu) {
+          if (menu === except) return;
+          menu.hidden = true;
+          menu.innerHTML = '';
+        });
+      }
+      function applyProduct(row, p) {
+        if (!row || !p) return;
+        row.querySelector('[name=product_id]').value = p.id;
+        row.querySelector('.prod-q').value = p.label || p.name || '';
+        row.setAttribute('data-stock', p.stock || '0');
+        row.setAttribute('data-kind', p.device_kind || '');
+        row.setAttribute('data-label', p.label || p.name || '');
+        row.querySelector('[name=unit_price]').value = formatMoneyNumber(parseFloat(p.price) || 0);
+        row.querySelector('[name=vat_rate]').value = String(p.vat || '');
+        lineSum();
+        var qty = row.querySelector('[name=qty]');
+        if (qty) qty.focus();
+      }
+      function paintProdMenu(row, results, query) {
+        var menu = row.querySelector('.prod-menu');
+        menu.innerHTML = '';
+        (results || []).forEach(function (p) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.tabIndex = -1;
+          btn.className = 'prod-opt';
+          btn.innerHTML = '<b></b><small></small>';
+          btn.querySelector('b').textContent = p.label || p.name;
+          btn.querySelector('small').textContent = (p.sku || '') + ' · ' + (p.stock || '0') + ' ' + (p.unit || 'adet');
+          btn.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+            applyProduct(row, p);
+            menu.hidden = true;
+            menu.innerHTML = '';
+          });
+          menu.appendChild(btn);
+        });
+        if (!results || !results.length) {
+          var empty = document.createElement('p');
+          empty.className = 'prod-empty';
+          empty.textContent = query ? 'Depoda eşleşen ürün yok.' : 'Depoda ürün yok.';
+          menu.appendChild(empty);
+        }
+        var add = document.createElement('button');
+        add.type = 'button';
+        add.tabIndex = -1;
+        add.className = 'prod-add';
+        add.textContent = 'Depoya ürün ekle';
+        add.addEventListener('mousedown', function (event) {
+          event.preventDefault();
+          menu.hidden = true;
+          openProductModal(row, query);
+        });
+        menu.appendChild(add);
+        menu.hidden = false;
+      }
+      function saleFamily() {
+        var on = document.querySelector('#sale-family-seg input[name=sale_family]:checked');
+        return on ? on.value : '';
+      }
+      function saleCategory() {
+        var on = document.querySelector('#sale-category-seg input[name=sale_category]:checked');
+        return on ? on.value : '';
+      }
+      function saleCategoryReady() {
+        return !document.getElementById('sale-category-seg') || Boolean(saleCategory());
+      }
+      function saleLineMin() {
+        var family = saleFamily();
+        if (family === 'multi') return 7;
+        if (family === 'split') return 3;
+        return 0;
+      }
+      function addSaleLine() {
+        var node = document.getElementById('line-tpl').content.cloneNode(true);
+        lines.appendChild(node);
+        bindLine(lines.lastElementChild.querySelector('.line-row'));
+      }
+      function lineHasProduct(block) {
+        var pid = block.querySelector('[name=product_id]');
+        return Boolean(pid && pid.value);
+      }
+      function setSaleCatalogOpen(open) {
+        var catalog = document.getElementById('sale-catalog-panel');
+        if (!catalog) return;
+        var shown = catalog.classList.contains('is-open');
+        if (open === shown) return;
+        window.clearTimeout(catalog._overflowTimer);
+        catalog.setAttribute('aria-hidden', open ? 'false' : 'true');
+        catalog.inert = !open;
+        var instant = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (instant) {
+          catalog.classList.toggle('is-open', open);
+          catalog.style.overflow = open ? 'visible' : '';
+          return;
+        }
+        catalog.style.overflow = 'hidden';
+        catalog.offsetHeight;
+        catalog.classList.toggle('is-open', open);
+        if (!open) return;
+        catalog._overflowTimer = window.setTimeout(function () {
+          if (catalog.classList.contains('is-open')) catalog.style.overflow = 'visible';
+        }, 430);
+      }
+      function ensureSaleLines() {
+        var min = saleLineMin();
+        if (min < 1) {
+          closeProdMenus();
+          setSaleCatalogOpen(false);
+          return;
+        }
+        while (lines.querySelectorAll('.line-block').length < min) {
+          addSaleLine();
+        }
+        var empty = Array.prototype.filter.call(lines.querySelectorAll('.line-block'), function (block) {
+          return !lineHasProduct(block);
+        });
+        while (lines.querySelectorAll('.line-block').length > min && empty.length) {
+          var extra = empty.pop();
+          extra.remove();
+        }
+        lineSum();
+        setSaleCatalogOpen(true);
+      }
+      function searchProducts(row, query) {
+        if (!saleFamily() || !saleCategoryReady()) return;
+        var ctl = row._prodCtl;
+        if (ctl) ctl.abort();
+        row._prodCtl = new AbortController();
+        var url = stockUrl + '?q=' + encodeURIComponent(query) + '&page=1';
+        var family = saleFamily();
+        var category = saleCategory();
+        if (family) url += '&device_family=' + encodeURIComponent(family);
+        if (category) url += '&category_id=' + encodeURIComponent(category);
+        fetch(url, {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          signal: row._prodCtl.signal
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (data && data.ok) {
+              cacheNextSku(data);
+              paintProdMenu(row, data.results || [], query);
+            }
+          })
+          .catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+          });
+      }
+      function bindProductPick(row) {
+        var hid = row.querySelector('[name=product_id]');
+        var q = row.querySelector('.prod-q');
+        var menu = row.querySelector('.prod-menu');
+        q.addEventListener('focus', function () {
+          if (!saleFamily() || !saleCategoryReady()) {
+            q.blur();
+            return;
+          }
+          closeProdMenus(menu);
+          searchProducts(row, q.value.trim());
+        });
+        q.addEventListener('input', function () {
+          hid.value = '';
+          row.removeAttribute('data-stock');
+          row.removeAttribute('data-kind');
+          row.removeAttribute('data-label');
+          paintLineStock(row);
+          window.clearTimeout(row._prodTimer);
+          row._prodTimer = window.setTimeout(function () {
+            searchProducts(row, q.value.trim());
+          }, 400);
+        });
+        q.addEventListener('keydown', function (event) {
+          if (event.key === 'Tab') {
+            menu.hidden = true;
+            menu.innerHTML = '';
+            return;
+          }
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            var first = menu.querySelector('.prod-opt');
+            if (first) first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          }
+          if (event.key === 'Escape') {
+            menu.hidden = true;
+            menu.innerHTML = '';
+          }
+        });
+      }
+      document.addEventListener('mousedown', function (event) {
+        if (event.target && event.target.closest && event.target.closest('.prod-pick')) return;
+        closeProdMenus();
+      });
+      function setProductBusy(on) {
+        saveProductBtn.classList.toggle('is-busy', on);
+        saveProductBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+      }
+      function openProductModal(row, seed) {
+        productRow = row;
+        var form = document.getElementById('product-modal-form');
+        form.reset();
+        document.getElementById('product-error').hidden = true;
+        setProductBusy(false);
+        if (seed) document.getElementById('p_name').value = String(seed).replace(/i/g, 'İ').replace(/ı/g, 'I').toUpperCase();
+        snapshotModalForm(form);
+        productModal.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { productModal.classList.add('is-on'); });
+        });
+        ensureNextSku().then(function () {
+          fillProductSku();
+          updateModalSnapshotField(form, document.getElementById('p_sku'));
+          focusProductModal(seed);
+        }).catch(function () {
+          focusProductModal(seed);
+        });
+      }
+      function closeProductModal() {
+        window.clearTimeout(productTimer);
+        productModal._closing = true;
+        productModal.classList.remove('is-on');
+        var hide = function () {
+          productModal.hidden = true;
+          productModal._closing = false;
+          document.getElementById('product-modal-form').reset();
+          document.getElementById('product-error').hidden = true;
+          setProductBusy(false);
+          productRow = null;
+        };
+        if (reduceMotion()) { hide(); return; }
+        productTimer = window.setTimeout(hide, 280);
+      }
+      productModal._closeModal = closeProductModal;
+      document.getElementById('close-product').addEventListener('click', function () {
+        requestCloseModal(document.getElementById('product-modal-form'), closeProductModal);
+      });
+      productModal.addEventListener('click', function (event) {
+        if (event.target === productModal) {
+          requestCloseModal(document.getElementById('product-modal-form'), closeProductModal);
+        }
+      });
+      document.getElementById('product-modal-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (saveProductBtn.classList.contains('is-busy')) return;
+        var name = document.getElementById('p_name').value.trim();
+        var err = document.getElementById('product-error');
+        if (!name) {
+          err.textContent = 'Boş zorunlu alanlar var. Yıldızlı alanları doldurun.';
+          err.hidden = false;
+          return;
+        }
+        err.hidden = true;
+        setProductBusy(true);
+        fetch(stockUrl, {
+          method: 'POST',
+          body: new FormData(event.target),
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+            'X-CSRFToken': csrf
+          },
+          credentials: 'same-origin'
+        }).then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok && data.ok, data: data };
+          });
+        }).then(function (result) {
+          if (!result.ok) {
+            setProductBusy(false);
+            err.textContent = (result.data && result.data.error) || 'Ürün kaydedilemedi.';
+            err.hidden = false;
+            return;
+          }
+          cacheNextSku(result.data);
+          applyProduct(productRow, result.data);
+          closeProductModal();
+          if (window.takePortalToast) window.takePortalToast(result.data);
+        }).catch(function () {
+          setProductBusy(false);
+          err.textContent = 'Bağlantı kurulamadı.';
+          err.hidden = false;
+        });
+      });
+      function bindLine(row) {
+        bindProductPick(row);
+        bindMoneyInput(row.querySelector('[name=unit_price]'));
+        row.querySelectorAll('input[name=qty], input[name=unit_price], input[name=vat_rate]').forEach(function (el) {
+          el.addEventListener('input', lineSum);
+        });
+        row.querySelector('[data-remove]').addEventListener('click', function () {
+          if (lines.querySelectorAll('.line-row').length <= saleLineMin()) return;
+          var block = row.closest('.line-block') || row;
+          block.remove();
+          lineSum();
+        });
+      }
+      document.getElementById('add-line').addEventListener('click', function () {
+        if (!saleFamily()) return;
+        addSaleLine();
+        lineSum();
+      });
+      document.querySelectorAll('input[name=vat_mode]').forEach(function (el) {
+        el.addEventListener('change', function () {
+          lineSum();
+          syncContinue();
+        });
+      });
+      document.querySelectorAll('#sale-family-seg input[name=sale_family]').forEach(function (el) {
+        el.addEventListener('change', function () {
+          closeProdMenus();
+          ensureSaleLines();
+          paintKlimaGroups();
+        });
+      });
+      document.querySelectorAll('#sale-category-seg input[name=sale_category]').forEach(function (el) {
+        el.addEventListener('change', function () {
+          closeProdMenus();
+        });
+      });
+      ensureSaleLines();
+      function syncPayExtras(animate) {
+        pays.querySelectorAll('[data-pay-method]').forEach(function (card) {
+          var extra = card.querySelector('.pay-card-extra');
+          if (!extra) return;
+          var amount = card.querySelector('[name=pay_amount]');
+          var on = parseMoney(amount && amount.value) > 0;
+          var shown = extra.classList.contains('is-open') && !extra.hidden;
+          extra.querySelectorAll('[name=card_holder], [name=transfer_sender]').forEach(function (el) {
+            el.required = on;
+            if (!on) el.value = '';
+          });
+          extra.querySelectorAll('[name=card_installments]').forEach(function (el, index) {
+            el.required = on && index === 0;
+            if (!on) el.checked = false;
+          });
+          card.classList.toggle('is-card-on', on);
+          if (on === shown) return;
+          if (window.setPortalReveal) window.setPortalReveal(extra, on, animate);
+          else {
+            extra.hidden = !on;
+            extra.classList.toggle('is-open', on);
+          }
+        });
+      }
+      pays.querySelectorAll('[name=pay_amount]').forEach(function (el) {
+        bindMoneyInput(el);
+        el.addEventListener('input', function () {
+          lineSum();
+          syncPayExtras(true);
+        });
+      });
+      syncPayExtras(false);
+      document.getElementById('next-step').addEventListener('click', function () {
+        if (step === 1 && !partyId) {
+          alert('Devam etmek için bir cari seçin veya yeni cari ekleyin.');
+          return;
+        }
+        if (step === 2) {
+          if (!saleFamily()) {
+            alert('Split veya Multi seçin.');
+            return;
+          }
+          if (!saleCategoryReady()) {
+            alert('Kategori seçin.');
+            return;
+          }
+          if (!saleVatReady()) {
+            alert('+ KDV, KDV dahil veya KDV yok seçin.');
+            return;
+          }
+          var ok = Array.prototype.some.call(lines.querySelectorAll('[name=product_id]'), function (el) {
+            return el.value;
+          });
+          if (!ok) {
+            alert('En az bir ürün kalemi seçin.');
+            return;
+          }
+        }
+        showStep(step + 1);
+      });
+      document.getElementById('prev-step').addEventListener('click', function () {
+        showStep(Math.max(1, step - 1));
+      });
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          var n = Number(tab.getAttribute('data-go'));
+          if (n > 1 && !partyId) return;
+          if (n === 3) {
+            if (!saleFamily() || !saleVatReady()) return;
+            var ok = Array.prototype.some.call(lines.querySelectorAll('[name=product_id]'), function (el) {
+              return el.value;
+            });
+            if (!ok) return;
+          }
+          showStep(n);
+        });
+      });
+      var invoiceWrap = document.getElementById('invoice-no-wrap');
+      var invoiceTimer = 0;
+      function finishInvoiceWrap(open) {
+        invoiceWrap.style.height = '';
+        if (!open) invoiceWrap.hidden = true;
+      }
+      function setInvoiceWrap(open, animate) {
+        document.getElementById('invoice_status').value = open ? 'issued' : 'not_issued';
+        window.clearTimeout(invoiceTimer);
+        if (!animate || reduceMotion()) {
+          invoiceWrap.classList.toggle('is-open', open);
+          invoiceWrap.hidden = !open;
+          invoiceWrap.style.height = '';
+          if (open) document.getElementById('id_invoice_no').focus();
+          return;
+        }
+        if (open) {
+          invoiceWrap.hidden = false;
+          invoiceWrap.style.height = '0px';
+          invoiceWrap.classList.remove('is-open');
+          invoiceWrap.offsetHeight;
+          invoiceWrap.classList.add('is-open');
+          invoiceWrap.style.height = invoiceWrap.scrollHeight + 'px';
+          requestAnimationFrame(function () {
+            document.getElementById('id_invoice_no').focus();
+          });
+          invoiceTimer = window.setTimeout(function () {
+            if (invoiceWrap.classList.contains('is-open')) invoiceWrap.style.height = '';
+          }, 360);
+          return;
+        }
+        invoiceWrap.style.height = invoiceWrap.scrollHeight + 'px';
+        invoiceWrap.offsetHeight;
+        invoiceWrap.classList.remove('is-open');
+        invoiceWrap.style.height = '0px';
+        invoiceTimer = window.setTimeout(function () {
+          finishInvoiceWrap(false);
+        }, 360);
+      }
+      document.getElementById('invoice_issued').addEventListener('change', function () {
+        setInvoiceWrap(this.checked, true);
+      });
+      var kindNow = 'real';
+      var kindTimer = 0;
+      var modalTimer = 0;
+      var saveBtn = document.getElementById('save-party');
+      function reduceMotion() {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+      function paneOf(kind) {
+        return document.querySelector('#party-modal-form .kind-pane[data-kind="' + kind + '"]');
+      }
+      function enablePane(kind) {
+        document.querySelectorAll('#party-modal-form .kind-pane').forEach(function (pane) {
+          var on = pane.getAttribute('data-kind') === kind;
+          pane.querySelectorAll('input, select, textarea').forEach(function (el) {
+            el.disabled = !on;
+          });
+        });
+      }
+      function paneHeight(pane) {
+        if (!pane) return 0;
+        var top = pane.getBoundingClientRect().top;
+        var bottom = top;
+        pane.querySelectorAll('.row').forEach(function (row) {
+          var r = row.getBoundingClientRect();
+          if (r.bottom > bottom) bottom = r.bottom;
+        });
+        var h = bottom - top;
+        if (h <= 0) h = pane.getBoundingClientRect().height || pane.offsetHeight || 0;
+        return Math.ceil(h);
+      }
+      function measurePane(pane) {
+        pane.classList.add('is-enter');
+        pane.style.visibility = 'hidden';
+        pane.style.transform = 'none';
+        var h = paneHeight(pane);
+        pane.classList.remove('is-enter');
+        pane.style.visibility = '';
+        pane.style.transform = '';
+        return h;
+      }
+      function lockStage(stage, height) {
+        if (!height) {
+          stage.style.height = '';
+          return;
+        }
+        stage.style.height = Math.ceil(height) + 'px';
+      }
+      function showPane(kind) {
+        document.querySelectorAll('#party-modal-form .kind-pane').forEach(function (pane) {
+          var on = pane.getAttribute('data-kind') === kind;
+          pane.classList.toggle('is-on', on);
+          pane.classList.remove('is-enter', 'is-leave');
+          pane.style.transform = '';
+          pane.style.visibility = '';
+        });
+        var stage = document.querySelector('#party-modal-form .kind-stage');
+        if (stage) lockStage(stage, null);
+        enablePane(kind);
+        kindNow = kind;
+      }
+      function syncKind(animate) {
+        var kind = document.querySelector('#party-modal-form input[name=kind]:checked').value;
+        var from = paneOf(kindNow);
+        var to = paneOf(kind);
+        var stage = document.querySelector('#party-modal-form .kind-stage');
+        if (!from || !to || !stage) return;
+        if (!animate || kind === kindNow || reduceMotion()) {
+          showPane(kind);
+          return;
+        }
+        window.clearTimeout(kindTimer);
+        var dir = kind === 'legal' ? 1 : -1;
+        var startH = paneHeight(from);
+        var endH = measurePane(to);
+        lockStage(stage, startH);
+        from.offsetHeight;
+        to.classList.add('is-enter');
+        to.style.transform = 'translateX(' + (dir * 100) + '%)';
+        from.classList.add('is-leave');
+        enablePane(kind);
+        from.offsetHeight;
+        from.style.transform = 'translateX(' + (-dir * 100) + '%)';
+        to.style.transform = 'translateX(0)';
+        lockStage(stage, endH);
+        kindNow = kind;
+        kindTimer = window.setTimeout(function () {
+          from.classList.remove('is-on', 'is-leave');
+          from.style.transform = '';
+          to.classList.remove('is-enter');
+          to.classList.add('is-on');
+          to.style.transform = '';
+          lockStage(stage, null);
+        }, 360);
+      }
+      document.querySelectorAll('#party-modal-form input[name=kind]').forEach(function (el) {
+        el.addEventListener('change', function () { syncKind(true); });
+      });
+      showPane('real');
+      function setSaveBusy(on) {
+        saveBtn.classList.toggle('is-busy', on);
+        saveBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+      }
+      function partyFieldEmpty(el) {
+        if (!el || el.disabled) return false;
+        if (el.hasAttribute('data-phone')) {
+          var digits = String(el.value || '').replace(/\D/g, '');
+          return digits.length <= 1;
+        }
+        return !String(el.value || '').trim();
+      }
+      function clearPartyInvalid(form) {
+        form.querySelectorAll('.row.is-invalid, [data-pick].is-invalid').forEach(function (row) {
+          row.classList.remove('is-invalid');
+        });
+      }
+      function showPartyAlert(text) {
+        var err = document.getElementById('modal-error');
+        err.textContent = text;
+        err.hidden = false;
+      }
+      function hidePartyAlert() {
+        var err = document.getElementById('modal-error');
+        err.hidden = true;
+        err.textContent = '';
+      }
+      function validatePartyForm(form) {
+        clearPartyInvalid(form);
+        var missing = [];
+        form.querySelectorAll('input[required]').forEach(function (el) {
+          if (el.disabled || !partyFieldEmpty(el)) return;
+          var row = el.closest('.row');
+          var pick = el.closest('[data-pick]');
+          if (row) row.classList.add('is-invalid');
+          if (pick) pick.classList.add('is-invalid');
+          missing.push(el);
+        });
+        if (!missing.length) {
+          hidePartyAlert();
+          return true;
+        }
+        showPartyAlert('Boş zorunlu alanlar var. Yıldızlı alanları doldurun.');
+        var first = missing[0];
+        var pick = first && first.closest('[data-pick]');
+        if (pick && pick._pickFocus) pick._pickFocus();
+        else if (first) first.focus();
+        try { (pick || first).scrollIntoView({ block: 'nearest' }); } catch (err) {}
+        return false;
+      }
+      function resetPartyModal() {
+        var form = document.getElementById('party-modal-form');
+        window.clearTimeout(kindTimer);
+        form.querySelectorAll('input, select, textarea').forEach(function (el) {
+          el.disabled = false;
+        });
+        form.reset();
+        clearPartyInvalid(form);
+        hidePartyAlert();
+        setSaveBusy(false);
+        showPane('real');
+        if (window.setPortalFold) {
+          form.querySelectorAll('[data-fold]').forEach(function (fold) {
+            window.setPortalFold(fold, false, false);
+          });
+        }
+      }
+      function openModal() {
+        window.clearTimeout(modalTimer);
+        resetPartyModal();
+        if (window.setCityDistrictValues) {
+          window.setCityDistrictValues('m_city', '', '', true);
+        }
+        snapshotModalForm(document.getElementById('party-modal-form'));
+        modal.hidden = false;
+        requestAnimationFrame(function () {
+          showPane('real');
+          requestAnimationFrame(function () {
+            modal.classList.add('is-on');
+          });
+        });
+        var first = document.getElementById('m_first_name');
+        if (first) first.focus();
+      }
+      function closeModal() {
+        window.clearTimeout(modalTimer);
+        modal._closing = true;
+        modal.classList.remove('is-on');
+        var hide = function () {
+          modal.hidden = true;
+          modal._closing = false;
+          resetPartyModal();
+        };
+        if (reduceMotion()) {
+          hide();
+          return;
+        }
+        modalTimer = window.setTimeout(hide, 280);
+      }
+      document.getElementById('open-party').addEventListener('click', openModal);
+      modal._closeModal = closeModal;
+      document.getElementById('close-party').addEventListener('click', function () {
+        requestCloseModal(document.getElementById('party-modal-form'), closeModal);
+      });
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+          requestCloseModal(document.getElementById('party-modal-form'), closeModal);
+        }
+      });
+      document.getElementById('party-modal-form').addEventListener('input', function (event) {
+        var el = event.target;
+        if (!el || !el.closest) return;
+        var row = el.closest('.row');
+        var pick = el.closest('[data-pick]');
+        if (row && row.classList.contains('is-invalid') && !partyFieldEmpty(el)) {
+          row.classList.remove('is-invalid');
+        }
+        if (pick && pick.classList.contains('is-invalid') && !partyFieldEmpty(el)) {
+          pick.classList.remove('is-invalid');
+        }
+        var form = event.currentTarget;
+        if (!form.querySelector('.row.is-invalid, [data-pick].is-invalid')) hidePartyAlert();
+      });
+      function partyJumpFields(form) {
+        var fields = [];
+        form.querySelectorAll('input, select, textarea, button.date-trigger').forEach(function (el) {
+          if (el.tagName === 'BUTTON') {
+            if (el.disabled || el.closest('[hidden]') || el.closest('.kind-pane:not(.is-on)')) return;
+            if (el.offsetParent === null) return;
+            fields.push(el);
+            return;
+          }
+          if (el.disabled) return;
+          var type = String(el.type || '').toLowerCase();
+          if (type === 'hidden' || type === 'radio' || type === 'checkbox' || type === 'search' || type === 'button' || type === 'submit') return;
+          if (el.tabIndex < 0) return;
+          if (el.closest('[hidden]') || el.closest('.kind-pane:not(.is-on)')) return;
+          if (el.offsetParent === null) return;
+          fields.push(el);
+        });
+        return fields;
+      }
+      document.getElementById('party-modal-form').addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+        var el = event.target;
+        if (!el || el.tagName === 'TEXTAREA') return;
+        if (el.tagName === 'BUTTON' && !el.classList.contains('date-trigger')) return;
+        var type = String(el.type || '').toLowerCase();
+        if (type === 'submit' || type === 'button' || type === 'radio' || type === 'checkbox') return;
+        if (el.closest && el.closest('.date-pop') && el.matches('[data-pick-q]')) return;
+        var form = event.currentTarget;
+        var fields = partyJumpFields(form);
+        var idx = fields.indexOf(el);
+        if (idx < 0) return;
+        event.preventDefault();
+        if (idx < fields.length - 1) {
+          var next = fields[idx + 1];
+          next.focus();
+          try { next.select(); } catch (err) {}
+          try { next.scrollIntoView({ block: 'nearest' }); } catch (err2) {}
+          return;
+        }
+        if (!validatePartyForm(form)) return;
+        if (typeof form.requestSubmit === 'function') form.requestSubmit(saveBtn);
+        else form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      });
+      document.getElementById('party-modal-form').addEventListener('change', function (event) {
+        var el = event.target;
+        if (!el || !el.closest) return;
+        var pick = el.closest('[data-pick]');
+        if (pick && pick.classList.contains('is-invalid') && !partyFieldEmpty(el)) {
+          pick.classList.remove('is-invalid');
+        }
+        var form = event.currentTarget;
+        if (!form.querySelector('.row.is-invalid, [data-pick].is-invalid')) hidePartyAlert();
+      });
+      document.getElementById('party-modal-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (saveBtn.classList.contains('is-busy')) return;
+        if (!validatePartyForm(event.target)) return;
+        setSaveBusy(true);
+        fetch('{% url "portal-sales-customers" %}', {
+          method: 'POST',
+          body: new FormData(event.target),
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+            'X-CSRFToken': csrf
+          },
+          credentials: 'same-origin'
+        }).then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok && data.ok, data: data };
+          });
+        }).then(function (result) {
+          if (!result.ok) {
+            setSaveBusy(false);
+            showPartyAlert((result.data && result.data.error) || 'Müşteri kaydedilemedi.');
+            return;
+          }
+          pageCache = {};
+          selectParty(result.data);
+          closeModal();
+          if (window.takePortalToast) window.takePortalToast(result.data);
+        }).catch(function () {
+          setSaveBusy(false);
+          showPartyAlert('Bağlantı kurulamadı.');
+        });
+      });
+      var saveSaleBtn = document.getElementById('save-sale');
+      var saleOkModal = document.getElementById('sale-ok-modal');
+      function setSaleBusy(on) {
+        saveSaleBtn.classList.toggle('is-busy', on);
+        saveSaleBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+      }
+      function showSaleError(text) {
+        var flash = document.getElementById('sale-error');
+        flash.textContent = text;
+        flash.hidden = false;
+      }
+      function hideSaleError() {
+        var flash = document.getElementById('sale-error');
+        flash.hidden = true;
+        flash.textContent = '';
+      }
+      function openSaleOkModal() {
+        saleOkModal.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { saleOkModal.classList.add('is-on'); });
+        });
+      }
+      document.getElementById('sale-form').addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (saveSaleBtn.classList.contains('is-busy')) return;
+        lines.querySelectorAll('[name=unit_price]').forEach(function (el) {
+          var next = formatMoneyInput(el.value, true);
+          if (el.value !== next) el.value = next;
+        });
+        pays.querySelectorAll('[name=pay_amount]').forEach(function (el) {
+          var next = formatMoneyInput(el.value, true);
+          if (el.value !== next) el.value = next;
+        });
+        if (!partyId) {
+          showStep(1);
+          alert('Müşteri seçilmeden satış kaydedilemez.');
+          return;
+        }
+        var groupErr = klimaGroupError();
+        if (groupErr) {
+          showSaleError(groupErr);
+          return;
+        }
+        hideSaleError();
+        setSaleBusy(true);
+        var started = Date.now();
+        fetch(event.target.action, {
+          method: 'POST',
+          body: new FormData(event.target),
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+            'X-CSRFToken': csrf
+          },
+          credentials: 'same-origin'
+        }).then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok && data.ok, data: data };
+          }).catch(function () {
+            return { ok: false, data: { error: 'Satış kaydedilemedi.' } };
+          });
+        }).then(function (result) {
+          if (!result.ok) {
+            setSaleBusy(false);
+            showSaleError((result.data && result.data.error) || 'Satış kaydedilemedi.');
+            return;
+          }
+          var wait = Math.max(0, 2000 - (Date.now() - started));
+          window.setTimeout(function () {
+            openSaleOkModal();
+            window.setTimeout(function () {
+              window.location = result.data.url;
+            }, 2000);
+          }, wait);
+        }).catch(function () {
+          setSaleBusy(false);
+          showSaleError('Bağlantı kurulamadı.');
+        });
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        var overlay = topPortalModal();
+        if (!overlay || !overlay._closeModal) return;
+        event.preventDefault();
+        requestCloseModal(overlay.querySelector('form'), overlay._closeModal);
+      });
+      (function bindServiceCal() {
+        var root = document.querySelector('[data-service-cal]');
+        if (!root) return;
+        var input = root.querySelector('input[name="service_date"]');
+        var monthEl = root.querySelector('[data-cal-month]');
+        var grid = root.querySelector('[data-cal-grid]');
+        var meta = root.querySelector('[data-cal-meta]');
+        var hours = root.querySelector('[data-cal-hours]');
+        var hoursClip = root.querySelector('[data-cal-hours-clip]') || hours;
+        var warn = root.querySelector('[data-cal-warn]');
+        var jobsTitle = root.querySelector('[data-cal-jobs-title]');
+        var jobsCount = root.querySelector('[data-cal-jobs-count]');
+        var jobsList = root.querySelector('[data-cal-jobs-list]');
+        if (!input || !monthEl || !grid) return;
+        var months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+        var shorts = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+        var load = {};
+        var jobsByMonth = {};
+        var cap = 4;
+        var lastDay = '';
+        var hoursTimer = 0;
+        var view = new Date();
+        view = new Date(view.getFullYear(), view.getMonth(), 1);
+        try {
+          var seed = JSON.parse(document.getElementById('service-load').textContent);
+          if (seed && seed.month) {
+            cap = seed.cap || cap;
+            load[seed.month] = seed.days || {};
+            jobsByMonth[seed.month] = seed.jobs || {};
+          }
+        } catch (err) {}
+        function ymd(date) {
+          var month = String(date.getMonth() + 1).padStart(2, '0');
+          var day = String(date.getDate()).padStart(2, '0');
+          return date.getFullYear() + '-' + month + '-' + day;
+        }
+        function monthKey(date) {
+          return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+        }
+        function pretty(iso) {
+          var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (!m) return '';
+          return Number(m[3]) + ' ' + shorts[Number(m[2]) - 1] + ' ' + m[1];
+        }
+        function todayStart() {
+          var now = new Date();
+          return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        }
+        function remember(key, data) {
+          if (data && data.ok) {
+            cap = data.cap || cap;
+            load[data.month || key] = data.days || {};
+            jobsByMonth[data.month || key] = data.jobs || {};
+          } else {
+            load[key] = load[key] || {};
+            jobsByMonth[key] = jobsByMonth[key] || {};
+          }
+          return load[key];
+        }
+        function ensure(key) {
+          if (load[key] && jobsByMonth[key]) return Promise.resolve(load[key]);
+          return fetch(serviceUrl + '?month=' + encodeURIComponent(key), {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+          })
+            .then(function (response) { return response.json(); })
+            .then(function (data) { return remember(key, data); })
+            .catch(function () { return remember(key, null); });
+        }
+        function jobsFor(iso) {
+          if (!iso) return [];
+          return (jobsByMonth[iso.slice(0, 7)] || {})[iso] || [];
+        }
+        function chosenTime() {
+          if (!hours) return '';
+          var picked = hours.querySelector('input:checked');
+          return picked && !picked.disabled ? picked.value : '';
+        }
+        function emptyJobs(copy) {
+          if (!jobsList) return;
+          jobsList.innerHTML = '';
+          var note = document.createElement('p');
+          note.className = 'day-jobs-empty';
+          note.textContent = copy;
+          jobsList.appendChild(note);
+        }
+        function paintJobs() {
+          if (!jobsTitle || !jobsList) return;
+          var chosen = input.value;
+          if (!chosen) {
+            jobsTitle.textContent = 'Gün seçilmedi';
+            if (jobsCount) jobsCount.textContent = '';
+            emptyJobs('Takvimden gün seçin. Atanan işler ve saatleri burada.');
+            return;
+          }
+          var items = jobsFor(chosen);
+          jobsTitle.textContent = pretty(chosen);
+          if (jobsCount) {
+            jobsCount.textContent = items.length
+              ? (items.length + ' iş' + (items.length >= cap ? ' · kapasite dolu' : ''))
+              : 'Boş';
+          }
+          if (!items.length) {
+            emptyJobs('Bu güne atanmış iş yok.');
+            return;
+          }
+          jobsList.innerHTML = '';
+          var picked = chosenTime();
+          items.forEach(function (item) {
+            var row = document.createElement('div');
+            row.className = 'day-job';
+            if (item.pending) row.classList.add('is-wait');
+            if (item.time && item.time === picked) row.classList.add('is-on');
+            var body = document.createElement('div');
+            var name = document.createElement('b');
+            name.textContent = item.party || 'Müşteri';
+            body.appendChild(name);
+            var bits = [];
+            if (item.kind) bits.push(item.kind);
+            if (item.number) bits.push(item.number);
+            if (item.pending) bits.push('Bekleyen');
+            if (bits.length) {
+              var metaLine = document.createElement('small');
+              metaLine.textContent = bits.join(' · ');
+              body.appendChild(metaLine);
+            }
+            if (item.time) {
+              var clock = document.createElement('time');
+              clock.textContent = item.time;
+              row.appendChild(clock);
+            }
+            row.appendChild(body);
+            jobsList.appendChild(row);
+          });
+        }
+        function hoursAreOpen() {
+          return Boolean(hoursClip && hoursClip.classList.contains('is-open') && !hoursClip.hidden);
+        }
+        function setHoursOpen(open, animate) {
+          if (!hoursClip) return;
+          window.clearTimeout(hoursTimer);
+          hoursClip.style.overflow = 'hidden';
+          if (!animate || reduceMotion()) {
+            hoursClip.classList.toggle('is-open', open);
+            hoursClip.hidden = !open;
+            hoursClip.style.height = '';
+            hoursClip.style.overflow = open ? 'visible' : '';
+            return;
+          }
+          if (open) {
+            hoursClip.hidden = false;
+            hoursClip.style.height = '0px';
+            hoursClip.classList.remove('is-open');
+            hoursClip.offsetHeight;
+            hoursClip.classList.add('is-open');
+            hoursClip.style.height = hoursClip.scrollHeight + 'px';
+            hoursTimer = window.setTimeout(function () {
+              if (!hoursClip.classList.contains('is-open')) return;
+              hoursClip.style.height = '';
+              hoursClip.style.overflow = 'visible';
+            }, 360);
+            return;
+          }
+          hoursClip.style.height = hoursClip.scrollHeight + 'px';
+          hoursClip.offsetHeight;
+          hoursClip.classList.remove('is-open');
+          hoursClip.style.height = '0px';
+          hoursTimer = window.setTimeout(function () {
+            hoursClip.style.height = '';
+            hoursClip.style.overflow = '';
+            hoursClip.hidden = true;
+          }, 360);
+        }
+        function syncHours() {
+          if (!hours) return;
+          var on = Boolean(input.value);
+          var dayChanged = input.value !== lastDay;
+          if (dayChanged) {
+            hours.querySelectorAll('input').forEach(function (el) { el.checked = false; });
+            lastDay = input.value;
+          }
+          var taken = {};
+          jobsFor(input.value).forEach(function (item) {
+            if (!item.time) return;
+            taken[item.time] = (taken[item.time] || 0) + 1;
+          });
+          hours.querySelectorAll('label').forEach(function (label) {
+            var el = label.querySelector('input');
+            var chip = label.querySelector('span');
+            if (!el || !chip) return;
+            var n = taken[el.value] || 0;
+            el.disabled = !on;
+            el.required = on;
+            label.classList.toggle('is-taken', Boolean(on && n));
+            label.title = on && n ? 'Dolu' : '';
+            chip.textContent = el.value;
+            if (on && n) {
+              var mark = document.createElement('em');
+              mark.textContent = String(n);
+              chip.appendChild(mark);
+            }
+          });
+          var wantOpen = on;
+          var isOpen = hoursAreOpen();
+          if (wantOpen !== isOpen) setHoursOpen(wantOpen, true);
+        }
+        function setMeta() {
+          syncHours();
+          paintJobs();
+          var chosen = input.value;
+          var count = jobsFor(chosen).length;
+          var full = Boolean(chosen && count >= cap);
+          if (warn) warn.hidden = !full;
+          if (!meta) return;
+          if (!chosen) {
+            meta.textContent = 'Gün seçilmedi.';
+            return;
+          }
+          var clock = chosenTime();
+          meta.textContent = pretty(chosen)
+            + (clock ? ' · ' + clock : ' · saat seçin')
+            + (count ? ' · ' + count + '/' + cap + ' iş' : ' · boş')
+            + (full ? ' · kapasite dolu' : '');
+        }
+        function paint() {
+          var key = monthKey(view);
+          var days = load[key] || {};
+          var chosen = input.value;
+          var today = todayStart();
+          monthEl.textContent = months[view.getMonth()] + ' ' + view.getFullYear();
+          grid.innerHTML = '';
+          var start = new Date(view.getFullYear(), view.getMonth(), 1);
+          var pad = (start.getDay() + 6) % 7;
+          start.setDate(start.getDate() - pad);
+          for (var i = 0; i < 42; i += 1) {
+            var cell = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+            var iso = ymd(cell);
+            var count = days[iso] || 0;
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = String(cell.getDate());
+            if (count) {
+              var mark = document.createElement('em');
+              mark.textContent = String(count);
+              btn.appendChild(mark);
+            }
+            if (cell.getMonth() !== view.getMonth()) btn.classList.add('is-muted');
+            if (iso === ymd(today)) btn.classList.add('is-today');
+            if (cell < today) btn.classList.add('is-past');
+            if (count > 0 && count < cap) btn.classList.add('is-busy');
+            if (count >= cap) btn.classList.add('is-full');
+            if (chosen && iso === chosen) btn.classList.add('is-on');
+            btn.addEventListener('click', function (dayIso) {
+              return function () {
+                input.value = input.value === dayIso ? '' : dayIso;
+                var needed = input.value ? input.value.slice(0, 7) : '';
+                if (needed && needed !== monthKey(view)) {
+                  ensure(needed).then(function () {
+                    paint();
+                    setMeta();
+                  });
+                  return;
+                }
+                paint();
+                setMeta();
+              };
+            }(iso));
+            grid.appendChild(btn);
+          }
+          setMeta();
+        }
+        function showMonth() {
+          ensure(monthKey(view)).then(paint);
+        }
+        var prev = root.querySelector('[data-cal-prev]');
+        var next = root.querySelector('[data-cal-next]');
+        if (prev) prev.addEventListener('click', function () {
+          view = new Date(view.getFullYear(), view.getMonth() - 1, 1);
+          showMonth();
+        });
+        if (next) next.addEventListener('click', function () {
+          view = new Date(view.getFullYear(), view.getMonth() + 1, 1);
+          showMonth();
+        });
+        if (hours) hours.addEventListener('change', function (event) {
+          var target = event.target;
+          if (target && target.focus) {
+            try { target.focus({ preventScroll: true }); } catch (err) {}
+          }
+          setMeta();
+        });
+        showMonth();
+      })();
+      loadParties(1, '');
+      showStep(1);
+    })();
+  </script>
+{% endblock %}

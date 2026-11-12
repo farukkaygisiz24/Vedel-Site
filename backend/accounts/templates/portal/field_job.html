@@ -1,0 +1,958 @@
+{% extends 'portal/field_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ job.number }} | Vedel Servis{% endblock %}
+
+{% block top %}
+  <a class="app-back" href="{% url 'portal-field' %}" aria-label="Listeye dön">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M15 5.8 8 12l7 6.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+  <img src="{% url 'portal-logo' %}" alt="Vedel Klima" />
+{% endblock %}
+
+{% block content %}
+{% if show_summary %}
+  <h1>{{ job.number }}</h1>
+  <p class="lead">Montaj fişi · {{ job.party.display_name }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}{% if job.is_submitted %} · Teslim edildi{% else %} · Kontrol edin{% endif %}</p>
+  {% if error %}<p class="flash is-err" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="fis-letter">
+    <span class="fis-kicker">Müşteri</span>
+    <div class="fis-name">{{ job.party.display_name }}</div>
+    <p>{{ job.party.get_kind_display }}</p>
+    <dl class="fis-facts">
+      {% include 'portal/_party_facts.html' with party=job.party %}
+      <div>
+        <dt>Randevu</dt>
+        <dd>{{ job.date|date:'d.m.Y' }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="fis-block">
+    <p class="field-label">Satılan cihazlar</p>
+    {% for group in sold_groups %}
+      {% with pack=group.pack %}
+      <article class="device-card">
+        <p class="device-card-kicker">{% if pack.kind == 'multi' %}{% for item in multi_packs %}{% if item.pk == pack.pk %}Grup {{ forloop.counter }} · {% endif %}{% endfor %}{% endif %}{{ pack.get_kind_display }} · {{ pack.brand }}</p>
+        <div class="device-card-stack">
+          {% if group.units %}
+          <div class="group">
+            {% for unit in group.units %}
+            <dl class="field-sum">
+              <div>
+                <dt>{% if group.units|length > 1 %}Oda · {{ forloop.counter }}{% else %}Oda{% endif %}</dt>
+                <dd>{{ unit.room|default:'—' }}</dd>
+              </div>
+            </dl>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div class="group">
+            {% for unit in group.units %}
+            <p class="device-card-unit">İç ünite{% if pack.kind == 'multi' %} {{ forloop.counter }}{% endif %} · {{ unit.model }}</p>
+            <dl class="field-sum">
+              <div>
+                <dt>Seri no</dt>
+                <dd>{{ unit.serial|default:'—' }}</dd>
+              </div>
+            </dl>
+            {% endfor %}
+            {% if pack.outdoor_name %}
+            <p class="device-card-unit">Dış ünite · {{ pack.outdoor_name }}</p>
+            <dl class="field-sum">
+              <div>
+                <dt>Seri no</dt>
+                <dd>{{ pack.outdoor_serial|default:'—' }}</dd>
+              </div>
+            </dl>
+            {% endif %}
+            <dl class="field-sum">
+              <div>
+                <dt>Bakım</dt>
+                <dd>
+                  {% for months, label in pack.CARE_INTERVALS %}{% if pack.interval_months == months %}{{ label }}{% endif %}{% endfor %}
+                  {% if pack.last_serviced_on %} · {{ pack.last_serviced_on|date:'d.m.Y' }}{% endif %}
+                  {% if pack.next_due %} → {{ pack.next_due|date:'d.m.Y' }}{% endif %}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+        {% if pack.photo_items %}
+        <div class="device-card-media">
+          <div class="device-card-stage">
+            <div class="device-card-shots">
+              {% for shot in pack.photo_items %}
+              <div class="device-card-shot">
+                <a href="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" target="_blank" rel="noopener">
+                  <img src="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" alt="" />
+                </a>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </article>
+      {% endwith %}
+    {% endfor %}
+  </section>
+
+  <section class="fis-block">
+    <p class="field-label">Montaj malzemesi</p>
+    {% for row in mount_rows %}
+    <div class="mount-line is-labor">
+      <div>
+        <b>{{ row.name }}</b>
+        <small>{% if row.sku %}{{ row.sku }}{% endif %}</small>
+      </div>
+      <span>{{ row.qty }}{% if row.unit %} {{ row.unit }}{% endif %}</span>
+    </div>
+    {% empty %}
+    <p class="hint">Malzeme yok.</p>
+    {% endfor %}
+  </section>
+
+  {% if job.notes %}
+  <section class="fis-block">
+    <p class="field-label">İşlem notu</p>
+    <div class="group">
+      <dl class="field-sum">
+        <div>
+          <dt>Not</dt>
+          <dd>{{ job.notes }}</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="field-actions">
+    {% if can_edit %}
+    <a class="btn is-ghost" href="{{ job.get_field_url }}">Tekrar düzenle</a>
+    {% endif %}
+    <a class="btn is-ghost" href="{% url 'portal-field-print' job.number %}">Yazdır</a>
+    {% if can_edit %}
+    <form method="post" action="{{ job.get_field_url }}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="submit" />
+      <button class="save" type="submit">İşi tamamla</button>
+    </form>
+    {% endif %}
+  </div>
+{% else %}
+  <h1>{{ job.number }}</h1>
+  <p class="lead">{{ job.kind_label }} · {{ job.party.display_name }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}{% if job.is_submitted %} · Teslim edildi{% endif %}</p>
+  <p class="flash is-err" role="alert" data-field-flash {% if not error %}hidden{% endif %}>{{ error }}</p>
+
+  <section class="fis-letter">
+    <span class="fis-kicker">Müşteri</span>
+    <div class="fis-name">{{ job.party.display_name }}</div>
+    <p>{{ job.party.get_kind_display }}</p>
+    <dl class="fis-facts">
+      {% include 'portal/_party_facts.html' with party=job.party %}
+      <div>
+        <dt>Randevu</dt>
+        <dd>{{ job.date|date:'d.m.Y' }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}</dd>
+      </div>
+      {% if job.device %}
+      <div>
+        <dt>Cihaz</dt>
+        <dd>{{ job.device.name }}{% if job.device.place %} · {{ job.device.place }}{% endif %}</dd>
+      </div>
+      {% endif %}
+    </dl>
+  </section>
+
+  <form method="post" action="{{ job.get_field_url }}" enctype="multipart/form-data" autocomplete="off" id="field-job-form"{% if sold_groups %} data-mount-handover{% endif %}>
+    {% csrf_token %}
+    <input type="hidden" name="action" id="field-action" value="save" />
+
+    {% if not sold_groups %}
+    <section class="fis-block">
+      <p class="field-label">Görseller</p>
+      <div class="device-album">
+        {% for item in photos %}
+        <div class="field-shot">
+          <a href="{{ item.file_url }}" target="_blank" rel="noopener">
+            <img class="device-album-shot" src="{{ item.file_url }}" alt="" />
+          </a>
+          {% if can_edit %}
+          <button class="sheet-edit" type="submit" name="photo_id" value="{{ item.pk }}" formnovalidate onclick="document.getElementById('field-action').value='delete_photo'">Sil</button>
+          {% endif %}
+        </div>
+        {% empty %}
+        <p class="hint">Görsel yok.</p>
+        {% endfor %}
+      </div>
+      {% if can_edit %}
+      <label class="file-pick" style="margin-top:12px">
+        <input type="file" name="job_photos" accept="image/jpeg,image/png,image/webp,image/heic,.jpg,.jpeg,.png,.webp,.heic" multiple />
+        <span data-file-label>Dosya ekle</span>
+      </label>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if show_multi_groups %}
+    <section class="fis-block">
+      <p class="field-label">Multi gruplar</p>
+      <p class="hint">Her iç üniteyi bir dış ünite grubuna bağlayın.</p>
+      {% for unit in multi_indoors %}
+      <article class="device-card">
+        <p class="device-card-kicker">İç ünite · {{ unit.brand }}</p>
+        <p class="device-card-unit" style="padding-top:0">{{ unit.model }}</p>
+        {% if can_edit %}
+        <input type="hidden" name="indoor_pack_{{ unit.pk }}" value="" />
+        <div class="device-group-opts" data-group-picks>
+          {% for pack in multi_packs %}
+          <label class="device-group-opt{% if unit.pack_id == pack.pk %} is-on{% endif %}">
+            <input type="radio" name="indoor_pack_{{ unit.pk }}" value="{{ pack.pk }}" {% if unit.pack_id == pack.pk %}checked{% endif %} />
+            <span>
+              <b>Grup {{ forloop.counter }}</b>
+              <small>{{ pack.outdoor_name }}</small>
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="hint" style="padding:0 14px 12px">
+          {% if unit.pack_id %}
+            {% for pack in multi_packs %}{% if unit.pack_id == pack.pk %}Grup {{ forloop.counter }} · {{ pack.outdoor_name }}{% endif %}{% endfor %}
+          {% else %}Grup seçilmedi.{% endif %}
+        </p>
+        {% endif %}
+        <div class="group">
+          <div class="row">
+            <input name="unit_room_{{ unit.pk }}" id="unit_room_{{ unit.pk }}" placeholder=" " autocomplete="off" data-upper value="{{ unit.room }}" {% if not can_edit %}readonly{% endif %} />
+            <label for="unit_room_{{ unit.pk }}">Oda</label>
+          </div>
+          <div class="row">
+            <input name="unit_serial_{{ unit.pk }}" id="unit_serial_{{ unit.pk }}" placeholder=" " autocomplete="off" data-upper value="{{ unit.serial }}" {% if not can_edit %}readonly{% endif %} />
+            <label for="unit_serial_{{ unit.pk }}">Seri no</label>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if sold_groups %}
+    <section class="fis-block">
+      <p class="field-label">Satılan cihazlar</p>
+      {% for group in sold_groups %}
+        {% with pack=group.pack %}
+        <article class="device-card">
+          <p class="device-card-kicker">{% if pack.kind == 'multi' %}{% for item in multi_packs %}{% if item.pk == pack.pk %}Grup {{ forloop.counter }} · {% endif %}{% endfor %}{% endif %}{{ pack.get_kind_display }} · {{ pack.brand }}</p>
+          <div class="device-card-stack">
+          {% if pack.kind == 'multi' and show_multi_groups %}
+            {% if group.units %}
+            <p class="hint" style="padding:0 2px">{% for unit in group.units %}{{ unit.model }}{% if unit.room %} · {{ unit.room }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+            {% else %}
+            <p class="hint" style="padding:0 2px">İç ünite bağlanmadı.</p>
+            {% endif %}
+            {% if pack.outdoor_name %}
+            <div class="group">
+              <p class="device-card-unit">Dış ünite · {{ pack.outdoor_name }}</p>
+              <div class="row">
+                <input name="pack_outdoor_serial_{{ pack.pk }}" id="pack_outdoor_serial_{{ pack.pk }}" placeholder=" " autocomplete="off" data-upper value="{{ pack.outdoor_serial }}" {% if not can_edit %}readonly{% endif %} />
+                <label for="pack_outdoor_serial_{{ pack.pk }}">Seri no</label>
+              </div>
+            </div>
+            {% endif %}
+          {% else %}
+            {% if group.units %}
+            <div class="group">
+              {% for unit in group.units %}
+              <div class="row">
+                <input name="unit_room_{{ unit.pk }}" id="unit_room_{{ unit.pk }}" placeholder=" " autocomplete="off" data-upper value="{{ unit.room }}" {% if not can_edit %}readonly{% endif %} />
+                <label for="unit_room_{{ unit.pk }}">{% if group.units|length > 1 %}Oda · {{ forloop.counter }}{% else %}Oda{% endif %}</label>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+            {% if group.units or pack.outdoor_name %}
+            <div class="group">
+              {% for unit in group.units %}
+              <p class="device-card-unit">İç ünite{% if pack.kind == 'multi' %} {{ forloop.counter }}{% endif %} · {{ unit.model }}</p>
+              <div class="row">
+                <input name="unit_serial_{{ unit.pk }}" id="unit_serial_{{ unit.pk }}" placeholder=" " autocomplete="off" data-upper value="{{ unit.serial }}" {% if not can_edit %}readonly{% endif %} />
+                <label for="unit_serial_{{ unit.pk }}">Seri no</label>
+              </div>
+              {% endfor %}
+              {% if pack.outdoor_name %}
+              <p class="device-card-unit">Dış ünite · {{ pack.outdoor_name }}</p>
+              <div class="row">
+                <input name="pack_outdoor_serial_{{ pack.pk }}" id="pack_outdoor_serial_{{ pack.pk }}" placeholder=" " autocomplete="off" data-upper value="{{ pack.outdoor_serial }}" {% if not can_edit %}readonly{% endif %} />
+                <label for="pack_outdoor_serial_{{ pack.pk }}">Seri no</label>
+              </div>
+              {% endif %}
+            </div>
+            {% endif %}
+          {% endif %}
+          {% include 'portal/_field_pack_care.html' with pack=pack %}
+          </div>
+          {% if pack.photo_items or can_edit %}
+          <div class="device-card-media" data-pack-photos data-pack="{{ pack.pk }}">
+            <div class="device-card-stage">
+              <div class="device-card-shots" data-shots>
+                {% for shot in pack.photo_items %}
+                <div class="device-card-shot" data-photo-id="{{ shot.pk }}">
+                  <a href="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" target="_blank" rel="noopener">
+                    <img src="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" alt="" />
+                  </a>
+                  {% if can_edit %}
+                  <button class="device-card-drop" type="button" data-photo-del aria-label="Görseli sil"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.2 2.2l7.6 7.6M9.8 2.2 2.2 9.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+                  {% endif %}
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% if can_edit %}
+            <label class="file-pick">
+              <input type="file" name="unit_photos_{{ pack.pk }}" accept="image/jpeg,image/png,image/webp,image/heic,.jpg,.jpeg,.png,.webp,.heic" multiple data-pack-photo />
+              <span data-file-label>Cihaz görseli</span>
+            </label>
+            {% endif %}
+          </div>
+          {% endif %}
+        </article>
+        {% endwith %}
+      {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if sold_groups %}
+    <section class="fis-block">
+      <p class="field-label">Montaj malzemesi</p>
+      <p class="hint">Kullanılan malzemeyi seçin, sonra birimine göre miktar yazın.</p>
+      <input type="hidden" name="field_mat_present" value="1" />
+      <div id="field-mount-rows"></div>
+      <p class="hint" id="field-mount-empty">Malzeme seçilmedi.</p>
+      {% if can_edit %}
+      <button class="btn is-ghost" type="button" id="field-mount-open" style="width:100%;margin-top:16px">Malzeme ekle</button>
+      {% endif %}
+    </section>
+    {% else %}
+    <section class="fis-block" id="field-labor-block" hidden>
+      <p class="field-label">Yapılacak iş</p>
+      <p class="hint">Ofisten atanan iş. Sahada bunu yapın, kullanılan malzemeyi alta yazın.</p>
+      <div id="field-labor-rows"></div>
+    </section>
+    <section class="fis-block">
+      <p class="field-label">Kalemler</p>
+      <p class="hint">Kullanılan malzemeyi seçin, sonra birimine göre miktar yazın.</p>
+      <input type="hidden" name="field_lines_present" value="1" />
+      <div id="field-part-rows"></div>
+      <p class="hint" id="field-mount-empty">Malzeme seçilmedi.</p>
+      {% if can_edit %}
+      <button class="btn is-ghost" type="button" id="field-mount-open" style="width:100%;margin-top:16px">Malzeme ekle</button>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <section class="fis-block">
+      <div class="group">
+        <div class="row">
+          <input id="field_notes" name="notes" placeholder=" " value="{{ job.notes }}" {% if not can_edit %}readonly{% endif %} />
+          <label for="field_notes">İşlem notu</label>
+        </div>
+      </div>
+    </section>
+
+    <div class="field-actions">
+      {% if can_edit %}
+      <button class="btn is-ghost" type="submit" data-mount-save onclick="document.getElementById('field-action').value='save'">Kaydet</button>
+      {% endif %}
+      {% if not sold_groups %}
+      <a class="btn is-ghost" href="{% url 'portal-field-print' job.number %}">Yazdır</a>
+      {% endif %}
+      {% if can_edit and not sold_groups %}
+      <button class="save" type="submit" onclick="document.getElementById('field-action').value='submit'">Teslim et</button>
+      {% endif %}
+    </div>
+  </form>
+  {% if can_edit %}
+  <div class="field-modal" id="field-mount-modal" hidden data-catalog="{% if sold_groups %}mount{% else %}service{% endif %}">
+    <div class="field-modal-card" role="dialog" aria-modal="true" aria-labelledby="field-mount-title">
+      <p class="field-label">{% if sold_groups %}Klima Montaj Malzemesi{% else %}Depo{% endif %}</p>
+      <h2 id="field-mount-title">Malzeme seç</h2>
+      <p class="hint">Birden fazla ürün işaretleyin, sonra ekleyin.</p>
+      <div class="field-mount-search">
+        <input id="field-mount-q" type="search" placeholder="Ürün veya stok kodu" autocomplete="off" />
+      </div>
+      <div id="field-mount-menu" class="field-mount-menu"></div>
+      <div class="btn-row">
+        <button class="btn is-ghost" type="button" id="field-mount-cancel">Vazgeç</button>
+        <button class="btn" type="button" id="field-mount-apply">Ekle</button>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not show_summary %}
+  {{ line_rows|json_script:"field-lines-data" }}
+  {{ mount_rows|json_script:"field-mount-data" }}
+  <script>
+    (function () {
+      function addMonths(iso, months) {
+        var parts = String(iso || '').split('-');
+        if (parts.length < 3) return '';
+        var year = Number(parts[0]);
+        var monthIndex = parts[1] - 1 + Number(months || 0);
+        var day = parts[2];
+        year += Math.floor(monthIndex / 12);
+        monthIndex = ((monthIndex % 12) + 12) % 12;
+        var last = new Date(year, monthIndex + 1, 0).getDate();
+        day = Math.min(day, last);
+        function pad(n) { return n < 10 ? '0' + n : String(n); }
+        return year + '-' + pad(monthIndex + 1) + '-' + pad(day);
+      }
+      document.querySelectorAll('[data-care]').forEach(function (row) {
+        var intervalEls = row.querySelectorAll('[data-care-interval]');
+        var last = row.querySelector('[data-care-last]');
+        var next = row.querySelector('[data-care-next]');
+        if (!intervalEls.length || !last || !next) return;
+        function intervalValue() {
+          var i, el;
+          for (i = 0; i < intervalEls.length; i += 1) {
+            el = intervalEls[i];
+            if (el.type === 'radio') {
+              if (el.checked) return el.value;
+            } else {
+              return el.value;
+            }
+          }
+          return '6';
+        }
+        function syncCare() {
+          next.value = last.value ? addMonths(last.value, intervalValue()) : '';
+        }
+        intervalEls.forEach(function (el) {
+          el.addEventListener('change', syncCare);
+        });
+        last.addEventListener('change', syncCare);
+        last.addEventListener('input', syncCare);
+        syncCare();
+      });
+      document.querySelectorAll('[data-upper]').forEach(function (el) {
+        el.addEventListener('input', function () {
+          var start = el.selectionStart;
+          el.value = el.value.toLocaleUpperCase('tr-TR');
+          try { el.setSelectionRange(start, start); } catch (err) {}
+        });
+      });
+      document.querySelectorAll('[data-group-picks]').forEach(function (box) {
+        box.addEventListener('change', function () {
+          box.querySelectorAll('.device-group-opt').forEach(function (opt) {
+            var input = opt.querySelector('input');
+            opt.classList.toggle('is-on', !!(input && input.checked));
+          });
+        });
+      });
+      document.querySelectorAll('.file-pick input[type=file]:not([data-pack-photo])').forEach(function (input) {
+        input.addEventListener('change', function () {
+          var pick = input.closest('.file-pick');
+          var label = pick && pick.querySelector('[data-file-label]');
+          var count = input.files ? input.files.length : 0;
+          if (label) label.textContent = count ? (count + ' dosya') : 'Dosya ekle';
+          if (pick) pick.classList.toggle('has-file', count > 0);
+        });
+      });
+      (function bindPackPhotos() {
+        var form = document.getElementById('field-job-form');
+        if (!form) return;
+        var csrf = (form.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+        var postUrl = form.getAttribute('action') || location.pathname;
+        var canEditPhotos = {% if can_edit %}true{% else %}false{% endif %};
+        document.querySelectorAll('[data-pack-photos]').forEach(function (root) {
+          var input = root.querySelector('[data-pack-photo]');
+          var shots = root.querySelector('[data-shots]');
+          var packId = root.getAttribute('data-pack') || '';
+          if (!shots || !packId) return;
+          if (input) {
+            input.addEventListener('change', function () {
+              var files = Array.prototype.slice.call(input.files || []).filter(Boolean);
+              input.value = '';
+              if (!files.length || root._photoBusy) return;
+              uploadPackPhotos(files);
+            });
+          }
+          shots.addEventListener('click', function (event) {
+            var btn = event.target.closest('[data-photo-del]');
+            if (!btn) return;
+            event.preventDefault();
+            event.stopPropagation();
+            var slot = btn.closest('.device-card-shot');
+            var photoId = slot && slot.getAttribute('data-photo-id');
+            if (!photoId || root._photoBusy) return;
+            deletePackPhoto(slot, photoId);
+          });
+          function wait(ms) {
+            return new Promise(function (resolve) { window.setTimeout(resolve, ms); });
+          }
+          function jsonPost(body) {
+            return fetch(postUrl, {
+              method: 'POST',
+              body: body,
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                Accept: 'application/json',
+                'X-CSRFToken': csrf
+              },
+              credentials: 'same-origin'
+            }).then(function (response) {
+              return response.json().then(function (data) {
+                return { ok: response.ok && data.ok, data: data };
+              }).catch(function () {
+                return { ok: false, data: { error: 'İşlem yapılamadı.' } };
+              });
+            });
+          }
+          function progressSvg() {
+            return '<div class="device-card-progress"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="track" cx="18" cy="18" r="15"></circle><circle class="fill" cx="18" cy="18" r="15"></circle></svg></div>';
+          }
+          function addWaitSlot(file) {
+            var slot = document.createElement('div');
+            slot.className = 'device-card-shot is-wait';
+            if (file && file.type && file.type.indexOf('image/') === 0) {
+              var img = document.createElement('img');
+              img.alt = '';
+              img.src = URL.createObjectURL(file);
+              slot.appendChild(img);
+              slot._blob = img.src;
+            }
+            slot.insertAdjacentHTML('beforeend', progressSvg());
+            shots.appendChild(slot);
+            return slot;
+          }
+          function dropButton() {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'device-card-drop';
+            btn.setAttribute('data-photo-del', '');
+            btn.setAttribute('aria-label', 'Görseli sil');
+            btn.innerHTML = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.2 2.2l7.6 7.6M9.8 2.2 2.2 9.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+            return btn;
+          }
+          function fillSlot(slot, photo) {
+            if (slot._blob) {
+              try { URL.revokeObjectURL(slot._blob); } catch (err) {}
+            }
+            slot.className = 'device-card-shot';
+            slot.setAttribute('data-photo-id', photo.id);
+            slot.innerHTML = '';
+            var link = document.createElement('a');
+            link.href = photo.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            var img = document.createElement('img');
+            img.src = photo.url;
+            img.alt = '';
+            link.appendChild(img);
+            slot.appendChild(link);
+            if (canEditPhotos) slot.appendChild(dropButton());
+          }
+          function uploadPackPhotos(files) {
+            if (!input) return;
+            root._photoBusy = true;
+            input.disabled = true;
+            var slots = files.map(addWaitSlot);
+            var body = new FormData();
+            body.append('csrfmiddlewaretoken', csrf);
+            body.append('action', 'unit_photo');
+            body.append('pack_id', packId);
+            files.forEach(function (file) {
+              body.append(input.name, file);
+            });
+            Promise.all([jsonPost(body), wait(2000)]).then(function (parts) {
+              return parts[0];
+            }).then(function (result) {
+              if (!result.ok) {
+                slots.forEach(function (slot) {
+                  if (slot._blob) {
+                    try { URL.revokeObjectURL(slot._blob); } catch (err) {}
+                  }
+                  slot.remove();
+                });
+                window.alert((result.data && result.data.error) || 'Görsel kaydedilemedi.');
+                return;
+              }
+              var photos = (result.data && result.data.photos) || [];
+              photos.forEach(function (photo, i) {
+                if (slots[i]) fillSlot(slots[i], photo);
+              });
+              slots.slice(photos.length).forEach(function (slot) { slot.remove(); });
+            }).catch(function () {
+              slots.forEach(function (slot) { slot.remove(); });
+              window.alert('Bağlantı kurulamadı.');
+            }).then(function () {
+              root._photoBusy = false;
+              input.disabled = false;
+            });
+          }
+          function deletePackPhoto(slot, photoId) {
+            root._photoBusy = true;
+            var body = new FormData();
+            body.append('csrfmiddlewaretoken', csrf);
+            body.append('action', 'delete_unit_photo');
+            body.append('photo_id', photoId);
+            jsonPost(body).then(function (result) {
+              if (!result.ok) {
+                window.alert((result.data && result.data.error) || 'Görsel silinemedi.');
+                return;
+              }
+              slot.remove();
+            }).catch(function () {
+              window.alert('Bağlantı kurulamadı.');
+            }).then(function () {
+              root._photoBusy = false;
+            });
+          }
+        });
+      })();
+      (function bindMountSave() {
+        var form = document.getElementById('field-job-form');
+        if (!form || !form.hasAttribute('data-mount-handover')) return;
+        var btn = form.querySelector('[data-mount-save]');
+        var actionInput = document.getElementById('field-action');
+        var csrf = (form.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+        function progressMarkup() {
+          return '<div class="device-card-progress"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="track" cx="18" cy="18" r="15"></circle><circle class="fill" cx="18" cy="18" r="15"></circle></svg></div>';
+        }
+        function showFlash(text) {
+          var el = document.querySelector('[data-field-flash]');
+          if (!el) {
+            el = document.createElement('p');
+            el.className = 'flash is-err';
+            el.setAttribute('role', 'alert');
+            el.setAttribute('data-field-flash', '');
+            var lead = document.querySelector('.lead');
+            if (lead && lead.parentNode) lead.parentNode.insertBefore(el, lead.nextSibling);
+            else document.body.insertBefore(el, document.body.firstChild);
+          }
+          el.textContent = text || '';
+          el.hidden = !text;
+        }
+        function clearWait() {
+          form._handoverWait = false;
+          if (!btn) return;
+          btn.disabled = false;
+          btn.classList.remove('is-wait');
+          var overlay = btn.querySelector('.device-card-progress');
+          if (overlay) overlay.remove();
+        }
+        function filled(sel) {
+          var nodes = form.querySelectorAll(sel);
+          for (var i = 0; i < nodes.length; i++) {
+            if (!String(nodes[i].value || '').trim()) return false;
+          }
+          return nodes.length > 0;
+        }
+        function handoverError() {
+          var packs = form.querySelectorAll('[data-pack-photos]');
+          for (var i = 0; i < packs.length; i++) {
+            if (packs[i].querySelectorAll('.device-card-shot:not(.is-wait)').length < 4) {
+              return 'Her cihaz için en az 4 görsel ekleyin.';
+            }
+          }
+          if (!filled('[name^="unit_room_"]')) return 'Oda yazın.';
+          if (!filled('[name^="unit_serial_"]')) return 'İç ünite seri numarasını yazın.';
+          if (form.querySelector('[name^="pack_outdoor_serial_"]') && !filled('[name^="pack_outdoor_serial_"]')) {
+            return 'Dış ünite seri numarasını yazın.';
+          }
+          if (form.querySelector('[name^="pack_last_"]') && !filled('[name^="pack_last_"]')) {
+            return 'Bakım tarihini yazın.';
+          }
+          var mats = form.querySelectorAll('[name="field_mat_product"]');
+          var hasMat = false;
+          for (var j = 0; j < mats.length; j++) {
+            if (String(mats[j].value || '').trim()) hasMat = true;
+          }
+          if (!hasMat) return 'En az bir montaj malzemesi ekleyin.';
+          return '';
+        }
+        function wait(ms) {
+          return new Promise(function (resolve) { window.setTimeout(resolve, ms); });
+        }
+        form.addEventListener('submit', function (event) {
+          if (!actionInput || actionInput.value !== 'save') return;
+          event.preventDefault();
+          if (form._handoverWait) return;
+          var err = handoverError();
+          if (err) {
+            showFlash(err);
+            return;
+          }
+          form._handoverWait = true;
+          showFlash('');
+          if (btn) {
+            btn.classList.add('is-wait');
+            if (!btn.querySelector('.device-card-progress')) {
+              btn.insertAdjacentHTML('beforeend', progressMarkup());
+            }
+            btn.disabled = true;
+          }
+          var body = new FormData(form);
+          body.set('action', 'save');
+          Promise.all([
+            fetch(form.getAttribute('action') || location.pathname, {
+              method: 'POST',
+              body: body,
+              headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrf
+              },
+              credentials: 'same-origin'
+            }).then(function (response) {
+              return response.json().then(function (data) {
+                return { ok: response.ok && data.ok, data: data };
+              }).catch(function () {
+                return { ok: false, data: { error: 'İşlem yapılamadı.' } };
+              });
+            }),
+            wait(2000)
+          ]).then(function (parts) {
+            var result = parts[0];
+            if (result.ok && result.data && result.data.next) {
+              window.location = result.data.next;
+              return;
+            }
+            clearWait();
+            showFlash((result.data && result.data.error) || 'İş kaydedilemedi.');
+          }).catch(function () {
+            clearWait();
+            showFlash('Bağlantı kurulamadı.');
+          });
+        });
+      })();
+      var canEdit = {% if can_edit %}true{% else %}false{% endif %};
+      var productsUrl = '{% url "portal-field-products" %}';
+      var mountWrap = document.getElementById('field-mount-rows');
+      var partWrap = document.getElementById('field-part-rows');
+      var listWrap = mountWrap || partWrap;
+      var asJobLine = !!partWrap;
+      var lineSeed = [];
+      var lineNode = document.getElementById('field-lines-data');
+      if (lineNode) {
+        try { lineSeed = JSON.parse(lineNode.textContent || '[]'); } catch (err) { lineSeed = []; }
+      }
+      if (listWrap) {
+        var mountSeed = [];
+        var mountNode = document.getElementById('field-mount-data');
+        if (mountNode) {
+          try { mountSeed = JSON.parse(mountNode.textContent || '[]'); } catch (err) { mountSeed = []; }
+        }
+        var modal = document.getElementById('field-mount-modal');
+        var search = document.getElementById('field-mount-q');
+        var menu = document.getElementById('field-mount-menu');
+        var applyBtn = document.getElementById('field-mount-apply');
+        var emptyHint = document.getElementById('field-mount-empty');
+        var catalog = (modal && modal.getAttribute('data-catalog')) || (asJobLine ? 'service' : 'mount');
+        var timer = 0;
+        var picked = {};
+        function qtyText(value) {
+          return String(value == null ? '' : value).replace('.', ',');
+        }
+        function qtyNice(value) {
+          var text = qtyText(value);
+          if (text.indexOf(',') >= 0) {
+            text = text.replace(/0+$/, '').replace(/,$/, '');
+          }
+          return text;
+        }
+        function unitLabel(value) {
+          var raw = String(value || '').trim();
+          return raw || 'Adet';
+        }
+        function listedIds() {
+          var ids = {};
+          listWrap.querySelectorAll('[data-mount-id]').forEach(function (el) {
+            ids[el.getAttribute('data-mount-id')] = true;
+          });
+          return ids;
+        }
+        function syncEmpty() {
+          if (emptyHint) emptyHint.hidden = !!listWrap.querySelector('[data-mount-id]');
+        }
+        function syncApply() {
+          if (!applyBtn) return;
+          var count = Object.keys(picked).length;
+          applyBtn.textContent = count ? ('Ekle · ' + count) : 'Ekle';
+          applyBtn.disabled = !count;
+        }
+        function addMount(data, keepQty) {
+          data = data || {};
+          var id = String(data.product_id || data.id || '');
+          if (!id) return;
+          if (listWrap.querySelector('[data-mount-id="' + id + '"]')) return;
+          var el = document.createElement('div');
+          el.className = 'mount-line';
+          el.setAttribute('data-mount-id', id);
+          var qtyName = asJobLine ? 'qty' : 'field_mat_qty';
+          var unit = unitLabel(data.unit);
+          el.innerHTML = asJobLine
+            ? (
+              '<input type="hidden" name="kind" value="part" />' +
+              '<input type="hidden" name="product_id" value="" />' +
+              '<input type="hidden" name="description" value="" />' +
+              '<input type="hidden" name="vat_rate" value="20" />' +
+              '<input type="hidden" name="cost_price" value="" />' +
+              '<input type="hidden" name="unit_price" value="" />' +
+              '<div><b></b><small></small></div>' +
+              '<div class="mount-qty"><input name="qty" inputmode="decimal" placeholder="" aria-label="" /><em></em></div>' +
+              (canEdit ? '<button class="sheet-edit" type="button" data-drop>Sil</button>' : '<span></span>')
+            )
+            : (
+              '<input type="hidden" name="field_mat_product" value="" />' +
+              '<div><b></b><small></small></div>' +
+              '<div class="mount-qty"><input name="field_mat_qty" inputmode="decimal" placeholder="" aria-label="" /><em></em></div>' +
+              (canEdit ? '<button class="sheet-edit" type="button" data-drop>Sil</button>' : '<span></span>')
+            );
+          var label = data.label || data.product_name || data.name || data.description || '';
+          el.querySelector('b').textContent = label;
+          el.querySelector('small').textContent = [data.category, data.sku].filter(Boolean).join(' · ');
+          var qtyInput = el.querySelector('[name="' + qtyName + '"]');
+          qtyInput.placeholder = unit;
+          qtyInput.setAttribute('aria-label', unit);
+          el.querySelector('.mount-qty em').textContent = unit;
+          qtyInput.value = keepQty ? qtyText(data.qty || '') : '';
+          qtyInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') e.preventDefault();
+          });
+          if (asJobLine) {
+            el.querySelector('[name=product_id]').value = id;
+            el.querySelector('[name=description]').value = label;
+            el.querySelector('[name=vat_rate]').value = data.vat_rate || data.vat || '20';
+            el.querySelector('[name=cost_price]').value = data.cost_price || data.buy || '';
+            el.querySelector('[name=unit_price]').value = qtyText(data.unit_price || data.price || '');
+          } else {
+            el.querySelector('[name=field_mat_product]').value = id;
+          }
+          if (!canEdit) {
+            el.querySelectorAll('input').forEach(function (input) { input.readOnly = true; });
+          }
+          var drop = el.querySelector('[data-drop]');
+          if (drop) drop.addEventListener('click', function () { el.remove(); syncEmpty(); });
+          listWrap.appendChild(el);
+          syncEmpty();
+        }
+        function renderMenu(items) {
+          if (!menu) return;
+          menu.innerHTML = '';
+          var already = listedIds();
+          if (!items.length) {
+            var empty = document.createElement('p');
+            empty.className = 'hint';
+            empty.textContent = 'Eşleşen malzeme yok.';
+            menu.appendChild(empty);
+            return;
+          }
+          items.forEach(function (item) {
+            var id = String(item.id || item.product_id || '');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'field-mount-opt';
+            if (already[id] || picked[id]) btn.classList.add('is-on');
+            if (already[id]) btn.classList.add('is-in');
+            btn.innerHTML = '<span><b></b><small></small></span>';
+            btn.querySelector('b').textContent = item.label || item.name || '';
+            btn.querySelector('small').textContent = [item.category, item.sku, item.unit].filter(Boolean).join(' · ');
+            btn.addEventListener('click', function () {
+              if (already[id]) return;
+              if (picked[id]) {
+                delete picked[id];
+                btn.classList.remove('is-on');
+              } else {
+                picked[id] = item;
+                btn.classList.add('is-on');
+              }
+              syncApply();
+            });
+            menu.appendChild(btn);
+          });
+        }
+        function loadMount(query) {
+          var flag = catalog === 'service' ? 'service=1' : 'mount=1';
+          fetch(productsUrl + '?' + flag + '&q=' + encodeURIComponent(query || ''), {
+            headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+          }).then(function (r) { return r.json(); })
+            .then(function (data) { renderMenu((data && data.results) || []); })
+            .catch(function () { renderMenu([]); });
+        }
+        var modalTimer = 0;
+        function openModal() {
+          if (!modal) return;
+          picked = {};
+          if (search) search.value = '';
+          syncApply();
+          window.clearTimeout(modalTimer);
+          modal.hidden = false;
+          document.body.classList.add('has-modal');
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { modal.classList.add('is-on'); });
+          });
+          loadMount('');
+        }
+        function closeModal() {
+          if (!modal) return;
+          picked = {};
+          modal.classList.remove('is-on');
+          document.body.classList.remove('has-modal');
+          window.clearTimeout(modalTimer);
+          modalTimer = window.setTimeout(function () { modal.hidden = true; }, 340);
+        }
+        var laborWrap = document.getElementById('field-labor-rows');
+        var laborBlock = document.getElementById('field-labor-block');
+        function addLabor(data) {
+          if (!laborWrap) return;
+          data = data || {};
+          var el = document.createElement('div');
+          el.className = 'mount-line is-labor';
+          el.innerHTML = '<div><b></b><small></small></div><span></span>';
+          el.querySelector('b').textContent = data.description || data.product_name || data.label || '';
+          el.querySelector('small').textContent = 'Ofisten atanan iş';
+          el.querySelector('span').textContent = qtyNice(data.qty || '1') + ' ' + unitLabel(data.unit);
+          laborWrap.appendChild(el);
+          if (laborBlock) laborBlock.hidden = false;
+        }
+        if (asJobLine) {
+          lineSeed.forEach(function (item) {
+            if ((item.kind || '') === 'labor') addLabor(item);
+            else if ((item.kind || '') === 'part') addMount(item, true);
+          });
+        } else {
+          mountSeed.forEach(function (item) { addMount(item, true); });
+        }
+        syncEmpty();
+        var openBtn = document.getElementById('field-mount-open');
+        var cancelBtn = document.getElementById('field-mount-cancel');
+        if (openBtn) openBtn.addEventListener('click', openModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+        if (modal) modal.addEventListener('click', function (e) {
+          if (e.target === modal) closeModal();
+        });
+        if (applyBtn) applyBtn.addEventListener('click', function () {
+          Object.keys(picked).forEach(function (id) { addMount(picked[id], false); });
+          closeModal();
+        });
+        if (search) {
+          search.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') e.preventDefault();
+          });
+          search.addEventListener('input', function () {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(function () { loadMount(search.value); }, 180);
+          });
+        }
+      }
+    })();
+  </script>
+{% endif %}
+{% endblock %}

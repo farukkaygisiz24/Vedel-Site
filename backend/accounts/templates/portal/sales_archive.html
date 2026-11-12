@@ -1,0 +1,16 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Geçmiş yıllar | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Geçmiş yıllar</h1>
+      <p class="lead">Önceki yılların satış fişleri.</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn is-ghost" href="{% url 'portal-sales' %}">Satış listesi</a>
+    </div>
+  </div>
+  {% include 'portal/_sale_sheet.html' %}
+{% endblock %}

@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Phone, Menu, X, ArrowRight, ChevronDown } from 'lucide-react'
+import AccountButton from '@/components/auth/AccountButton'
+import { getServicePortalUrl } from '@/lib/service-portal'
 
 const productsMenu = [
   {
@@ -233,7 +235,7 @@ export default function Header() {
           </div>
         </nav>
 
-        <div className="relative z-20 grid h-full min-w-0 grid-cols-[minmax(0,1fr)_4.5rem] items-center gap-1 sm:grid-cols-[minmax(0,1fr)_5rem] sm:gap-2 lg:flex lg:justify-between lg:gap-4 pointer-events-none">
+        <div className="relative z-20 grid h-full min-w-0 grid-cols-[minmax(0,1fr)_6.75rem] items-center gap-1 sm:grid-cols-[minmax(0,1fr)_7.5rem] sm:gap-2 lg:flex lg:justify-between lg:gap-4 pointer-events-none">
 
           {/* Logo — mobil: grid ile taşma yok | lg+: masaüstü düzeni */}
           <Link
@@ -291,6 +293,8 @@ export default function Header() {
           >
             <Phone className="h-5 w-5 md:h-[1.35rem] md:w-[1.35rem]" />
           </a>
+
+          <AccountButton />
 
           <button
             className="lg:hidden flex h-8 w-8 items-center justify-center rounded-full text-gray-800 active:bg-gray-100 sm:h-9 sm:w-9 md:h-10 md:w-10 md:hover:bg-gray-100"
@@ -414,7 +418,14 @@ export default function Header() {
         </nav>
 
         {/* Phone CTA at bottom */}
-        <div className="p-5 border-t border-gray-100">
+        <div className="space-y-3 p-5 border-t border-gray-100">
+          <a
+            href={getServicePortalUrl()}
+            className="flex w-full items-center justify-center rounded-xl bg-neutral-900 py-3 text-base font-bold text-white"
+            onClick={closeMobileMenu}
+          >
+            Giriş yap
+          </a>
           <a
             href="tel:+902244132316"
             className="flex items-center justify-center gap-3 w-full py-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 active:bg-red-800 transition-colors text-lg"

@@ -1,0 +1,329 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ party.display_name }} | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="fis">
+    <div class="toolbar">
+      <div>
+        <h1>{{ party.display_name }}</h1>
+        <div class="fis-meta">
+          <span class="fis-chip">{{ party.number }}</span>
+          <span class="fis-chip">{{ party.get_kind_display }}</span>
+          <span class="fis-chip">{{ party.phone|tel_link }}</span>
+        </div>
+      </div>
+      <div class="fis-toolbar-actions">
+        <a class="btn is-ghost" href="{% url 'portal-sales-customers' %}">Listeye dön</a>
+      </div>
+    </div>
+    {% if error and not party_modal_open and not pay_open %}<p class="flash is-err">{{ error }}</p>{% endif %}
+
+    <section class="fis-letter">
+      <div class="fis-letter-head">
+        <div>
+          <span class="fis-kicker">Müşteri bilgileri</span>
+          <div class="fis-name">{{ party.display_name }}</div>
+          <p>{{ party.get_kind_display }}</p>
+        </div>
+        <button class="btn is-ghost" type="button" id="open-edit">Düzenle</button>
+      </div>
+      <dl class="fis-facts">
+        <div>
+          <dt>Telefon</dt>
+          <dd>{{ party.phone|tel_link }}</dd>
+        </div>
+        <div>
+          <dt>2. ulaşım</dt>
+          <dd>
+            {% if party.contact2_parts %}
+              {% for part in party.contact2_parts %}{{ part }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+            {% else %}—{% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt>E-posta</dt>
+          <dd>{{ party.email|default:'—' }}</dd>
+        </div>
+        {% if party.kind == 'legal' %}
+        <div>
+          <dt>Yetkili</dt>
+          <dd>{% if party.first_name or party.last_name %}{{ party.first_name }} {{ party.last_name }}{% else %}—{% endif %}</dd>
+        </div>
+        <div>
+          <dt>Vergi dairesi</dt>
+          <dd>{{ party.tax_office|default:'—' }}</dd>
+        </div>
+        <div>
+          <dt>Vergi no</dt>
+          <dd>{{ party.tax_no|default:'—' }}</dd>
+        </div>
+        {% else %}
+        <div>
+          <dt>T.C. kimlik no</dt>
+          <dd>{{ party.national_id|default:'—' }}</dd>
+        </div>
+        {% endif %}
+        <div>
+          <dt>İl</dt>
+          <dd>{% if party.district and party.city %}{{ party.district }} / {{ party.city }}{% elif party.city %}{{ party.city }}{% elif party.district %}{{ party.district }}{% else %}—{% endif %}</dd>
+        </div>
+        <div class="is-wide">
+          <dt>Adres</dt>
+          <dd>{{ party.address|default:'—' }}</dd>
+        </div>
+        {% if party.notes.strip %}
+        <div class="is-wide">
+          <dt>Müşteri notu</dt>
+          <dd>{{ party.notes }}</dd>
+        </div>
+        {% endif %}
+      </dl>
+    </section>
+
+    <div class="fis-settle">
+      <section class="fis-card">
+        <p class="field-label">Bakiye</p>
+        <div class="fis-flag{% if remain_sum > 0 %} is-due{% endif %}">
+          <div>
+            <b>İş {{ work_sum|tr_money }} ₺</b>
+            <small>Tahsil {{ paid_sum|tr_money }} ₺ · {{ sale_count }} fiş</small>
+          </div>
+          <span class="money">Kalan {{ remain_sum|tr_money }} ₺</span>
+        </div>
+      </section>
+    </div>
+
+    <nav class="fis-tabs" role="tablist" aria-label="Müşteri kayıtları" data-fis-tabs>
+      <a href="?tab=devices" data-tab="devices" role="tab" aria-selected="{% if tab == 'devices' %}true{% else %}false{% endif %}" class="{% if tab == 'devices' %}is-on{% endif %}">Cihazlar</a>
+      <a href="?tab=sales" data-tab="sales" role="tab" aria-selected="{% if tab == 'sales' %}true{% else %}false{% endif %}" class="{% if tab == 'sales' %}is-on{% endif %}">Satışlar</a>
+      <a href="?tab=jobs" data-tab="jobs" role="tab" aria-selected="{% if tab == 'jobs' %}true{% else %}false{% endif %}" class="{% if tab == 'jobs' %}is-on{% endif %}">Servis işleri</a>
+      <a href="?tab=payments" data-tab="payments" role="tab" aria-selected="{% if tab == 'payments' %}true{% else %}false{% endif %}" class="{% if tab == 'payments' %}is-on{% endif %}">Ödemeler</a>
+    </nav>
+
+    <section class="fis-block" role="tabpanel" data-tab-panel="devices"{% if tab != 'devices' %} hidden{% endif %}>
+      <p class="field-label">Cihazlar</p>
+      {% if sold_groups %}
+        {% include 'portal/_job_sold_units.html' with readonly=True show_job=True %}
+      {% else %}
+      <div class="sheet-wrap sale-sheet">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th>Cihaz</th>
+              <th>Aralık</th>
+              <th>Son bakım</th>
+              <th>Sonraki</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in devices %}
+            <tr>
+              <td>{{ item.name }}{% if item.place %}<div class="hint">{{ item.place }}</div>{% endif %}</td>
+              <td>{{ item.get_interval_months_display }}</td>
+              <td>{% if item.last_serviced_on %}{{ item.last_serviced_on|date:'d.m.Y' }}{% else %}—{% endif %}</td>
+              <td class="money{% if item.next_due and item.next_due < today %} is-over{% endif %}">{% if item.next_due %}{{ item.next_due|date:'d.m.Y' }}{% else %}—{% endif %}</td>
+              <td class="num"><a class="sheet-edit" href="{% url 'portal-service-job-new' %}?party={{ party.pk }}&device={{ item.pk }}">İş aç</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="empty">Bu müşteride cihaz yok.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </section>
+
+    <section class="fis-block" role="tabpanel" data-tab-panel="sales"{% if tab != 'sales' %} hidden{% endif %}>
+      <p class="field-label">Satışlar</p>
+      <div class="sheet-wrap sale-sheet">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th>Tarih</th>
+              <th>No</th>
+              <th>İş</th>
+              <th>Genel</th>
+              <th>Tahsil</th>
+              <th>Kalan</th>
+              <th>Fatura</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for sale in sales %}
+            <tr class="sale-row">
+              <td>{{ sale.date|date:'d.m.Y' }}</td>
+              <td>
+                <a class="sale-row-go" href="{{ sale.get_absolute_url }}">{{ sale.number }}</a>{% if sale.service_job %} · <a class="sale-job-go" href="{{ sale.service_job.get_absolute_url }}">{{ sale.service_job.number }}</a>{% endif %}
+              </td>
+              <td>{{ sale.get_work_type_display }}</td>
+              <td class="money">{{ sale.grand_total|tr_money }} ₺</td>
+              <td class="money">{{ sale.paid_sum|tr_money }} ₺</td>
+              <td class="money{% if sale.remain_sum > 0 %} is-over{% endif %}">{{ sale.remain_sum|tr_money }} ₺</td>
+              <td>{{ sale.get_invoice_status_display }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="empty">{{ empty_copy }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if paginator.count %}
+      <p class="pager-meta">{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ paginator.count }}</p>
+      {% endif %}
+      <nav class="pager" aria-label="Sayfa"{% if paginator.num_pages <= 1 %} hidden{% endif %}>
+        {% if page_obj.has_previous %}
+        <a href="{{ prev_href }}">‹</a>
+        {% else %}
+        <span class="is-off">‹</span>
+        {% endif %}
+        {% for item in page_links %}
+          {% if item.gap %}
+          <span class="is-off">{{ item.label }}</span>
+          {% elif item.on %}
+          <a href="{{ item.href }}" class="is-on" aria-current="page">{{ item.label }}</a>
+          {% else %}
+          <a href="{{ item.href }}">{{ item.label }}</a>
+          {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+        <a href="{{ next_href }}">›</a>
+        {% else %}
+        <span class="is-off">›</span>
+        {% endif %}
+      </nav>
+    </section>
+
+    <section class="fis-block" role="tabpanel" data-tab-panel="jobs"{% if tab != 'jobs' %} hidden{% endif %}>
+      <p class="field-label">Servis işleri</p>
+      <div class="sheet-wrap sale-sheet">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th>Tarih</th>
+              <th>No</th>
+              <th>Durum</th>
+              <th>Tutar</th>
+              <th>Tahsil</th>
+              <th>Kalan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for job in service_jobs %}
+            <tr class="sale-row">
+              <td>{{ job.date|date:'d.m.Y' }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}</td>
+              <td><a class="sale-row-go" href="{{ job.get_absolute_url }}">{{ job.number }}</a></td>
+              <td>{{ job.get_status_display }}</td>
+              <td class="money">{{ job.grand_total|tr_money }} ₺</td>
+              <td class="money">{{ job.paid_sum|tr_money }} ₺</td>
+              <td class="money{% if job.remain_sum > 0 %} is-over{% endif %}">{{ job.remain_sum|tr_money }} ₺</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="empty">Bu müşteride servis işi yok.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="fis-block" role="tabpanel" data-tab-panel="payments"{% if tab != 'payments' %} hidden{% endif %}>
+      <div class="fis-card">
+        <div class="fis-card-head">
+          <p class="field-label">Ödemeler</p>
+          {% if remain_sum > 0 %}
+          <button class="btn" type="button" id="open-pay">Tahsilat ekle</button>
+          {% endif %}
+        </div>
+        <div class="sheet-wrap is-ops">
+          <table class="sheet">
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Yöntem</th>
+                <th>Tutar</th>
+                <th>Fişler</th>
+                <th>İşleyen</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for pay in receipts %}
+              <tr>
+                <td>{{ pay.date|date:'d.m.Y' }}</td>
+                <td>{{ pay.get_method_display }}{% if pay.pay_detail %}<div class="hint">{{ pay.pay_detail }}</div>{% endif %}</td>
+                <td class="money">{{ pay.amount|tr_money }} ₺</td>
+                <td>
+                  {% for alloc in pay.allocations.all %}
+                    {% if alloc.slip_url %}<a href="{{ alloc.slip_url }}">{{ alloc.slip_number }}</a>{% else %}{{ alloc.slip_number }}{% endif %}
+                    {{ alloc.amount|tr_money }} ₺{% if not forloop.last %}<br>{% endif %}
+                  {% empty %}—{% endfor %}
+                </td>
+                <td>{{ pay.created_by.username }}</td>
+                <td class="is-action">
+                  <div class="pay-ops" data-pay-ops>
+                    <button class="pay-ops-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="İşlem">
+                      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                        <circle cx="8" cy="3.2" r="1.4"/>
+                        <circle cx="8" cy="8" r="1.4"/>
+                        <circle cx="8" cy="12.8" r="1.4"/>
+                      </svg>
+                    </button>
+                    <div class="pay-ops-menu" hidden role="menu">
+                      <button
+                        class="pay-ops-item is-danger"
+                        type="button"
+                        role="menuitem"
+                        data-pay-delete
+                        data-pay-id="{{ pay.pk }}"
+                        data-pay-copy="{{ pay.amount|tr_money }} ₺ · {{ pay.get_method_display }}{% if pay.pay_detail %} · {{ pay.pay_detail }}{% endif %} · {{ pay.date|date:'d.m.Y' }}"
+                      >Sil</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="6" class="empty">Tahsilat yok.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  {% include 'portal/_party_modal.html' %}
+  {% include 'portal/_pay_modal.html' %}
+  {% include 'portal/_pay_script.html' %}
+  <script>
+    (function () {
+      var allowed = { devices: true, sales: true, jobs: true, payments: true };
+      function reduceMotion() {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+      window.portalShowFisTab = function (name) {
+        if (!allowed[name]) name = 'devices';
+        var nav = document.querySelector('[data-fis-tabs]');
+        if (!nav) return false;
+        nav.querySelectorAll('[role="tab"]').forEach(function (tab) {
+          var on = tab.getAttribute('data-tab') === name;
+          tab.classList.toggle('is-on', on);
+          tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        document.querySelectorAll('[data-tab-panel]').forEach(function (panel) {
+          var on = panel.getAttribute('data-tab-panel') === name;
+          panel.hidden = !on;
+          panel.classList.remove('is-tab-in');
+          if (on && !reduceMotion()) {
+            panel.offsetWidth;
+            panel.classList.add('is-tab-in');
+          }
+        });
+        return true;
+      };
+    })();
+  </script>
+{% endblock %}

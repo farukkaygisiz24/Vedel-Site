@@ -1,0 +1,22 @@
+<div class="group" data-care>
+  <p class="device-card-unit">Bakım</p>
+  <div class="field-care">
+    <p class="field-label">Aralık</p>
+    <div class="field-care-seg" role="radiogroup" aria-label="Bakım aralığı">
+      {% for months, label in pack.CARE_INTERVALS %}
+      <label>
+        <input type="radio" name="pack_interval_{{ pack.pk }}" value="{{ months }}" data-care-interval{% if pack.interval_months == months %} checked{% endif %} {% if not can_edit %}disabled{% endif %} />
+        <span>{{ label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="row">
+    <input type="date" name="pack_last_{{ pack.pk }}" id="pack_last_{{ pack.pk }}" placeholder=" " data-care-last value="{% if pack.last_serviced_on %}{{ pack.last_serviced_on|date:'Y-m-d' }}{% else %}{{ job.date|date:'Y-m-d' }}{% endif %}" {% if not can_edit %}readonly{% endif %} />
+    <label for="pack_last_{{ pack.pk }}">Son bakım</label>
+  </div>
+  <div class="row">
+    <input type="date" name="pack_next_{{ pack.pk }}" id="pack_next_{{ pack.pk }}" placeholder=" " data-care-next value="{{ pack.next_due|date:'Y-m-d' }}" readonly tabindex="-1" />
+    <label for="pack_next_{{ pack.pk }}">Sonraki bakım</label>
+  </div>
+</div>

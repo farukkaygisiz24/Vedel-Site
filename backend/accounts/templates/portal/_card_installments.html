@@ -1,0 +1,8 @@
+<div class="seg is-mini card-installments">
+  {% for value, label in card_installment_choices %}
+  <label>
+    <input type="radio" name="card_installments" value="{{ value }}"{% if card_installments|default:''|stringformat:'s' == value|stringformat:'s' %} checked{% endif %} />
+    <span>{% if value == 1 %}Peşin{% else %}{{ value }}{% endif %}</span>
+  </label>
+  {% endfor %}
+</div>

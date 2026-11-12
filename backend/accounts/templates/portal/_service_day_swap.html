@@ -1,0 +1,112 @@
+{{ day_panel|json_script:"service-day-panel" }}
+<script>
+  (function () {
+    var node = document.getElementById('service-day-panel');
+    if (!node) return;
+    var payload;
+    try { payload = JSON.parse(node.textContent); } catch (err) { return; }
+    var days = (payload && payload.days) || {};
+    var todayIso = payload.today || '';
+    var aside = document.querySelector('[data-service-browse]');
+    var grid = document.querySelector('.day-cal.is-browse .date-grid');
+    if (!aside || !grid) return;
+    var titleEl = aside.querySelector('[data-day-title]');
+    var countEl = aside.querySelector('[data-day-count]');
+    var listEl = aside.querySelector('[data-day-list]');
+    var hintEl = document.querySelector('[data-cal-chosen]');
+    var dateInput = document.getElementById('service_date');
+    var hours = document.querySelector('[data-day-hours]');
+
+    function markHours(info) {
+      if (!hours) return;
+      var taken = {};
+      (info.jobs || []).forEach(function (item) {
+        if (item.time) taken[item.time] = true;
+      });
+      hours.querySelectorAll('label').forEach(function (lab) {
+        var input = lab.querySelector('input');
+        lab.classList.toggle('is-taken', Boolean(input && taken[input.value]));
+      });
+    }
+
+    function paint(iso) {
+      var info = days[iso];
+      if (!info) return false;
+      grid.querySelectorAll('a[data-day]').forEach(function (cell) {
+        var on = cell.getAttribute('data-day') === iso;
+        cell.classList.toggle('is-on', on);
+        if (on) cell.setAttribute('aria-current', 'date');
+        else cell.removeAttribute('aria-current');
+      });
+      if (titleEl) titleEl.textContent = info.label;
+      if (hintEl) hintEl.textContent = info.label;
+      if (countEl) countEl.textContent = info.jobs.length ? (info.jobs.length + ' iş') : 'Boş';
+      if (dateInput) dateInput.value = iso;
+      if (listEl) {
+        listEl.innerHTML = '';
+        if (!info.jobs.length) {
+          var note = document.createElement('p');
+          note.className = 'day-jobs-empty';
+          note.textContent = info.empty;
+          listEl.appendChild(note);
+        } else {
+          info.jobs.forEach(function (item) {
+            var row = document.createElement('a');
+            row.className = 'day-job';
+            row.href = item.url;
+            var body = document.createElement('div');
+            var name = document.createElement('b');
+            name.textContent = item.party || 'Müşteri';
+            body.appendChild(name);
+            var bits = [];
+            if (item.kind) bits.push(item.kind);
+            if (item.number) bits.push(item.number);
+            if (item.assignee) bits.push(item.assignee);
+            if (bits.length) {
+              var meta = document.createElement('small');
+              meta.textContent = bits.join(' · ');
+              body.appendChild(meta);
+            }
+            if (item.time) {
+              var clock = document.createElement('time');
+              clock.textContent = item.time;
+              row.appendChild(clock);
+            }
+            row.appendChild(body);
+            listEl.appendChild(row);
+          });
+        }
+      }
+      markHours(info);
+      var assignIso = iso >= todayIso ? iso : todayIso;
+      var assignInfo = days[assignIso] || info;
+      document.querySelectorAll('[data-assign-date]').forEach(function (input) {
+        input.value = assignIso;
+      });
+      document.querySelectorAll('[data-assign-label]').forEach(function (label) {
+        label.textContent = assignInfo.label;
+      });
+      return true;
+    }
+
+    var start = dateInput && dateInput.value ? dateInput.value : '';
+    if (start && days[start]) markHours(days[start]);
+
+    window.portalSwapDay = function (href, iso) {
+      if (!aside.isConnected || !grid.isConnected) return false;
+      var key = iso;
+      if (!key) {
+        try { key = new URL(href, location.href).searchParams.get('day') || todayIso; }
+        catch (err) { key = todayIso; }
+      }
+      if (!paint(key)) return false;
+      try {
+        var next = new URL(href, location.href);
+        if (next.pathname + next.search !== location.pathname + location.search) {
+          history.pushState({ portal: true }, document.title, next.href);
+        }
+      } catch (err) {}
+      return true;
+    };
+  })();
+</script>

@@ -1,0 +1,321 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{% if category_name %}{{ category_name }} | {% endif %}Depo | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>{% if category_name %}{{ category_name }}{% else %}Depo{% endif %}</h1>
+      <p class="lead">{% if show_list %}Bu kategorideki ürün kartları.{% else %}Depo özeti. Kategoriden ürün listesine geçilir.{% endif %}</p>
+    </div>
+    <div class="toolbar-actions">
+      {% if can_stock_manage and category %}
+      <button class="btn is-ghost" type="button" id="open-stock-settings">Kategori ayarları</button>
+      {% endif %}
+      {% if can_stock_manage %}
+      <a class="btn" href="{% url 'portal-stock-new' %}{% if category %}?category={{ category }}{% endif %}">Yeni ürün</a>
+      {% endif %}
+    </div>
+  </div>
+  {% if error and stock_modal != 'category' %}<p class="flash is-err">{{ error }}</p>{% endif %}
+
+  <div class="party-stats">
+    <div class="party-stat">
+      <span>Ürün</span>
+      <b>{{ product_count }}</b>
+    </div>
+    <div class="party-stat">
+      <span>Elde</span>
+      <b>{{ qty_total|tr_qty }}</b>
+    </div>
+    <div class="party-stat">
+      <span>Alış değeri</span>
+      <b class="money">{{ value_total|tr_money }} ₺</b>
+    </div>
+    <div class="party-stat">
+      <span>Tükenen</span>
+      <b{% if empty_count %} class="is-over"{% endif %}>{{ empty_count }}</b>
+    </div>
+  </div>
+
+  {% if show_list %}
+  <form class="sale-filters" method="get" data-sale-filters>
+    <div class="sale-filters-top">
+      <input type="search" name="q" value="{{ query }}" placeholder="Kod, marka veya ürün adı" autocomplete="off" />
+      {% if category %}<input type="hidden" name="category" value="{{ category }}" />{% endif %}
+    </div>
+    <div class="sale-filters-bar is-one{% if category_is_klima %} is-stack{% endif %}">
+      {% if category_is_klima %}
+      <div class="sale-filter">
+        <span class="sale-filter-kicker">Cihaz</span>
+        <div class="sale-filter-opts is-four">
+          <label>
+            <input type="radio" name="device" value=""{% if not device %} checked{% endif %} />
+            <span>Tümü</span>
+          </label>
+          <label>
+            <input type="radio" name="device" value="split"{% if device == 'split' %} checked{% endif %} />
+            <span>Split</span>
+          </label>
+          <label>
+            <input type="radio" name="device" value="multi_indoor"{% if device == 'multi_indoor' %} checked{% endif %} />
+            <span>Multi iç ünite</span>
+          </label>
+          <label>
+            <input type="radio" name="device" value="multi_outdoor"{% if device == 'multi_outdoor' %} checked{% endif %} />
+            <span>Multi dış ünite</span>
+          </label>
+        </div>
+      </div>
+      {% endif %}
+      <div class="sale-filter">
+        <span class="sale-filter-kicker">Stok</span>
+        <div class="sale-filter-opts">
+          <label>
+            <input type="radio" name="stock" value=""{% if not stock %} checked{% endif %} />
+            <span>Tümü</span>
+          </label>
+          <label>
+            <input type="radio" name="stock" value="in"{% if stock == 'in' %} checked{% endif %} />
+            <span>Stokta</span>
+          </label>
+          <label>
+            <input type="radio" name="stock" value="out"{% if stock == 'out' %} checked{% endif %} />
+            <span>Tükendi</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="sheet-wrap sale-sheet stock-sheet">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>Kod</th>
+          <th>Ürün</th>
+          <th>Birim</th>
+          <th>Stok</th>
+          <th>Alış</th>
+          <th>Satış</th>
+          <th>KDV</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in products %}
+        <tr class="sale-row">
+          <td><a class="sale-row-go" href="{{ item.get_absolute_url }}">{{ item.sku }}</a></td>
+          <td>{{ item.display_name }}</td>
+          <td>{{ item.unit }}</td>
+          <td class="num{% if item.is_low %} money is-over{% endif %}">{{ item.stock_qty|tr_qty }}</td>
+          <td class="money">{{ item.buy_price|tr_money }} ₺</td>
+          <td class="money">{{ item.sale_price|tr_money }} ₺</td>
+          <td class="num">{{ item.vat_rate|tr_qty }}%</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="empty">{{ empty_copy }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'portal/_pager.html' %}
+
+  <script>
+    (function () {
+      var formFilters = document.querySelector('[data-sale-filters]');
+      if (!formFilters) return;
+      formFilters.addEventListener('submit', function () {
+        formFilters.querySelectorAll('input').forEach(function (el) {
+          if (el.disabled) return;
+          if (!String(el.value || '').trim()) el.disabled = true;
+        });
+      });
+      formFilters.querySelectorAll('.sale-filter input').forEach(function (el) {
+        el.addEventListener('change', function () {
+          if (typeof formFilters.requestSubmit === 'function') formFilters.requestSubmit();
+          else formFilters.submit();
+        });
+      });
+    })();
+  </script>
+  {% endif %}
+
+  <div class="modal" id="stock-settings-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Depo</span>
+        <h2>Kategori ayarları</h2>
+        <p class="step-copy">Kategoriye marka bağla. Önek kart kodunu verir.</p>
+      </div>
+      <form id="stock-settings-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="category" />
+        <input type="hidden" name="id" id="s_cat_id" value="" />
+        <div class="modal-body">
+          <div class="group">
+            <div class="row">
+              <input id="s_name" name="name" placeholder=" " required data-title autocomplete="off" />
+              <label for="s_name">Kategori adı</label>
+            </div>
+            <div class="row">
+              <input id="s_prefix" name="sku_prefix" placeholder=" " required data-upper autocomplete="off" maxlength="6" />
+              <label for="s_prefix">Stok öneki</label>
+            </div>
+            <div class="row">
+              <input id="s_brand" name="brand" placeholder=" " data-title autocomplete="off" />
+              <label for="s_brand">Marka</label>
+            </div>
+          </div>
+          <label class="switch" for="s_is_klima" style="margin-top:16px">
+            <span>
+              <b>Klima kategorisi</b>
+              <small class="hint">Split ve multi cihaz kartı bu kategoride açılır.</small>
+            </span>
+            <span class="toggle">
+              <input type="checkbox" name="is_klima" id="s_is_klima" value="1" />
+              <i></i>
+            </span>
+          </label>
+          <p class="hint" id="s-cat-hint">Önek 2–6 harf. Marka bu kategorideki yeni ürüne gelir.</p>
+        </div>
+        <p class="modal-alert" id="stock-settings-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost is-danger" type="button" id="delete-stock-settings" hidden style="margin-right:auto">Sil</button>
+          <button class="btn is-ghost" type="button" id="close-stock-settings">Vazgeç</button>
+          <button class="btn" type="submit" id="save-stock-settings">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% if setting_cat %}{{ setting_cat|json_script:"setting-cat" }}{% endif %}
+  <script>
+    (function () {
+      var modal = document.getElementById('stock-settings-modal');
+      var form = document.getElementById('stock-settings-form');
+      var openBtn = document.getElementById('open-stock-settings');
+      if (!modal || !form || !openBtn) return;
+      var err = document.getElementById('stock-settings-error');
+      var idEl = document.getElementById('s_cat_id');
+      var nameEl = document.getElementById('s_name');
+      var prefixEl = document.getElementById('s_prefix');
+      var brandEl = document.getElementById('s_brand');
+      var klimaEl = document.getElementById('s_is_klima');
+      var deleteBtn = document.getElementById('delete-stock-settings');
+      var hintEl = document.getElementById('s-cat-hint');
+      var csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+      var cat = null;
+      var catNode = document.getElementById('setting-cat');
+      if (catNode) {
+        try { cat = JSON.parse(catNode.textContent) || null; } catch (e) { cat = null; }
+      }
+      if (!cat) return;
+      function lockPrefix(on) {
+        prefixEl.readOnly = !!on;
+        prefixEl.tabIndex = on ? -1 : 0;
+        hintEl.textContent = on
+          ? 'Bu kategoride ürün var; önek kilitli. Markayı buradan değiştirebilirsin.'
+          : 'Önek 2–6 harf. Marka bu kategorideki yeni ürüne gelir.';
+      }
+      function fillCat() {
+        err.hidden = true;
+        err.textContent = '';
+        idEl.value = cat.id;
+        nameEl.value = cat.name || '';
+        prefixEl.value = cat.prefix || '';
+        brandEl.value = cat.brand || '';
+        if (klimaEl) klimaEl.checked = !!cat.is_klima;
+        lockPrefix(!!cat.locked);
+        if (deleteBtn) deleteBtn.hidden = false;
+      }
+      function reveal() {
+        fillCat();
+        modal.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { modal.classList.add('is-on'); });
+        });
+        window.setTimeout(function () {
+          try { brandEl.focus(); } catch (e) {}
+        }, 40);
+      }
+      function hide() {
+        modal.classList.remove('is-on');
+        window.setTimeout(function () {
+          modal.hidden = true;
+          form.reset();
+          err.hidden = true;
+        }, 280);
+      }
+      function postForm(action) {
+        var body = new FormData(form);
+        body.set('action', action);
+        return fetch('{% url "portal-stock" %}', {
+          method: 'POST',
+          body: body,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+            'X-CSRFToken': csrf
+          },
+          credentials: 'same-origin'
+        }).then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok && data.ok, data: data };
+          });
+        });
+      }
+      openBtn.addEventListener('click', reveal);
+      document.getElementById('close-stock-settings').addEventListener('click', hide);
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', function () {
+          if (!window.confirm((cat.name || 'Kategori') + ' silinecek. Onaylıyor musun?')) return;
+          err.hidden = true;
+          postForm('delete_category').then(function (result) {
+            if (!result.ok) {
+              err.textContent = (result.data && result.data.error) || 'Kategori silinemedi.';
+              err.hidden = false;
+              return;
+            }
+            if (window.takePortalToast) window.takePortalToast(result.data);
+            window.location = (result.data && result.data.url) || '{% url "portal-stock" %}';
+          }).catch(function () {
+            err.textContent = 'Bağlantı kurulamadı.';
+            err.hidden = false;
+          });
+        });
+      }
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) hide();
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape' || modal.hidden) return;
+        event.preventDefault();
+        hide();
+      });
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (!nameEl.value.trim() || !prefixEl.value.trim()) {
+          err.textContent = 'Kategori adı ve önek zorunlu.';
+          err.hidden = false;
+          return;
+        }
+        err.hidden = true;
+        postForm('category').then(function (result) {
+          if (!result.ok) {
+            err.textContent = (result.data && result.data.error) || 'Kategori kaydedilemedi.';
+            err.hidden = false;
+            return;
+          }
+          if (window.takePortalToast) window.takePortalToast(result.data);
+          window.location = (result.data && result.data.url) || window.location.href;
+        }).catch(function () {
+          err.textContent = 'Bağlantı kurulamadı.';
+          err.hidden = false;
+        });
+      });
+      {% if stock_modal == 'category' %}
+      reveal();
+      {% endif %}
+    })();
+  </script>
+{% endblock %}

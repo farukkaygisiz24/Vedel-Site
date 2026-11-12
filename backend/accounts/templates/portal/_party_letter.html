@@ -1,0 +1,12 @@
+<section class="fis-letter">
+  <div class="fis-letter-head">
+    <div>
+      <span class="fis-kicker">Müşteri bilgileri</span>
+      <div class="fis-name">{{ party.display_name }}</div>
+      <p>{{ party.get_kind_display }}</p>
+    </div>
+  </div>
+  <dl class="fis-facts">
+    {% include 'portal/_party_facts.html' %}
+  </dl>
+</section>

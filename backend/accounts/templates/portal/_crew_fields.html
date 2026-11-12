@@ -1,0 +1,51 @@
+<p class="field-label">Kimlik</p>
+<div class="group">
+  <div class="row">
+    <input id="c_first_name" name="first_name" placeholder=" " required data-title autocomplete="off" value="{{ form.first_name }}" />
+    <label for="c_first_name">Ad</label>
+  </div>
+  <div class="row">
+    <input id="c_last_name" name="last_name" placeholder=" " required data-title autocomplete="off" value="{{ form.last_name }}" />
+    <label for="c_last_name">Soyad</label>
+  </div>
+  <div class="row">
+    <input id="c_national_id" name="national_id" placeholder=" " required inputmode="numeric" maxlength="11" data-digits="11" autocomplete="off" value="{{ form.national_id }}" />
+    <label for="c_national_id">T.C. kimlik no</label>
+  </div>
+  <div class="row">
+    <input id="c_title" name="title" placeholder=" " data-title autocomplete="off" value="{{ form.title }}" />
+    <label for="c_title">Unvan</label>
+  </div>
+</div>
+
+<p class="field-label">İletişim</p>
+<div class="group">
+  <div class="row">
+    <input id="c_phone" name="phone" placeholder=" " required inputmode="tel" maxlength="17" data-phone autocomplete="tel" value="{{ form.phone }}" />
+    <label for="c_phone">Telefon</label>
+  </div>
+  <div class="row">
+    <input id="c_phone2" name="phone2" placeholder=" " inputmode="tel" maxlength="17" data-phone autocomplete="tel" value="{{ form.phone2 }}" />
+    <label for="c_phone2">2. telefon</label>
+  </div>
+  <div class="row">
+    <input id="c_email" name="email" type="email" placeholder=" " autocomplete="email" value="{{ form.email }}" />
+    <label for="c_email">E-posta</label>
+  </div>
+</div>
+
+<p class="field-label">Ev adresi</p>
+<div class="group">
+  <div class="row">
+    <input id="c_address" name="address" placeholder=" " required data-upper autocomplete="street-address" value="{{ form.address }}" />
+    <label for="c_address">Adres</label>
+  </div>
+  <div class="row">
+    <input id="c_city" name="city" placeholder=" " data-upper autocomplete="address-level1" value="{{ form.city }}" />
+    <label for="c_city">İl</label>
+  </div>
+  <div class="row">
+    <input id="c_district" name="district" placeholder=" " data-upper autocomplete="address-level2" value="{{ form.district }}" />
+    <label for="c_district">İlçe</label>
+  </div>
+</div>

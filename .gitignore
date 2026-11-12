@@ -23,6 +23,10 @@
 # misc
 .DS_Store
 *.pem
+.cursor/
+*.pdf
+/diamond.png
+/trend.png
 
 # debug
 npm-debug.log*
@@ -39,3 +43,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.venv-hero/
+backend/.venv/
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+__pycache__/
+*.pyc
+
+# local test credentials
+backend/.dev-superuser

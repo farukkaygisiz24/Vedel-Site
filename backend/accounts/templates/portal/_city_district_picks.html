@@ -1,0 +1,42 @@
+{# Requires city_id, district_id. Optional: city_value, district_value, default_city. #}
+{% with city_val=city_value|default:'' district_val=district_value|default:'' def_city=default_city|default:tr_default_city %}
+<div class="city-district" data-city-district data-default-city="{{ def_city }}">
+  <div class="row">
+    <div class="pick-chip" data-pick data-city-pick data-pick-empty="Eşleşen il yok." data-pick-blank="">
+      <button type="button" class="date-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="{{ city_id }}-list">
+        <span data-pick-label{% if not city_val %} class="is-empty"{% endif %}>{% if city_val %}{{ city_val }}{% endif %}</span>
+      </button>
+      <input type="hidden" name="city" id="{{ city_id }}" value="{{ city_val }}" required />
+      <div class="date-pop" id="{{ city_id }}-list">
+        <div class="pick-search">
+          <span class="pick-search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M16 16.5 20 20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <input type="search" data-pick-q placeholder="İl ara" autocomplete="off" aria-autocomplete="list" aria-controls="{{ city_id }}-opts" />
+        </div>
+        <div class="pick-list" data-pick-list role="listbox" aria-label="İl seç" id="{{ city_id }}-opts"></div>
+      </div>
+    </div>
+    <label for="{{ city_id }}">İl</label>
+  </div>
+
+  <div class="row">
+    <div class="pick-chip" data-pick data-district-pick data-pick-empty="Eşleşen ilçe yok." data-pick-blank="">
+      <button type="button" class="date-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="{{ district_id }}-list">
+        <span data-pick-label{% if not district_val %} class="is-empty"{% endif %}>{% if district_val %}{{ district_val }}{% endif %}</span>
+      </button>
+      <input type="hidden" name="district" id="{{ district_id }}" value="{{ district_val }}" required />
+      <div class="date-pop" id="{{ district_id }}-list">
+        <div class="pick-search">
+          <span class="pick-search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/><path d="M16 16.5 20 20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <input type="search" data-pick-q placeholder="İlçe ara" autocomplete="off" aria-autocomplete="list" aria-controls="{{ district_id }}-opts" />
+        </div>
+        <div class="pick-list" data-pick-list role="listbox" aria-label="İlçe seç" id="{{ district_id }}-opts"></div>
+      </div>
+    </div>
+    <label for="{{ district_id }}">İlçe</label>
+  </div>
+</div>
+{% endwith %}

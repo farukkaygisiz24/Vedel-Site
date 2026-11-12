@@ -1,0 +1,10 @@
+<div id="{{ outdoor_wrap_id|default:'outdoor-wrap' }}"{% if not is_device %} hidden{% endif %}>
+  <p class="field-label">Dış ünite</p>
+  <div class="pick-chip is-search" data-outdoor-pick data-stock-url="{% url 'portal-stock' %}"{% if exclude_id %} data-exclude="{{ exclude_id }}"{% endif %}>
+    <input type="search" data-pick-q name="outdoor_name" placeholder="Dış ünite ara veya yaz" value="{{ outdoor_name }}" autocomplete="off" aria-autocomplete="list" aria-expanded="false" />
+    <input type="hidden" name="outdoor_id" value="{{ outdoor_id|default_if_none:'' }}" />
+    <div class="date-pop" role="listbox" aria-label="Dış ünite seç">
+      <div class="pick-list" data-pick-list></div>
+    </div>
+  </div>
+</div>

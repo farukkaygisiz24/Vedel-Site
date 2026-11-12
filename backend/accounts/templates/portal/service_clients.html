@@ -1,0 +1,68 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}Müşteriler | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Müşteriler</h1>
+      <p class="lead">Kayıtlı müşteriler. Cihaz ve servis işleri.</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn is-ghost" href="{% url 'portal-service' %}">Hafta</a>
+      <button class="btn" type="button" id="open-party">Yeni müşteri</button>
+    </div>
+  </div>
+
+  <form class="sale-filters" method="get" data-sale-filters>
+    <div class="sale-filters-top">
+      <input type="search" name="q" value="{{ query }}" placeholder="Kod, isim, unvan veya telefon" autocomplete="off" />
+    </div>
+  </form>
+
+  <div class="sheet-wrap sale-sheet">
+    <table class="sheet">
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>Müşteri</th>
+          <th>Telefon</th>
+          <th>Cihaz</th>
+          <th>İş</th>
+          <th>Son iş</th>
+          <th>Sonraki bakım</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in parties %}
+        <tr class="sale-row">
+          <td><a class="sale-row-go" href="{{ item.get_absolute_url }}">{{ item.number }}</a></td>
+          <td>{{ item.display_name }}</td>
+          <td>{{ item.phone|tel_link }}</td>
+          <td class="num">{{ item.device_count }}</td>
+          <td class="num">{{ item.job_count }}</td>
+          <td>{% if item.last_job_on %}{{ item.last_job_on|date:'d.m.Y' }}{% else %}—{% endif %}</td>
+          <td class="money{% if item.next_care and item.next_care < today %} is-over{% endif %}">{% if item.next_care %}{{ item.next_care|date:'d.m.Y' }}{% else %}—{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="empty">{{ empty_copy }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include 'portal/_pager.html' %}
+  {% include 'portal/_party_modal.html' %}
+  <script>
+    (function () {
+      var form = document.querySelector('[data-sale-filters]');
+      if (!form) return;
+      form.addEventListener('submit', function () {
+        form.querySelectorAll('input').forEach(function (el) {
+          if (el.disabled) return;
+          if (!String(el.value || '').trim()) el.disabled = true;
+        });
+      });
+    })();
+  </script>
+{% endblock %}

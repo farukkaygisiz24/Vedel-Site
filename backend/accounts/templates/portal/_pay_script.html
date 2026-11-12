@@ -1,0 +1,422 @@
+<script>
+  (function () {
+    function reduceMotion() {
+      return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    }
+    function formatMoneyInput(raw, complete) {
+      var text = String(raw || '');
+      if (!text.trim()) return '';
+      if (text.indexOf(',') < 0 && /^\d+\.\d{1,2}$/.test(text.trim())) {
+        text = text.trim().replace('.', ',');
+      }
+      text = text.replace(/[^\d,]/g, '');
+      var comma = text.indexOf(',');
+      var intPart;
+      var decPart;
+      var hasComma = comma >= 0;
+      if (hasComma) {
+        intPart = text.slice(0, comma).replace(/\D/g, '');
+        decPart = text.slice(comma + 1).replace(/\D/g, '').slice(0, 2);
+      } else {
+        intPart = text.replace(/\D/g, '');
+        decPart = '';
+      }
+      if (!intPart && !decPart && !hasComma) return '';
+      intPart = intPart.replace(/^0+(?=\d)/, '').slice(0, 10);
+      if (!intPart) intPart = '0';
+      var grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      if (complete) return grouped + ',' + (decPart + '00').slice(0, 2);
+      return hasComma ? grouped + ',' + decPart : grouped;
+    }
+    function caretAfterDigits(value, count) {
+      var pos = 0;
+      var seen = 0;
+      while (pos < value.length && seen < count) {
+        if (/\d/.test(value.charAt(pos))) seen += 1;
+        pos += 1;
+      }
+      return pos;
+    }
+    function bindMoneyInput(el) {
+      if (!el || el._moneyBound) return;
+      el._moneyBound = true;
+      el.addEventListener('keydown', function (event) {
+        if (event.key !== '.' && event.key !== ',') return;
+        if (String(el.value).indexOf(',') >= 0) {
+          event.preventDefault();
+          return;
+        }
+        if (event.key !== '.') return;
+        event.preventDefault();
+        var start = el.selectionStart;
+        var end = el.selectionEnd;
+        el.value = el.value.slice(0, start) + ',' + el.value.slice(end);
+        el.setSelectionRange(start + 1, start + 1);
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      el.addEventListener('input', function () {
+        var start = el.selectionStart;
+        var old = el.value;
+        var typedComma = start > 0 && old.charAt(start - 1) === ',';
+        var digitsBefore = old.slice(0, start).replace(/\D/g, '').length;
+        var next = formatMoneyInput(old);
+        el.value = next;
+        if (typedComma && next.indexOf(',') >= 0) {
+          var commaAt = next.indexOf(',');
+          el.setSelectionRange(commaAt + 1, commaAt + 1);
+        } else {
+          var pos = caretAfterDigits(next, digitsBefore);
+          el.setSelectionRange(pos, pos);
+        }
+      });
+      el.addEventListener('blur', function () {
+        var next = formatMoneyInput(el.value, true);
+        if (el.value !== next) el.value = next;
+      });
+    }
+    function parseMoney(raw) {
+      var text = String(raw || '').trim().replace(/\s/g, '');
+      if (!text) return 0;
+      if (text.indexOf(',') >= 0) {
+        return parseFloat(text.replace(/\./g, '').replace(',', '.')) || 0;
+      }
+      var parts = text.split('.');
+      if (parts.length > 1 && parts.slice(1).every(function (part) { return part.length === 3; })) {
+        return parseFloat(parts.join('')) || 0;
+      }
+      return parseFloat(text) || 0;
+    }
+    function moneyLabel(n) {
+      return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+    }
+    var MODAL_DISCARD_CONFIRM = 'Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?';
+    function isIgnoredModalField(el) {
+      if (!el || el.disabled) return true;
+      var type = String(el.type || '').toLowerCase();
+      var name = String(el.name || '');
+      if (type === 'hidden' && name === 'pay_date') return false;
+      if (type === 'hidden' || type === 'button' || type === 'submit' || type === 'reset' || type === 'file') return true;
+      if (name === 'csrfmiddlewaretoken' || name === 'action') return true;
+      return false;
+    }
+    function modalFieldKey(el) {
+      var type = String(el.type || '').toLowerCase();
+      if (el.id) return 'id:' + el.id;
+      if (type === 'radio') return 'radio:' + el.name + '=' + el.value;
+      return 'name:' + (el.name || el.tagName);
+    }
+    function normalizeModalValue(el) {
+      var type = String(el.type || '').toLowerCase();
+      if (type === 'checkbox' || type === 'radio') return el.checked ? '1' : '0';
+      return String(el.value || '');
+    }
+    function snapshotModalForm(form) {
+      var snap = {};
+      if (!form) return;
+      form.querySelectorAll('input, select, textarea').forEach(function (el) {
+        if (isIgnoredModalField(el)) return;
+        snap[modalFieldKey(el)] = normalizeModalValue(el);
+      });
+      form._modalSnapshot = snap;
+    }
+    function isModalFormDirty(form) {
+      if (!form || !form._modalSnapshot) return false;
+      var dirty = false;
+      form.querySelectorAll('input, select, textarea').forEach(function (el) {
+        if (dirty || isIgnoredModalField(el)) return;
+        var key = modalFieldKey(el);
+        var initial = Object.prototype.hasOwnProperty.call(form._modalSnapshot, key) ? form._modalSnapshot[key] : '';
+        if (normalizeModalValue(el) !== initial) dirty = true;
+      });
+      return dirty;
+    }
+    function requestCloseModal(form, closeFn) {
+      if (isModalFormDirty(form) && !window.confirm(MODAL_DISCARD_CONFIRM)) return false;
+      closeFn();
+      return true;
+    }
+
+    bindMoneyInput(document.getElementById('id_pay_amount'));
+    var payForm = document.getElementById('pay-form');
+    var payModal = document.getElementById('pay-modal');
+    var payError = document.getElementById('pay-error');
+    var payAfter = document.getElementById('pay-after');
+    var cardPayMeta = document.getElementById('card-pay-meta');
+    var cardHolder = document.getElementById('id_card_holder');
+    var transferPayMeta = document.getElementById('transfer-pay-meta');
+    var transferSender = document.getElementById('id_transfer_sender');
+    var payTimer = 0;
+    var remaining = payForm ? parseFloat(payForm.getAttribute('data-remaining')) || 0 : 0;
+
+    function syncPayMethod() {
+      if (!payForm) return;
+      var checked = payForm.querySelector('[name=pay_method]:checked');
+      var method = checked ? checked.value : '';
+      var cardOn = method === 'card';
+      var transferOn = method === 'transfer';
+      if (cardHolder) {
+        cardHolder.required = cardOn;
+        if (!cardOn) cardHolder.value = '';
+      }
+      payForm.querySelectorAll('[name=card_installments]').forEach(function (el, index) {
+        el.required = cardOn && index === 0;
+        if (!cardOn) el.checked = false;
+      });
+      if (transferSender) {
+        transferSender.required = transferOn;
+        if (!transferOn) transferSender.value = '';
+      }
+      if (window.setPortalReveal) {
+        if (cardPayMeta) window.setPortalReveal(cardPayMeta, cardOn, true);
+        if (transferPayMeta) window.setPortalReveal(transferPayMeta, transferOn, true);
+      } else {
+        if (cardPayMeta) {
+          cardPayMeta.hidden = !cardOn;
+          cardPayMeta.classList.toggle('is-open', cardOn);
+        }
+        if (transferPayMeta) {
+          transferPayMeta.hidden = !transferOn;
+          transferPayMeta.classList.toggle('is-open', transferOn);
+        }
+      }
+    }
+
+    function showPayError(text) {
+      if (!payError) return;
+      if (!text) {
+        payError.hidden = true;
+        payError.textContent = '';
+        return;
+      }
+      payError.textContent = text;
+      payError.hidden = false;
+    }
+    function syncPayRest() {
+      if (!payForm) return;
+      var amount = parseMoney((document.getElementById('id_pay_amount') || {}).value);
+      var rest = Math.round((remaining - amount) * 100) / 100;
+      if (payAfter) {
+        if (!amount) {
+          payAfter.textContent = 'Bu ödeme sonrası kalan ' + moneyLabel(remaining) + '.';
+          payAfter.style.color = '';
+        } else if (amount > remaining + 0.001) {
+          payAfter.textContent = 'Tutar kalanı aşıyor. Kalan ' + moneyLabel(remaining) + '.';
+          payAfter.style.color = 'var(--danger)';
+        } else {
+          payAfter.textContent = 'Bu ödeme sonrası kalan ' + moneyLabel(rest) + '.';
+          payAfter.style.color = '';
+        }
+      }
+      return amount;
+    }
+    function openPayModal() {
+      if (!payModal || !payForm) return;
+      window.clearTimeout(payTimer);
+      payModal.hidden = false;
+      requestAnimationFrame(function () {
+        payModal.classList.add('is-on');
+      });
+      snapshotModalForm(payForm);
+      syncPayRest();
+      syncPayMethod();
+      var amountEl = document.getElementById('id_pay_amount');
+      if (amountEl) amountEl.focus();
+    }
+    function closePayModal() {
+      if (!payModal) return;
+      window.clearTimeout(payTimer);
+      payModal._closing = true;
+      payModal.classList.remove('is-on');
+      var hide = function () {
+        payModal.hidden = true;
+        payModal._closing = false;
+        if (payForm) {
+          payForm.reset();
+          showPayError('');
+          syncPayRest();
+          syncPayMethod();
+        }
+      };
+      if (reduceMotion()) {
+        hide();
+        return;
+      }
+      payTimer = window.setTimeout(hide, 280);
+    }
+
+    if (payForm) {
+      payForm.addEventListener('input', syncPayRest);
+      payForm.addEventListener('change', function (event) {
+        if (event.target && event.target.name === 'pay_method') syncPayMethod();
+      });
+      payForm.addEventListener('submit', function (event) {
+        var el = document.getElementById('id_pay_amount');
+        if (el) {
+          var next = formatMoneyInput(el.value, true);
+          if (el.value !== next) el.value = next;
+        }
+        var amount = syncPayRest();
+        if (amount > remaining + 0.001) {
+          event.preventDefault();
+          showPayError('Kalan ' + moneyLabel(remaining) + '. Daha fazla tahsil edilemez.');
+        }
+      });
+    }
+    var openPay = document.getElementById('open-pay');
+    if (openPay) openPay.addEventListener('click', openPayModal);
+    if (payModal) {
+      payModal._closeModal = closePayModal;
+      var closePay = document.getElementById('close-pay');
+      if (closePay) {
+        closePay.addEventListener('click', function () {
+          requestCloseModal(payForm, closePayModal);
+        });
+      }
+      payModal.addEventListener('click', function (event) {
+        if (event.target === payModal) requestCloseModal(payForm, closePayModal);
+      });
+    }
+    document.addEventListener('keydown', function (event) {
+      if (event.key !== 'Escape') return;
+      var overlay = document.querySelector('.modal.is-on:not([hidden])');
+      if (!overlay || overlay._closing || typeof overlay._closeModal !== 'function') return;
+      event.preventDefault();
+      requestCloseModal(overlay.querySelector('form'), overlay._closeModal);
+    });
+
+    var deletePayModal = document.getElementById('delete-pay-modal');
+    var deletePayForm = document.getElementById('delete-pay-form');
+    var deletePayBtn = document.getElementById('delete-pay-btn');
+    var deletePayTimer = 0;
+    function deletePayBusy() {
+      return deletePayBtn && deletePayBtn.classList.contains('is-busy');
+    }
+    function setDeletePayBusy(on) {
+      if (!deletePayBtn) return;
+      deletePayBtn.classList.toggle('is-busy', on);
+      deletePayBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+    }
+    function showDeletePayError(text) {
+      var el = document.getElementById('delete-pay-error');
+      if (!el) return;
+      el.textContent = text || '';
+      el.hidden = !text;
+    }
+    function openDeletePayModal(btn) {
+      if (!deletePayModal || deletePayBusy()) return;
+      var idInput = document.getElementById('delete-pay-id');
+      var copy = document.getElementById('delete-pay-copy');
+      if (idInput) idInput.value = btn.getAttribute('data-pay-id') || '';
+      if (copy) {
+        var line = btn.getAttribute('data-pay-copy') || 'Bu tahsilat';
+        copy.textContent = line + ' silinecek. Kalan borç güncellenir.';
+      }
+      window.clearTimeout(deletePayTimer);
+      showDeletePayError('');
+      deletePayModal.hidden = false;
+      requestAnimationFrame(function () {
+        deletePayModal.classList.add('is-on');
+      });
+    }
+    function closeDeletePayModal() {
+      if (!deletePayModal || deletePayBusy()) return;
+      window.clearTimeout(deletePayTimer);
+      deletePayModal._closing = true;
+      deletePayModal.classList.remove('is-on');
+      var hide = function () {
+        deletePayModal.hidden = true;
+        deletePayModal._closing = false;
+      };
+      if (reduceMotion()) {
+        hide();
+        return;
+      }
+      deletePayTimer = window.setTimeout(hide, 280);
+    }
+    function closePayOps(except) {
+      document.querySelectorAll('[data-pay-ops]').forEach(function (ops) {
+        if (ops === except) return;
+        ops.classList.remove('is-on');
+        var menu = ops.querySelector('.pay-ops-menu');
+        var trigger = ops.querySelector('.pay-ops-btn');
+        if (menu) menu.hidden = true;
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+      });
+    }
+    document.querySelectorAll('[data-pay-ops]').forEach(function (ops) {
+      var trigger = ops.querySelector('.pay-ops-btn');
+      var menu = ops.querySelector('.pay-ops-menu');
+      if (!trigger || !menu) return;
+      trigger.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var open = ops.classList.contains('is-on');
+        closePayOps();
+        if (open) return;
+        ops.classList.add('is-on');
+        menu.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+      });
+    });
+    document.addEventListener('click', function () {
+      closePayOps();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') closePayOps();
+    });
+    document.querySelectorAll('[data-pay-delete]').forEach(function (btn) {
+      btn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        closePayOps();
+        openDeletePayModal(btn);
+      });
+    });
+    if (deletePayModal) {
+      deletePayModal._closeModal = closeDeletePayModal;
+      var closeDeletePay = document.getElementById('close-delete-pay');
+      if (closeDeletePay) closeDeletePay.addEventListener('click', closeDeletePayModal);
+      deletePayModal.addEventListener('click', function (event) {
+        if (event.target === deletePayModal) closeDeletePayModal();
+      });
+    }
+    if (deletePayForm) {
+      deletePayForm.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (deletePayBusy()) return;
+        showDeletePayError('');
+        setDeletePayBusy(true);
+        var started = Date.now();
+        var csrf = deletePayForm.querySelector('[name=csrfmiddlewaretoken]');
+        fetch(deletePayForm.getAttribute('action') || window.location.href, {
+          method: 'POST',
+          body: new FormData(deletePayForm),
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+            'X-CSRFToken': csrf ? csrf.value : ''
+          },
+          credentials: 'same-origin'
+        }).then(function (response) {
+          return response.json().then(function (data) {
+            return { ok: response.ok && data.ok, data: data };
+          }).catch(function () {
+            return { ok: false, data: { error: 'Tahsilat silinemedi.' } };
+          });
+        }).then(function (result) {
+          if (!result.ok) {
+            setDeletePayBusy(false);
+            showDeletePayError((result.data && result.data.error) || 'Tahsilat silinemedi.');
+            return;
+          }
+          var wait = Math.max(0, 2000 - (Date.now() - started));
+          window.setTimeout(function () {
+            window.location = result.data.url || window.location.href;
+          }, wait);
+        }).catch(function () {
+          setDeletePayBusy(false);
+          showDeletePayError('Bağlantı kurulamadı.');
+        });
+      });
+    }
+    if ({{ pay_open|yesno:'true,false' }}) openPayModal();
+  })();
+</script>

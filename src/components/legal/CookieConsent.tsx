@@ -12,16 +12,15 @@ import {
 import { activateGoogleAdsTracking } from '@/lib/googleTag'
 
 export default function CookieConsent() {
-  const [choice, setChoice] = useState<CookieConsentChoice | null>(
-    () => (typeof window !== 'undefined' ? getCookieConsent() : null)
-  )
+  const [choice, setChoice] = useState<CookieConsentChoice | null>(null)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    const stored = getCookieConsent()
+    setChoice(stored)
     setMounted(true)
 
-    if (getCookieConsent() === 'accepted') {
+    if (stored === 'accepted') {
       activateGoogleAdsTracking()
     }
 
@@ -53,6 +52,7 @@ export default function CookieConsent() {
     }
   }
 
+  // Mount sonrası localStorage okunana kadar banner gösterme (flash / yanlış tekrar)
   const showBanner = mounted && choice === null
 
   return (

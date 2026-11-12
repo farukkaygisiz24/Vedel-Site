@@ -1,0 +1,1084 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ sale.number }} | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="fis">
+    <div class="toolbar">
+      <div>
+        <h1>{{ sale.number }}</h1>
+        <div class="fis-meta">
+          <span class="fis-chip">{{ sale.date|date:'d.m.Y' }}</span>
+          <span class="fis-chip">{{ sale.get_work_type_display }}</span>
+          <span class="fis-chip">{{ sale.get_vat_mode_display }}</span>
+        </div>
+      </div>
+      <div class="fis-toolbar-actions">
+        <button class="btn is-ghost" type="button" id="print-sale">PDF yazdır</button>
+        <a class="btn is-ghost" href="{{ sale.get_list_url }}">Listeye dön</a>
+      </div>
+    </div>
+    {% if error and not pay_open and not invoice_open %}<p class="flash is-err">{{ error }}</p>{% endif %}
+
+    <section class="fis-letter">
+      <div class="fis-letter-head">
+        <div>
+          <span class="fis-kicker">Müşteri bilgileri</span>
+          <div class="fis-name">{{ sale.party.display_name }}</div>
+          <p>{{ sale.party.get_kind_display }}</p>
+        </div>
+        <a class="btn is-ghost" href="{{ sale.party.get_absolute_url }}">Düzenle</a>
+      </div>
+      <dl class="fis-facts">
+        <div>
+          <dt>Telefon</dt>
+          <dd>{{ sale.party.phone|tel_link }}</dd>
+        </div>
+        <div>
+          <dt>2. ulaşım</dt>
+          <dd>
+            {% if sale.party.contact2_parts %}
+              {% for part in sale.party.contact2_parts %}{{ part }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+            {% else %}—{% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt>E-posta</dt>
+          <dd>{{ sale.party.email|default:'—' }}</dd>
+        </div>
+        {% if sale.party.kind == 'legal' %}
+        <div>
+          <dt>Yetkili</dt>
+          <dd>{% if sale.party.first_name or sale.party.last_name %}{{ sale.party.first_name }} {{ sale.party.last_name }}{% else %}—{% endif %}</dd>
+        </div>
+        <div>
+          <dt>Vergi dairesi</dt>
+          <dd>{{ sale.party.tax_office|default:'—' }}</dd>
+        </div>
+        <div>
+          <dt>Vergi no</dt>
+          <dd>{{ sale.party.tax_no|default:'—' }}</dd>
+        </div>
+        {% else %}
+        <div>
+          <dt>T.C. kimlik no</dt>
+          <dd>{{ sale.party.national_id|default:'—' }}</dd>
+        </div>
+        {% endif %}
+        <div>
+          <dt>İl</dt>
+          <dd>{% if sale.party.district and sale.party.city %}{{ sale.party.district }} / {{ sale.party.city }}{% elif sale.party.city %}{{ sale.party.city }}{% elif sale.party.district %}{{ sale.party.district }}{% else %}—{% endif %}</dd>
+        </div>
+        <div class="is-wide">
+          <dt>Adres</dt>
+          <dd>{{ sale.party.address|default:'—' }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section class="fis-block">
+      <p class="field-label">Kalemler</p>
+      <div class="sheet-wrap">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th>Ürün</th>
+              <th>Adet</th>
+              <th>Birim</th>
+              <th>KDV</th>
+              <th>Tutar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in lines %}
+            <tr>
+              <td>{{ line.display_name }}{% if line.description and line.product_id and line.description != line.product.display_name %}<div class="hint">{{ line.description }}</div>{% endif %}</td>
+              <td class="money">{{ line.qty|tr_qty }}</td>
+              <td class="money">{{ line.unit_price|tr_money }} ₺</td>
+              <td class="money">{{ line.vat_rate|tr_qty }}%</td>
+              <td class="money">{{ line.line_total|tr_money }} ₺</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% regroup lines by vat_rate as vat_groups %}
+      <div class="totals-stack">
+        <span>Ara toplam</span>
+        <b>{{ sale.subtotal|tr_money }} ₺</b>
+        <span>{% if vat_groups|length == 1 %}KDV %{{ vat_groups.0.grouper|tr_qty }}{% elif vat_groups %}KDV{% else %}KDV %20{% endif %}</span>
+        <b>{{ sale.vat_total|tr_money }} ₺</b>
+        <span>Genel toplam</span>
+        <b class="is-grand">{{ sale.grand_total|tr_money }} ₺</b>
+      </div>
+    </section>
+
+    {% if sold_groups %}
+    <section class="fis-block">
+      <p class="field-label">Cihazlar</p>
+      {% include 'portal/_job_sold_units.html' with readonly=True show_job=True %}
+    </section>
+    {% endif %}
+
+    {% if sale.service_job %}
+    <section class="fis-block">
+      <p class="field-label">Servis günü</p>
+      <div class="fis-note">
+        {{ sale.service_job.date|date:'d.m.Y' }}{% if sale.service_job.time %} · {{ sale.service_job.time|time:'H:i' }}{% endif %}
+        · <a href="{{ sale.service_job.get_absolute_url }}">{{ sale.service_job.number }}</a>
+        · {{ sale.service_job.get_status_display }}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if sale.notes.strip %}
+    <section class="fis-block">
+      <p class="field-label">İşlem notu</p>
+      <div class="fis-note">{{ sale.notes }}</div>
+    </section>
+    {% endif %}
+
+    <div class="fis-settle">
+      <section class="fis-card is-split">
+        <div>
+          <p class="field-label">Fatura</p>
+          <div class="fis-flag{% if sale.invoice_status == 'issued' %} is-issued{% endif %}">
+            <div>
+              <b>{{ sale.get_invoice_status_display }}</b>
+              <small>{% if sale.invoice_no %}{{ sale.invoice_no }}{% else %}Fatura no yok.{% endif %}</small>
+            </div>
+          </div>
+        </div>
+        <button class="btn" type="button" id="open-invoice">Faturayı güncelle</button>
+      </section>
+
+      <section class="fis-card">
+        <div class="fis-card-head">
+          <p class="field-label">Ödemeler</p>
+          {% if sale.remaining > 0 %}
+          <button class="btn" type="button" id="open-pay">Ödeme ekle</button>
+          {% endif %}
+        </div>
+        <div class="fis-flag{% if sale.remaining > 0 %} is-due{% endif %}">
+          <div>
+            <b>Tahsil {{ sale.paid_total|tr_money }} ₺</b>
+            <small>Genel {{ sale.grand_total|tr_money }} ₺</small>
+          </div>
+          <span class="money">Kalan {{ sale.remaining|tr_money }} ₺</span>
+        </div>
+        <div class="sheet-wrap is-ops">
+          <table class="sheet">
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Yöntem</th>
+                {% if pay_has_card %}<th>Kart bilgisi</th>{% endif %}
+                {% if pay_has_transfer %}<th>Havale bilgisi</th>{% endif %}
+                {% if pay_has_card %}<th>Taksit</th>{% endif %}
+                <th>Tutar</th>
+                <th>İşleyen</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for alloc in allocations %}
+              {% with pay=alloc.payment %}
+              <tr>
+                <td>{{ pay.date|date:'d.m.Y' }}</td>
+                <td>{{ pay.get_method_display }}</td>
+                {% if pay_has_card %}
+                <td>{% if pay.method == 'card' and pay.card_holder %}{{ pay.card_holder }}{% else %}—{% endif %}</td>
+                {% endif %}
+                {% if pay_has_transfer %}
+                <td>{% if pay.method == 'transfer' and pay.transfer_sender %}{{ pay.transfer_sender }}{% else %}—{% endif %}</td>
+                {% endif %}
+                {% if pay_has_card %}
+                <td>{% if pay.method == 'card' and pay.installment_label %}{{ pay.installment_label }}{% else %}—{% endif %}</td>
+                {% endif %}
+                <td class="money">{{ alloc.amount|tr_money }} ₺</td>
+                <td>{{ pay.created_by.username }}</td>
+                <td class="is-action">
+                  <div class="pay-ops" data-pay-ops>
+                    <button class="pay-ops-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="İşlem">
+                      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                        <circle cx="8" cy="3.2" r="1.4"/>
+                        <circle cx="8" cy="8" r="1.4"/>
+                        <circle cx="8" cy="12.8" r="1.4"/>
+                      </svg>
+                    </button>
+                    <div class="pay-ops-menu" hidden role="menu">
+                      <button
+                        class="pay-ops-item is-danger"
+                        type="button"
+                        role="menuitem"
+                        data-pay-delete
+                        data-pay-id="{{ pay.pk }}"
+                        data-pay-copy="{{ alloc.amount|tr_money }} ₺ · {{ pay.get_method_display }}{% if pay.pay_detail %} · {{ pay.pay_detail }}{% endif %} · {{ pay.date|date:'d.m.Y' }}"
+                      >Sil</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              {% endwith %}
+              {% empty %}
+              <tr><td colspan="{{ pay_colspan }}" class="empty">Tahsilat yok.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if sale.remaining <= 0 %}
+        <p class="hint">Borç kapandı.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="fis-delete">
+      <button class="btn is-ghost is-danger" type="button" id="open-delete">Kaydı sil</button>
+    </div>
+
+    <p class="hint fis-foot">Giren: {{ sale.created_by.username }}{% if sale.updated_by %} · Son işlem: {{ sale.updated_by.username }}{% endif %}</p>
+  </div>
+
+  <div class="modal" id="pdf-modal" hidden>
+    <div class="modal-card is-pdf">
+      <div class="modal-head">
+        <span class="fis-kicker">Fiş</span>
+        <h2>PDF</h2>
+        <p class="step-copy">{{ sale.number }}</p>
+      </div>
+      <div class="pdf-stage" id="pdf-stage">
+        <div class="pdf-pages" id="pdf-pages"></div>
+      </div>
+      <div class="wizard-nav modal-foot">
+        <button class="btn is-ghost" type="button" id="close-pdf">Vazgeç</button>
+        <a class="btn is-ghost" id="pdf-download" download="{{ sale.number }}.pdf">İndir</a>
+        <button class="btn" type="button" id="pdf-print">Yazdır</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="invoice-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Fatura</span>
+        <h2>Fatura girişi</h2>
+        <p class="step-copy">Fatura numarasını lütfen tüm karakterleri ile beraber yazınız.</p>
+      </div>
+      <form method="post" id="invoice-form" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="invoice" />
+        <input type="hidden" name="invoice_status" value="issued" />
+        <div class="modal-body">
+          <div class="group">
+            <div class="row">
+              <input id="id_invoice_no" name="invoice_no" value="{{ invoice_no }}" placeholder=" " required data-upper autocomplete="off" />
+              <label for="id_invoice_no">Fatura no</label>
+            </div>
+          </div>
+        </div>
+        <p class="modal-alert" id="invoice-error"{% if not invoice_open or not error %} hidden{% endif %} role="alert">{% if invoice_open %}{{ error }}{% endif %}</p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-invoice">Vazgeç</button>
+          <button class="btn" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if sale.remaining > 0 %}
+  <div class="modal" id="pay-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Tahsilat</span>
+        <h2>Ödeme ekle</h2>
+        <p class="step-copy">Tutar kalanı aşamaz. Genel ve kalan aşağıda durur.</p>
+      </div>
+      <form method="post" id="pay-form" novalidate data-remaining="{{ sale.remaining }}" data-grand="{{ sale.grand_total }}" data-paid="{{ sale.paid_total }}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="payment" />
+        <div class="modal-seg">
+          <div class="seg">
+            {% for value, label in pay_choices %}
+            <label>
+              <input type="radio" name="pay_method" value="{{ value }}"{% if pay_method == value or not pay_method and forloop.first %} checked{% endif %} />
+              <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="totals">
+            <span>Genel <b>{{ sale.grand_total|tr_money }} ₺</b></span>
+            <span>Tahsil <b>{{ sale.paid_total|tr_money }} ₺</b></span>
+            <span>Kalan <b class="is-over" id="pay-rest-label">{{ sale.remaining|tr_money }} ₺</b></span>
+          </div>
+          {% include 'portal/_datepicker.html' with date_name='pay_date' date_value=pay_date|default:today date_kicker='Tarih' %}
+          <div class="group">
+            <div class="row">
+              <input id="id_pay_amount" name="pay_amount" inputmode="decimal" placeholder=" " required value="{{ pay_amount }}" autocomplete="off" />
+              <label for="id_pay_amount">Tutar (kalan {{ sale.remaining|tr_money }} ₺)</label>
+            </div>
+          </div>
+          <div id="card-pay-meta" class="{% if pay_method == 'card' %}is-open{% endif %}"{% if pay_method != 'card' %} hidden{% endif %}>
+            <div class="pay-meta-inner">
+              <p class="field-label">Mail order</p>
+              <div class="group">
+                <div class="row">
+                  <input id="id_card_holder" name="card_holder" placeholder=" " data-upper autocomplete="off" value="{{ card_holder }}"{% if pay_method == 'card' %} required{% endif %} />
+                  <label for="id_card_holder">Kart üzerindeki ad soyad</label>
+                </div>
+              </div>
+              <p class="field-label">Taksit</p>
+              {% include 'portal/_card_installments.html' %}
+            </div>
+          </div>
+          <div id="transfer-pay-meta" class="{% if pay_method == 'transfer' %}is-open{% endif %}"{% if pay_method != 'transfer' %} hidden{% endif %}>
+            <div class="pay-meta-inner">
+              <p class="field-label">Havale</p>
+              <div class="group">
+                <div class="row">
+                  <input id="id_transfer_sender" name="transfer_sender" placeholder=" " data-upper autocomplete="off" value="{{ transfer_sender }}"{% if pay_method == 'transfer' %} required{% endif %} />
+                  <label for="id_transfer_sender">Havale eden ad soyad</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="hint" id="pay-after">Bu ödeme sonrası kalan {{ sale.remaining|tr_money }} ₺.</p>
+        </div>
+        <p class="modal-alert" id="pay-error"{% if not pay_open or not error %} hidden{% endif %} role="alert">{% if pay_open %}{{ error }}{% endif %}</p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-pay">Vazgeç</button>
+          <button class="btn" type="submit" id="save-pay">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="modal" id="delete-pay-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Tahsilat</span>
+        <h2>Tahsilatı sil</h2>
+        <p class="step-copy" id="delete-pay-copy">Bu tahsilat silinecek. Kalan borç güncellenir.</p>
+      </div>
+      <form method="post" id="delete-pay-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_payment" />
+        <input type="hidden" name="payment_id" id="delete-pay-id" value="" />
+        <p class="modal-alert" id="delete-pay-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-delete-pay">Vazgeç</button>
+          <button class="btn" type="submit" id="delete-pay-btn">
+            <span class="btn-label">Sil</span>
+            <span class="btn-spin" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="delete-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Fiş</span>
+        <h2>Kaydı sil</h2>
+        <p class="step-copy">{{ sale.number }} silinecek. Satış kalemleri stoka iade edilir.</p>
+      </div>
+      <form method="post" id="delete-sale-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete" />
+        <p class="modal-alert" id="delete-error" hidden role="alert"></p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-delete">Vazgeç</button>
+          <button class="btn" type="submit" id="delete-sale-btn">
+            <span class="btn-label">Sil</span>
+            <span class="btn-spin" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      function reduceMotion() {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+      var invoiceForm = document.getElementById('invoice-form');
+      var invoiceModal = document.getElementById('invoice-modal');
+      var invoiceTimerModal = 0;
+      function openInvoiceModal() {
+        if (!invoiceModal || !invoiceForm) return;
+        window.clearTimeout(invoiceTimerModal);
+        invoiceModal.hidden = false;
+        requestAnimationFrame(function () {
+          invoiceModal.classList.add('is-on');
+        });
+        snapshotModalForm(invoiceForm);
+        var noEl = document.getElementById('id_invoice_no');
+        if (noEl) noEl.focus();
+      }
+      function closeInvoiceModal() {
+        if (!invoiceModal) return;
+        window.clearTimeout(invoiceTimerModal);
+        invoiceModal._closing = true;
+        invoiceModal.classList.remove('is-on');
+        var hide = function () {
+          invoiceModal.hidden = true;
+          invoiceModal._closing = false;
+          if (invoiceForm) invoiceForm.reset();
+        };
+        if (reduceMotion()) {
+          hide();
+          return;
+        }
+        invoiceTimerModal = window.setTimeout(hide, 280);
+      }
+
+      function formatMoneyInput(raw, complete) {
+        var text = String(raw || '');
+        if (!text.trim()) return '';
+        if (text.indexOf(',') < 0 && /^\d+\.\d{1,2}$/.test(text.trim())) {
+          text = text.trim().replace('.', ',');
+        }
+        text = text.replace(/[^\d,]/g, '');
+        var comma = text.indexOf(',');
+        var intPart;
+        var decPart;
+        var hasComma = comma >= 0;
+        if (hasComma) {
+          intPart = text.slice(0, comma).replace(/\D/g, '');
+          decPart = text.slice(comma + 1).replace(/\D/g, '').slice(0, 2);
+        } else {
+          intPart = text.replace(/\D/g, '');
+          decPart = '';
+        }
+        if (!intPart && !decPart && !hasComma) return '';
+        intPart = intPart.replace(/^0+(?=\d)/, '').slice(0, 10);
+        if (!intPart) intPart = '0';
+        var grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        if (complete) return grouped + ',' + (decPart + '00').slice(0, 2);
+        return hasComma ? grouped + ',' + decPart : grouped;
+      }
+      function caretAfterDigits(value, count) {
+        var pos = 0;
+        var seen = 0;
+        while (pos < value.length && seen < count) {
+          if (/\d/.test(value.charAt(pos))) seen += 1;
+          pos += 1;
+        }
+        return pos;
+      }
+      function bindMoneyInput(el) {
+        if (!el || el._moneyBound) return;
+        el._moneyBound = true;
+        el.addEventListener('keydown', function (event) {
+          if (event.key !== '.' && event.key !== ',') return;
+          if (String(el.value).indexOf(',') >= 0) {
+            event.preventDefault();
+            return;
+          }
+          if (event.key !== '.') return;
+          event.preventDefault();
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = el.value.slice(0, start) + ',' + el.value.slice(end);
+          el.setSelectionRange(start + 1, start + 1);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        el.addEventListener('input', function () {
+          var start = el.selectionStart;
+          var old = el.value;
+          var typedComma = start > 0 && old.charAt(start - 1) === ',';
+          var digitsBefore = old.slice(0, start).replace(/\D/g, '').length;
+          var next = formatMoneyInput(old);
+          el.value = next;
+          if (typedComma && next.indexOf(',') >= 0) {
+            var commaAt = next.indexOf(',');
+            el.setSelectionRange(commaAt + 1, commaAt + 1);
+          } else {
+            var pos = caretAfterDigits(next, digitsBefore);
+            el.setSelectionRange(pos, pos);
+          }
+        });
+        el.addEventListener('blur', function () {
+          var next = formatMoneyInput(el.value, true);
+          if (el.value !== next) el.value = next;
+        });
+      }
+      function parseMoney(raw) {
+        var text = String(raw || '').trim().replace(/\s/g, '');
+        if (!text) return 0;
+        if (text.indexOf(',') >= 0) {
+          return parseFloat(text.replace(/\./g, '').replace(',', '.')) || 0;
+        }
+        var parts = text.split('.');
+        if (parts.length > 1 && parts.slice(1).every(function (part) { return part.length === 3; })) {
+          return parseFloat(parts.join('')) || 0;
+        }
+        return parseFloat(text) || 0;
+      }
+      function moneyLabel(n) {
+        return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+      }
+      var MODAL_DISCARD_CONFIRM = 'Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?';
+      function isIgnoredModalField(el) {
+        if (!el || el.disabled) return true;
+        var type = String(el.type || '').toLowerCase();
+        var name = String(el.name || '');
+        if (type === 'hidden' && name === 'pay_date') return false;
+        if (type === 'hidden' || type === 'button' || type === 'submit' || type === 'reset' || type === 'file') return true;
+        if (name === 'csrfmiddlewaretoken' || name === 'action') return true;
+        return false;
+      }
+      function modalFieldKey(el) {
+        var type = String(el.type || '').toLowerCase();
+        if (el.id) return 'id:' + el.id;
+        if (type === 'radio') return 'radio:' + el.name + '=' + el.value;
+        return 'name:' + (el.name || el.tagName);
+      }
+      function normalizeModalValue(el) {
+        var type = String(el.type || '').toLowerCase();
+        if (type === 'checkbox' || type === 'radio') return el.checked ? '1' : '0';
+        return String(el.value || '');
+      }
+      function snapshotModalForm(form) {
+        var snap = {};
+        if (!form) return;
+        form.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (isIgnoredModalField(el)) return;
+          snap[modalFieldKey(el)] = normalizeModalValue(el);
+        });
+        form._modalSnapshot = snap;
+      }
+      function isModalFormDirty(form) {
+        if (!form || !form._modalSnapshot) return false;
+        var dirty = false;
+        form.querySelectorAll('input, select, textarea').forEach(function (el) {
+          if (dirty || isIgnoredModalField(el)) return;
+          var key = modalFieldKey(el);
+          var initial = Object.prototype.hasOwnProperty.call(form._modalSnapshot, key) ? form._modalSnapshot[key] : '';
+          if (normalizeModalValue(el) !== initial) dirty = true;
+        });
+        return dirty;
+      }
+      function requestCloseModal(form, closeFn) {
+        if (isModalFormDirty(form) && !window.confirm(MODAL_DISCARD_CONFIRM)) return false;
+        closeFn();
+        return true;
+      }
+
+      bindMoneyInput(document.getElementById('id_pay_amount'));
+      var payForm = document.getElementById('pay-form');
+      var payModal = document.getElementById('pay-modal');
+      var payError = document.getElementById('pay-error');
+      var payAfter = document.getElementById('pay-after');
+      var cardPayMeta = document.getElementById('card-pay-meta');
+      var cardHolder = document.getElementById('id_card_holder');
+      var transferPayMeta = document.getElementById('transfer-pay-meta');
+      var transferSender = document.getElementById('id_transfer_sender');
+      var payTimer = 0;
+      var remaining = payForm ? parseFloat(payForm.getAttribute('data-remaining')) || 0 : 0;
+
+      function syncPayMethod() {
+        if (!payForm) return;
+        var checked = payForm.querySelector('[name=pay_method]:checked');
+        var method = checked ? checked.value : '';
+        var cardOn = method === 'card';
+        var transferOn = method === 'transfer';
+        if (cardHolder) {
+          cardHolder.required = cardOn;
+          if (!cardOn) cardHolder.value = '';
+        }
+        payForm.querySelectorAll('[name=card_installments]').forEach(function (el, index) {
+          el.required = cardOn && index === 0;
+          if (!cardOn) el.checked = false;
+        });
+        if (transferSender) {
+          transferSender.required = transferOn;
+          if (!transferOn) transferSender.value = '';
+        }
+        if (window.setPortalReveal) {
+          if (cardPayMeta) window.setPortalReveal(cardPayMeta, cardOn, true);
+          if (transferPayMeta) window.setPortalReveal(transferPayMeta, transferOn, true);
+        } else {
+          if (cardPayMeta) {
+            cardPayMeta.hidden = !cardOn;
+            cardPayMeta.classList.toggle('is-open', cardOn);
+          }
+          if (transferPayMeta) {
+            transferPayMeta.hidden = !transferOn;
+            transferPayMeta.classList.toggle('is-open', transferOn);
+          }
+        }
+      }
+
+      function showPayError(text) {
+        if (!payError) return;
+        if (!text) {
+          payError.hidden = true;
+          payError.textContent = '';
+          return;
+        }
+        payError.textContent = text;
+        payError.hidden = false;
+      }
+      function syncPayRest() {
+        if (!payForm) return;
+        var amount = parseMoney((document.getElementById('id_pay_amount') || {}).value);
+        var rest = Math.round((remaining - amount) * 100) / 100;
+        if (payAfter) {
+          if (!amount) {
+            payAfter.textContent = 'Bu ödeme sonrası kalan ' + moneyLabel(remaining) + '.';
+            payAfter.style.color = '';
+          } else if (amount > remaining + 0.001) {
+            payAfter.textContent = 'Tutar kalanı aşıyor. Kalan ' + moneyLabel(remaining) + '.';
+            payAfter.style.color = 'var(--danger)';
+          } else {
+            payAfter.textContent = 'Bu ödeme sonrası kalan ' + moneyLabel(rest) + '.';
+            payAfter.style.color = '';
+          }
+        }
+        return amount;
+      }
+      function openPayModal() {
+        if (!payModal || !payForm) return;
+        window.clearTimeout(payTimer);
+        payModal.hidden = false;
+        requestAnimationFrame(function () {
+          payModal.classList.add('is-on');
+        });
+        snapshotModalForm(payForm);
+        syncPayRest();
+        syncPayMethod();
+        var amountEl = document.getElementById('id_pay_amount');
+        if (amountEl) amountEl.focus();
+      }
+      function closePayModal() {
+        if (!payModal) return;
+        window.clearTimeout(payTimer);
+        payModal._closing = true;
+        payModal.classList.remove('is-on');
+        var hide = function () {
+          payModal.hidden = true;
+          payModal._closing = false;
+          if (payForm) {
+            payForm.reset();
+            showPayError('');
+            syncPayRest();
+            syncPayMethod();
+          }
+        };
+        if (reduceMotion()) {
+          hide();
+          return;
+        }
+        payTimer = window.setTimeout(hide, 280);
+      }
+
+      if (payForm) {
+        payForm.addEventListener('input', syncPayRest);
+        payForm.addEventListener('change', function (event) {
+          if (event.target && event.target.name === 'pay_method') syncPayMethod();
+        });
+        payForm.addEventListener('submit', function (event) {
+          var el = document.getElementById('id_pay_amount');
+          if (el) {
+            var next = formatMoneyInput(el.value, true);
+            if (el.value !== next) el.value = next;
+          }
+          var amount = syncPayRest();
+          if (amount > remaining + 0.001) {
+            event.preventDefault();
+            showPayError('Kalan ' + moneyLabel(remaining) + '. Daha fazla tahsil edilemez.');
+          }
+        });
+      }
+      var openPay = document.getElementById('open-pay');
+      if (openPay) openPay.addEventListener('click', openPayModal);
+      if (payModal) {
+        payModal._closeModal = closePayModal;
+        var closePay = document.getElementById('close-pay');
+        if (closePay) {
+          closePay.addEventListener('click', function () {
+            requestCloseModal(payForm, closePayModal);
+          });
+        }
+        payModal.addEventListener('click', function (event) {
+          if (event.target === payModal) requestCloseModal(payForm, closePayModal);
+        });
+      }
+      var openInvoice = document.getElementById('open-invoice');
+      if (openInvoice) openInvoice.addEventListener('click', openInvoiceModal);
+      if (invoiceModal) {
+        invoiceModal._closeModal = closeInvoiceModal;
+        var closeInvoice = document.getElementById('close-invoice');
+        if (closeInvoice) {
+          closeInvoice.addEventListener('click', function () {
+            requestCloseModal(invoiceForm, closeInvoiceModal);
+          });
+        }
+        invoiceModal.addEventListener('click', function (event) {
+          if (event.target === invoiceModal) requestCloseModal(invoiceForm, closeInvoiceModal);
+        });
+      }
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        var overlay = document.querySelector('.modal.is-on:not([hidden])');
+        if (!overlay || overlay._closing || typeof overlay._closeModal !== 'function') return;
+        event.preventDefault();
+        requestCloseModal(overlay.querySelector('form'), overlay._closeModal);
+      });
+      var pdfModal = document.getElementById('pdf-modal');
+      var pdfPages = document.getElementById('pdf-pages');
+      var pdfTimer = 0;
+      function freshPdfSrc() {
+        return window.location.pathname + '?format=pdf&t=' + Date.now();
+      }
+      var pdfBytes = null;
+      function loadPdfJs() {
+        if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+        return new Promise(function (resolve, reject) {
+          var script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          script.onload = function () {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+              'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            resolve(window.pdfjsLib);
+          };
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+      function setPdfHint(text) {
+        if (!pdfPages) return;
+        pdfPages.innerHTML = '';
+        var hint = document.createElement('p');
+        hint.className = 'hint';
+        hint.textContent = text;
+        pdfPages.appendChild(hint);
+      }
+      function renderPdfPages(bytes) {
+        return loadPdfJs().then(function (pdfjsLib) {
+          return pdfjsLib.getDocument({ data: bytes }).promise;
+        }).then(function (doc) {
+          if (!pdfPages) return;
+          pdfPages.innerHTML = '';
+          var chain = Promise.resolve();
+          var scale = 1.35;
+          for (var n = 1; n <= doc.numPages; n += 1) {
+            chain = chain.then(function (pageNo) {
+              return doc.getPage(pageNo).then(function (page) {
+                var viewport = page.getViewport({ scale: scale });
+                var canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                pdfPages.appendChild(canvas);
+                return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+              });
+            }.bind(null, n));
+          }
+          return chain;
+        });
+      }
+      function openPdfModal() {
+        if (!pdfModal) return;
+        window.clearTimeout(pdfTimer);
+        var down = document.getElementById('pdf-download');
+        if (down) down.href = freshPdfSrc() + '&download=1';
+        setPdfHint('Fiş yükleniyor.');
+        pdfModal.hidden = false;
+        requestAnimationFrame(function () {
+          pdfModal.classList.add('is-on');
+        });
+        fetch(freshPdfSrc(), { credentials: 'same-origin', headers: { Accept: 'application/pdf' } })
+          .then(function (response) {
+            var type = (response.headers.get('content-type') || '').toLowerCase();
+            if (!response.ok || type.indexOf('pdf') === -1) throw new Error('pdf');
+            return response.arrayBuffer();
+          })
+          .then(function (buffer) {
+            pdfBytes = new Uint8Array(buffer);
+            return renderPdfPages(pdfBytes);
+          })
+          .catch(function () {
+            setPdfHint('PDF açılamadı.');
+          });
+      }
+      function closePdfModal() {
+        if (!pdfModal) return;
+        window.clearTimeout(pdfTimer);
+        pdfModal._closing = true;
+        pdfModal.classList.remove('is-on');
+        var hide = function () {
+          pdfModal.hidden = true;
+          pdfModal._closing = false;
+          if (pdfPages) pdfPages.innerHTML = '';
+          pdfBytes = null;
+        };
+        if (reduceMotion()) {
+          hide();
+          return;
+        }
+        pdfTimer = window.setTimeout(hide, 280);
+      }
+      var printSale = document.getElementById('print-sale');
+      if (printSale) printSale.addEventListener('click', openPdfModal);
+      if (pdfModal) {
+        pdfModal._closeModal = closePdfModal;
+        var closePdf = document.getElementById('close-pdf');
+        if (closePdf) closePdf.addEventListener('click', closePdfModal);
+        pdfModal.addEventListener('click', function (event) {
+          if (event.target === pdfModal) closePdfModal();
+        });
+      }
+      var pdfPrint = document.getElementById('pdf-print');
+      if (pdfPrint) {
+        pdfPrint.addEventListener('click', function () {
+          if (!pdfPages) return;
+          var canvases = pdfPages.querySelectorAll('canvas');
+          if (!canvases.length) return;
+          var win = window.open('', '_blank');
+          if (!win) return;
+          var html = '<html><head><title>{{ sale.number }}</title><style>body{margin:0}img{width:100%;display:block;page-break-after:always}</style></head><body>';
+          canvases.forEach(function (canvas) {
+            html += '<img src="' + canvas.toDataURL('image/png') + '">';
+          });
+          html += '</body></html>';
+          win.document.write(html);
+          win.document.close();
+          win.focus();
+          win.print();
+        });
+      }
+      var deleteModal = document.getElementById('delete-modal');
+      var deleteForm = document.getElementById('delete-sale-form');
+      var deleteBtn = document.getElementById('delete-sale-btn');
+      var deleteTimer = 0;
+      function deleteBusy() {
+        return deleteBtn && deleteBtn.classList.contains('is-busy');
+      }
+      function setDeleteBusy(on) {
+        if (!deleteBtn) return;
+        deleteBtn.classList.toggle('is-busy', on);
+        deleteBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+      }
+      function showDeleteError(text) {
+        var el = document.getElementById('delete-error');
+        if (!el) return;
+        el.textContent = text || '';
+        el.hidden = !text;
+      }
+      function openDeleteModal() {
+        if (!deleteModal || deleteBusy()) return;
+        window.clearTimeout(deleteTimer);
+        showDeleteError('');
+        deleteModal.hidden = false;
+        requestAnimationFrame(function () {
+          deleteModal.classList.add('is-on');
+        });
+      }
+      function closeDeleteModal() {
+        if (!deleteModal || deleteBusy()) return;
+        window.clearTimeout(deleteTimer);
+        deleteModal._closing = true;
+        deleteModal.classList.remove('is-on');
+        var hide = function () {
+          deleteModal.hidden = true;
+          deleteModal._closing = false;
+        };
+        if (reduceMotion()) {
+          hide();
+          return;
+        }
+        deleteTimer = window.setTimeout(hide, 280);
+      }
+      var openDelete = document.getElementById('open-delete');
+      if (openDelete) openDelete.addEventListener('click', openDeleteModal);
+      if (deleteModal) {
+        deleteModal._closeModal = closeDeleteModal;
+        var closeDelete = document.getElementById('close-delete');
+        if (closeDelete) closeDelete.addEventListener('click', closeDeleteModal);
+        deleteModal.addEventListener('click', function (event) {
+          if (event.target === deleteModal) closeDeleteModal();
+        });
+      }
+      if (deleteForm) {
+        deleteForm.addEventListener('submit', function (event) {
+          event.preventDefault();
+          if (deleteBusy()) return;
+          showDeleteError('');
+          setDeleteBusy(true);
+          var started = Date.now();
+          var csrf = deleteForm.querySelector('[name=csrfmiddlewaretoken]');
+          fetch(deleteForm.getAttribute('action') || window.location.href, {
+            method: 'POST',
+            body: new FormData(deleteForm),
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              Accept: 'application/json',
+              'X-CSRFToken': csrf ? csrf.value : ''
+            },
+            credentials: 'same-origin'
+          }).then(function (response) {
+            return response.json().then(function (data) {
+              return { ok: response.ok && data.ok, data: data };
+            }).catch(function () {
+              return { ok: false, data: { error: 'Kayıt silinemedi.' } };
+            });
+          }).then(function (result) {
+            if (!result.ok) {
+              setDeleteBusy(false);
+              showDeleteError((result.data && result.data.error) || 'Kayıt silinemedi.');
+              return;
+            }
+            var wait = Math.max(0, 2000 - (Date.now() - started));
+            window.setTimeout(function () {
+              window.location = result.data.url;
+            }, wait);
+          }).catch(function () {
+            setDeleteBusy(false);
+            showDeleteError('Bağlantı kurulamadı.');
+          });
+        });
+      }
+      var deletePayModal = document.getElementById('delete-pay-modal');
+      var deletePayForm = document.getElementById('delete-pay-form');
+      var deletePayBtn = document.getElementById('delete-pay-btn');
+      var deletePayTimer = 0;
+      function deletePayBusy() {
+        return deletePayBtn && deletePayBtn.classList.contains('is-busy');
+      }
+      function setDeletePayBusy(on) {
+        if (!deletePayBtn) return;
+        deletePayBtn.classList.toggle('is-busy', on);
+        deletePayBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+      }
+      function showDeletePayError(text) {
+        var el = document.getElementById('delete-pay-error');
+        if (!el) return;
+        el.textContent = text || '';
+        el.hidden = !text;
+      }
+      function openDeletePayModal(btn) {
+        if (!deletePayModal || deletePayBusy()) return;
+        var idInput = document.getElementById('delete-pay-id');
+        var copy = document.getElementById('delete-pay-copy');
+        if (idInput) idInput.value = btn.getAttribute('data-pay-id') || '';
+        if (copy) {
+          var line = btn.getAttribute('data-pay-copy') || 'Bu tahsilat';
+          copy.textContent = line + ' silinecek. Kalan borç güncellenir.';
+        }
+        window.clearTimeout(deletePayTimer);
+        showDeletePayError('');
+        deletePayModal.hidden = false;
+        requestAnimationFrame(function () {
+          deletePayModal.classList.add('is-on');
+        });
+      }
+      function closeDeletePayModal() {
+        if (!deletePayModal || deletePayBusy()) return;
+        window.clearTimeout(deletePayTimer);
+        deletePayModal._closing = true;
+        deletePayModal.classList.remove('is-on');
+        var hide = function () {
+          deletePayModal.hidden = true;
+          deletePayModal._closing = false;
+        };
+        if (reduceMotion()) {
+          hide();
+          return;
+        }
+        deletePayTimer = window.setTimeout(hide, 280);
+      }
+      function closePayOps(except) {
+        document.querySelectorAll('[data-pay-ops]').forEach(function (ops) {
+          if (ops === except) return;
+          ops.classList.remove('is-on');
+          var menu = ops.querySelector('.pay-ops-menu');
+          var trigger = ops.querySelector('.pay-ops-btn');
+          if (menu) menu.hidden = true;
+          if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        });
+      }
+      document.querySelectorAll('[data-pay-ops]').forEach(function (ops) {
+        var trigger = ops.querySelector('.pay-ops-btn');
+        var menu = ops.querySelector('.pay-ops-menu');
+        if (!trigger || !menu) return;
+        trigger.addEventListener('click', function (event) {
+          event.stopPropagation();
+          var open = ops.classList.contains('is-on');
+          closePayOps();
+          if (open) return;
+          ops.classList.add('is-on');
+          menu.hidden = false;
+          trigger.setAttribute('aria-expanded', 'true');
+        });
+      });
+      document.addEventListener('click', function () {
+        closePayOps();
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closePayOps();
+      });
+      document.querySelectorAll('[data-pay-delete]').forEach(function (btn) {
+        btn.addEventListener('click', function (event) {
+          event.stopPropagation();
+          closePayOps();
+          openDeletePayModal(btn);
+        });
+      });
+      if (deletePayModal) {
+        deletePayModal._closeModal = closeDeletePayModal;
+        var closeDeletePay = document.getElementById('close-delete-pay');
+        if (closeDeletePay) closeDeletePay.addEventListener('click', closeDeletePayModal);
+        deletePayModal.addEventListener('click', function (event) {
+          if (event.target === deletePayModal) closeDeletePayModal();
+        });
+      }
+      if (deletePayForm) {
+        deletePayForm.addEventListener('submit', function (event) {
+          event.preventDefault();
+          if (deletePayBusy()) return;
+          showDeletePayError('');
+          setDeletePayBusy(true);
+          var started = Date.now();
+          var csrf = deletePayForm.querySelector('[name=csrfmiddlewaretoken]');
+          fetch(deletePayForm.getAttribute('action') || window.location.href, {
+            method: 'POST',
+            body: new FormData(deletePayForm),
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              Accept: 'application/json',
+              'X-CSRFToken': csrf ? csrf.value : ''
+            },
+            credentials: 'same-origin'
+          }).then(function (response) {
+            return response.json().then(function (data) {
+              return { ok: response.ok && data.ok, data: data };
+            }).catch(function () {
+              return { ok: false, data: { error: 'Tahsilat silinemedi.' } };
+            });
+          }).then(function (result) {
+            if (!result.ok) {
+              setDeletePayBusy(false);
+              showDeletePayError((result.data && result.data.error) || 'Tahsilat silinemedi.');
+              return;
+            }
+            var wait = Math.max(0, 2000 - (Date.now() - started));
+            window.setTimeout(function () {
+              window.location = result.data.url || window.location.href;
+            }, wait);
+          }).catch(function () {
+            setDeletePayBusy(false);
+            showDeletePayError('Bağlantı kurulamadı.');
+          });
+        });
+      }
+      if ({{ pay_open|yesno:'true,false' }}) openPayModal();
+      if ({{ invoice_open|yesno:'true,false' }}) openInvoiceModal();
+    })();
+  </script>
+{% endblock %}

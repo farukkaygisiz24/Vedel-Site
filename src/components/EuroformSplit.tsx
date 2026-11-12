@@ -37,8 +37,8 @@ export default function EuroformSplitClient({ data }: { data: EuroformSplitData 
       }
     >
       <ProductCategorySection
-        title="Wing Serisi"
-        desc="Enerji verimli ve ekonomik split klima çözümleri"
+        title="Euroform Split"
+        desc="Enerji verimli ve ekonomik duvar tipi klima çözümleri"
         products={filteredProducts}
         brand="euroform"
         accent="orange"

@@ -1,0 +1,66 @@
+<div class="day-cal-row">
+  <div class="day-cal is-browse">
+    {% if cal_date_name %}
+    <input type="hidden" name="{{ cal_date_name }}" id="service_date" value="{{ chosen_day|date:'Y-m-d' }}" />
+    {% endif %}
+    <div class="day-cal-head">
+      <a href="{{ cal_prev }}" aria-label="Önceki ay">‹</a>
+      <b>{{ cal_month_label }}</b>
+      <a href="{{ cal_next }}" aria-label="Sonraki ay">›</a>
+    </div>
+    <div class="date-dow">
+      <span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span>
+    </div>
+    <div class="date-grid">
+      {% for cell in cal_cells %}
+      <a
+        href="{{ cell.href }}"
+        data-day="{{ cell.iso }}"
+        {% if not cell.muted %}data-day-swap{% endif %}
+        class="{% if cell.muted %}is-muted {% endif %}{% if cell.today %}is-today {% endif %}{% if cell.on %}is-on {% endif %}{% if cell.busy %}is-busy {% endif %}{% if cell.full %}is-full{% endif %}"
+        {% if cell.on %}aria-current="date"{% endif %}
+      >
+        {{ cell.day }}
+        {% if cell.count %}<em>{{ cell.count }}</em>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    {% if show_hours %}
+    <div class="seg is-mini day-hours" data-day-hours>
+      {% for hour in service_hours %}
+      <label>
+        <input type="radio" name="service_time" value="{{ hour }}"{% if hour == job_time %} checked{% endif %} />
+        <span>{{ hour }}</span>
+      </label>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="day-cal-foot">
+      <div class="day-cal-key">
+        <span><i></i>Boş</span>
+        <span><i class="is-busy"></i>Dolu</span>
+        <span><i class="is-full"></i>Kapasite dolu</span>
+      </div>
+      <span class="hint" data-cal-chosen>{{ chosen_label }}</span>
+    </div>
+  </div>
+  <aside class="day-jobs" data-service-browse>
+    <div class="day-jobs-head">
+      <b data-day-title>{{ chosen_label }}</b>
+      <small data-day-count>{% if jobs %}{{ jobs|length }} iş{% else %}Boş{% endif %}</small>
+    </div>
+    <div class="day-jobs-list" data-day-list>
+      {% for item in jobs %}
+      <a class="day-job" href="{{ item.get_absolute_url }}">
+        {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
+        <div>
+          <b>{{ item.party.display_name }}</b>
+          <small>{{ item.kind_label }} · {{ item.display_number }}{% if item.assignee_label %} · {{ item.assignee_label }}{% endif %}</small>
+        </div>
+      </a>
+      {% empty %}
+      <p class="day-jobs-empty">{{ empty_copy }}</p>
+      {% endfor %}
+    </div>
+  </aside>
+</div>

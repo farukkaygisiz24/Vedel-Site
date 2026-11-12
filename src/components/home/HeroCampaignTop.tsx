@@ -7,7 +7,7 @@ export default function HeroCampaignTop() {
       backgroundSrc={CAMPAIGN_HERO_IMAGE}
       backgroundVideoSrc={CAMPAIGN_HERO_VIDEO}
       backgroundPosterSrc={CAMPAIGN_HERO_IMAGE}
-      backgroundAlt="MHI Yaz Kampanyası — 8 Yıl Garanti, 2500 TL MaxiPuan, 12 Ay Taksit"
+      backgroundAlt="MHI Yaz Kampanyası — 5 Yıl Garanti, 2500 TL MaxiPuan, 12 Ay Taksit"
       backgroundClassName="object-contain object-center"
       backgroundVideoClassName="object-contain object-center"
       backgroundFitContain

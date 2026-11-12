@@ -1,0 +1,33 @@
+<div id="klima-wrap"{% if not category_is_klima %} hidden{% endif %}>
+  <p class="field-label">Cihaz tipi</p>
+  <input type="hidden" name="device_kind" id="p_device_kind" value="{{ form_device_kind }}" />
+  <div class="seg" id="device-family-seg">
+    <label>
+      <input type="radio" name="device_family" value="split"{% if form_device_kind == 'split' %} checked{% endif %} />
+      <span>Split</span>
+    </label>
+    <label>
+      <input type="radio" name="device_family" value="multi"{% if form_device_kind == 'multi_indoor' or form_device_kind == 'multi_outdoor' %} checked{% endif %} />
+      <span>Multi</span>
+    </label>
+  </div>
+  <div class="seg is-mini" id="multi-role-seg"{% if form_device_kind != 'multi_indoor' and form_device_kind != 'multi_outdoor' %} hidden{% endif %}>
+    <label>
+      <input type="radio" name="multi_role" value="indoor"{% if form_device_kind != 'multi_outdoor' %} checked{% endif %} />
+      <span>İç ünite</span>
+    </label>
+    <label>
+      <input type="radio" name="multi_role" value="outdoor"{% if form_device_kind == 'multi_outdoor' %} checked{% endif %} />
+      <span>Dış ünite</span>
+    </label>
+  </div>
+  <div id="outdoor-wrap"{% if form_device_kind != 'split' %} hidden{% endif %}>
+    <p class="field-label">Dış ünite model kodu</p>
+    <div class="group">
+      <div class="row">
+        <input id="p_outdoor_name" name="outdoor_name" placeholder=" " data-upper autocomplete="off" value="{{ outdoor_name }}" />
+        <label for="p_outdoor_name">Dış ünite</label>
+      </div>
+    </div>
+  </div>
+</div>

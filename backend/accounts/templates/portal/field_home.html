@@ -1,0 +1,74 @@
+{% extends 'portal/field_base.html' %}
+
+{% block title %}İşler | Vedel Servis{% endblock %}
+
+{% block content %}
+  <h1>İşler</h1>
+  <p class="lead">{% if member %}{{ member.display_name }}. Size atanan açık işler.{% else %}Personel kartınız bağlı değil.{% endif %}</p>
+
+  {% if not member %}
+  <p class="day-jobs-empty">Saha işleri personel kartına bağlı hesaba düşer.{% if can_crew %} Kendinize iş atamak için bu hesabı bir personel kartına bağlayın.{% else %} Ofis bu hesabı bir personel kartına bağlamalı.{% endif %}</p>
+  {% if can_crew %}
+  <p class="day-jobs-empty"><a href="{% url 'portal-crew' %}">Personel listesi</a></p>
+  {% endif %}
+  {% else %}
+  <section class="day-jobs">
+    <div class="day-jobs-head">
+      <b>Bugün</b>
+      <small>{{ today|date:'d.m.Y' }}</small>
+    </div>
+    <div class="day-jobs-list">
+      {% for item in today_jobs %}
+      <a class="day-job" href="{{ item.get_field_url }}">
+        {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
+        <div>
+          <b>{{ item.party.display_name }}</b>
+          <small>{{ item.number }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
+        </div>
+      </a>
+      {% empty %}
+      <p class="day-jobs-empty">Bugün açık iş yok.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="day-jobs">
+    <div class="day-jobs-head">
+      <b>Yarın</b>
+      <small>{{ tomorrow|date:'d.m.Y' }}</small>
+    </div>
+    <div class="day-jobs-list">
+      {% for item in tomorrow_jobs %}
+      <a class="day-job" href="{{ item.get_field_url }}">
+        {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
+        <div>
+          <b>{{ item.party.display_name }}</b>
+          <small>{{ item.number }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
+        </div>
+      </a>
+      {% empty %}
+      <p class="day-jobs-empty">Yarın açık iş yok.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="day-jobs">
+    <div class="day-jobs-head">
+      <b>Son tamamlanan</b>
+    </div>
+    <div class="day-jobs-list">
+      {% for item in recent_done %}
+      <a class="day-job" href="{{ item.get_field_url }}">
+        <time datetime="{{ item.date|date:'Y-m-d' }}">{{ item.date|date:'d.m' }}</time>
+        <div>
+          <b>{{ item.party.display_name }}</b>
+          <small>{{ item.number }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
+        </div>
+      </a>
+      {% empty %}
+      <p class="day-jobs-empty">Tamamlanan iş yok.</p>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+{% endblock %}

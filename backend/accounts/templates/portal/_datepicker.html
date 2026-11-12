@@ -1,0 +1,24 @@
+<div class="date-chip" data-datepicker{% if date_optional %} data-optional{% endif %}>
+  <button type="button" class="date-trigger" aria-haspopup="dialog" aria-expanded="false">
+    <span class="date-kicker">{{ date_kicker|default:'Tarih' }}</span>
+    <span data-date-label></span>
+  </button>
+  <input type="hidden" name="{{ date_name }}" value="{{ date_value }}" />
+  <div class="date-pop" hidden role="dialog" aria-label="Tarih seç">
+    <div class="date-pop-head">
+      <button type="button" data-date-prev aria-label="Önceki ay">‹</button>
+      <b data-date-month></b>
+      <button type="button" data-date-next aria-label="Sonraki ay">›</button>
+    </div>
+    <div class="date-dow">
+      <span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span>
+    </div>
+    <div class="date-grid" data-date-grid></div>
+    <div class="date-pop-foot">
+      <button type="button" class="date-today" data-date-today>Bugün</button>
+      {% if date_optional %}
+      <button type="button" class="date-today" data-date-clear>Temizle</button>
+      {% endif %}
+    </div>
+  </div>
+</div>

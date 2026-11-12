@@ -1,0 +1,13 @@
+<td{% if rowspan %} rowspan="{{ rowspan }}"{% endif %} class="device-care-cell">
+  <select class="device-serial" name="unit_{{ prefix }}interval_{{ unit.pk }}" data-care-interval aria-label="Bakım aralığı">
+    {% for months, label in unit.CARE_INTERVALS %}
+    <option value="{{ months }}"{% if interval == months %} selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+</td>
+<td{% if rowspan %} rowspan="{{ rowspan }}"{% endif %} class="device-care-cell">
+  <input class="device-serial" type="date" name="unit_{{ prefix }}last_{{ unit.pk }}" data-care-last value="{{ last|date:'Y-m-d' }}" aria-label="Son bakım" />
+</td>
+<td{% if rowspan %} rowspan="{{ rowspan }}"{% endif %} class="device-care-cell">
+  <input class="device-serial" type="date" name="unit_{{ prefix }}next_{{ unit.pk }}" data-care-next value="{{ next|date:'Y-m-d' }}" aria-label="Sonraki bakım" readonly tabindex="-1" />
+</td>

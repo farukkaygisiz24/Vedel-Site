@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Store, Wrench, Settings, RefreshCw, ChevronDown, FileText, Zap, Building2 } from 'lucide-react'
+import { ArrowRight, ChevronDown } from 'lucide-react'
 import {
   CAMPAIGN_CONTENT_BORDER_CLASS,
   CAMPAIGN_CONTENT_SURFACE_CLASS,
@@ -16,25 +16,30 @@ export default function Hero() {
 
   const faqs = [
     {
-      question: "Klima ne sıklıkla bakımı yapılmalı?",
-      answer: "Klimanızın verimli çalışması ve ömrünü uzatmak için yılda en az 2 kez (mevsim geçişlerinde) profesyonel bakım yaptırmanızı öneriyoruz. Yaz ve kış sezonlarından önce bakım, cihazlarınızın performansını artırır."
+      question: 'Klima montajı ne kadar sürer?',
+      answer:
+        'Standart bir split klima montajı, tesisat uygunsa genellikle 1,5-3 saat içinde tamamlanır. Duvar tipi, drenaj ve elektrik altyapısı işi uzatabilir. Multi ve VRF kurulumları keşif ve proje kapsamına göre daha uzun sürer.',
     },
     {
-      question: "Inverter klima nedir, avantajları nelerdir?",
-      answer: "Inverter klimalar, kompresör hızını ortam sıcaklığına göre ayarlayarak enerji tasarrufu sağlar. Geleneksel klimalara göre %30-50 daha az enerji tüketir, daha sessiz çalışır ve sıcaklık dalgalanmalarını önleyerek daha konforlu bir ortam sunar."
+      question: 'Garanti kapsamına neler dahildir?',
+      answer:
+        'Üretim kaynaklı arızalar, kompresör ve elektronik kart sorunları garanti kapsamında değerlendirilir. MHI ürünlerde garanti süresi 5 yıl, Euroform ürünlerde 2 yıldır. Yetkisiz montaj, kullanım hatası ve düzenli bakımın ihmal edilmesi kapsam dışındadır.',
     },
     {
-      question: "Klimanın BTU değeri nasıl hesaplanır?",
-      answer: "BTU (British Thermal Unit), klimanın soğutma kapasitesini ifade eder. Odanızın metrekaresini 2.2 ile bölerek yaklaşık BTU ihtiyacınızı hesaplayabilirsiniz. Örneğin: 20 m² oda için yaklaşık 9.000 BTU kapasiteli klima yeterlidir."
+      question: 'Klimam yeterince soğutmuyor, neden olabilir?',
+      answer:
+        'Kirli filtre, dış ünite etrafında engel, yanlış kapasite seçimi veya gaz kaçağı sık görülen nedenlerdir. Önce filtreleri temizleyin; sorun sürerse yetkili servis ile kontrol ettirmenizi öneririz. Yaz öncesi bakım bu tür şikayetleri büyük ölçüde azaltır.',
     },
     {
-      question: "Garanti kapsamına neler dahildir?",
-      answer: "Garanti kapsamında üretim hatalarından kaynaklanan arızalar, kompresör ve elektronik kart arızaları yer alır. Garanti süresi MHI klimalarda 5 yıl, Euroform klimalarda 2 yıldır. Yanlış montaj, kullanım hatası ve düzenli bakımın yapılmaması garanti kapsamı dışındadır."
+      question: 'Split mi multi mi tercih etmeliyim?',
+      answer:
+        'Tek oda veya bağımsız kullanım için split yeterlidir. Birden fazla odayı tek dış üniteyle yönetmek, dış cepheyi sade tutmak veya yer tasarrufu istiyorsanız multi daha uygundur. Mekân planınıza göre Kayapa veya Özlüce şubelerimizde birlikte netleştiriyoruz.',
     },
     {
-      question: "Klima montajı ne kadar sürer?",
-      answer: "Standart bir split klima montajı, genellikle 1.5 - 2 saat arasında tamamlanır. Montaj süresi, mekanın durumuna, duvar tipine ve tesisat gereksinimlerine göre değişebilir. Multi sistem veya VRF kurulumları daha uzun sürebilir."
-    }
+      question: 'Montajı neden yetkili servis yapmalı?',
+      answer:
+        'Markaya özel ölçüm, vakumlama ve devreye alma adımları doğru uygulanmazsa hem performans hem garanti süreci risk altına girer. Yetkili servis montajı, resmi garanti koşullarının geçerli kalması için kritiktir.',
+    },
   ]
 
   return (
@@ -44,252 +49,268 @@ export default function Hero() {
       <section
         className={
           CAMPAIGN_HERO_ENABLED
-            ? `${CAMPAIGN_CONTENT_SURFACE_CLASS} py-20 border-t ${CAMPAIGN_CONTENT_BORDER_CLASS}`
-            : 'bg-gradient-to-b from-blue-50 to-white py-20'
+            ? `${CAMPAIGN_CONTENT_SURFACE_CLASS} border-t ${CAMPAIGN_CONTENT_BORDER_CLASS} py-16 sm:py-20`
+            : 'border-t border-neutral-200/80 bg-white py-16 sm:py-20'
         }
       >
-        <div className="container mx-auto px-4 max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="inline-block px-4 py-1.5 bg-blue-600 text-white text-xs font-bold tracking-wider rounded-full mb-4">
-              NEDEN VEDEL?
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Neden Biz?
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-16 lg:px-8">
+          <div className="text-center lg:text-left">
+            <p className="mb-3 text-sm font-semibold tracking-[0.2em] text-red-600">NEDEN VEDEL</p>
+            <h2 className="mb-6 text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl lg:text-[2.65rem] lg:leading-[1.15]">
+              Satıştan servise tek adres.
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              İklimlendirme sektöründeki köklü tecrübemizle, konforunuzu ve cihaz verimliliğinizi en üst seviyeye taşıyan profesyonel çözümler üretiyoruz.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-                <Store className="w-7 h-7 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Yetkili Satış</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                MHI ve Euroform markalarının yetkili satış noktasıyız. Orijinal ürünler ve garantili hizmet.
+            <div className="mx-auto max-w-xl space-y-4 text-left text-[15px] leading-[1.75] text-neutral-600 sm:text-base lg:mx-0 lg:max-w-none">
+              <p>
+                Vedel Klima, Bursa&apos;da 25 yılı aşkın süredir iklimlendirme
+                sektörünün içinde. Konuttan ofise, işletmeden üretim tesisine kadar
+                aynı prensiple çalışıyoruz: doğru ürünü seçmek, doğru kurmak ve uzun
+                yıllar sorunsuz çalışmasını sağlamak.
               </p>
-              <Link href="/hakkimizda" className="inline-flex items-center text-blue-600 font-semibold text-sm hover:text-blue-800">
-                Detaylı Bilgi <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
+              <p>
+                Mitsubishi Heavy Industries ve Euroform yetkili bayisi olarak orijinal
+                ürün gamını resmi garanti koşullarıyla sunuyoruz. Split ve multi
+                sistemlerden profesyonel ve VRF çözümlerine kadar ihtiyaca göre
+                yönlendiriyor; kapasite, enerji sınıfı ve mekân koşullarını birlikte
+                değerlendirerek en doğru çözümü belirliyoruz.
+              </p>
+              <p>
+                Satış sonrası süreçte de yanınızdayız. Montaj, periyodik bakım ve
+                arıza müdahalesini aynı teknik ekiple yürütüyor; Kayapa ve Özlüce
+                şubelerimizle Bursa genelinde kesintisiz destek sağlıyoruz.
+              </p>
             </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-                <Wrench className="w-7 h-7 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Yetkili Servis</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Tüm ürünlerimizde yetkili servis hizmeti. Garanti kapsamında profesyonel müdahale.
-              </p>
-              <Link href="/hakkimizda" className="inline-flex items-center text-blue-600 font-semibold text-sm hover:text-blue-800">
-                Detaylı Bilgi <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-                <Settings className="w-7 h-7 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Montaj & Kurulum</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Uzman ekibimizle güvenli ve profesyonel montaj. Doğru kurulum için detaylı çözümler.
-              </p>
-              <Link href="/hakkimizda" className="inline-flex items-center text-blue-600 font-semibold text-sm hover:text-blue-800">
-                Detaylı Bilgi <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 relative overflow-hidden group">
-              <div className="absolute top-0 left-0 w-full h-1 bg-blue-600"></div>
-              <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-                <RefreshCw className="w-7 h-7 text-blue-600" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Bakım & Onarım</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Periyodik bakım ve arıza çözümleri. Cihazlarınızı uzun ömürlü kullanmanız için hizmetinizdeyiz.
-              </p>
-              <Link href="/hakkimizda" className="inline-flex items-center text-blue-600 font-semibold text-sm hover:text-blue-800">
-                Detaylı Bilgi <ArrowRight className="w-4 h-4 ml-1" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-gradient-to-b from-green-50 to-white py-20">
-        <div className="container mx-auto px-4 max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="inline-block px-4 py-1.5 bg-green-600 text-white text-xs font-bold tracking-wider rounded-full mb-4">
-              KLİMA SİSTEMLERİ
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Ne Yapıyoruz?
-            </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              İhtiyacınıza uygun klimayı seçin. Konut, işyeri ve endüstriyel alanlar için çözümlerimiz.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Link href="/urunler/splitsistemler" className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-green-600 transition-colors">
-                <Building2 className="w-8 h-8 text-green-600 group-hover:text-white transition-colors" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Split Sistemler</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Ev ve küçük ofisler için tek ünite ile mükemmel soğutma ve ısıtma çözümleri.
-              </p>
-              <span className="inline-flex items-center text-green-600 font-semibold text-sm group-hover:text-green-700">
-                Detaylı Bilgi <ArrowRight className="w-4 h-4 ml-1" />
+            <Link
+              href="/hakkimizda"
+              className="group mx-auto mt-7 flex max-w-xl items-center justify-between gap-4 border-t border-neutral-200 pt-5 text-left transition-colors hover:border-red-600 lg:mx-0 lg:max-w-none"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-bold text-neutral-900 transition-colors group-hover:text-red-600">
+                  Hakkımızda
+                </span>
+                <span className="mt-0.5 block text-xs text-neutral-500 sm:text-sm">
+                  25 yıllık hikâyemizi tanıyın
+                </span>
               </span>
-            </Link>
-
-            <Link href="/urunler/multisistemler" className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-green-600 transition-colors">
-                <Settings className="w-8 h-8 text-green-600 group-hover:text-white transition-colors" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Multi Sistemler</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Bir dış üniteye bağlanan birden fazla iç ünite ile esnek iklimlendirme.
-              </p>
-              <span className="inline-flex items-center text-green-600 font-semibold text-sm group-hover:text-green-700">
-                Detaylı Bilgi <ArrowRight className="w-4 h-4 ml-1" />
-              </span>
-            </Link>
-
-            <Link href="/urunler/profesyonelsistemler" className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-green-600 transition-colors">
-                <Store className="w-8 h-8 text-green-600 group-hover:text-white transition-colors" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Profesyonel Sistemler</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Ticari ve endüstriyel alanlar için yüksek kapasiteli profesyonel çözümler.
-              </p>
-              <span className="inline-flex items-center text-green-600 font-semibold text-sm group-hover:text-green-700">
-                Detaylı Bilgi <ArrowRight className="w-4 h-4 ml-1" />
-              </span>
-            </Link>
-
-            <Link href="/urunler/vrfsistemler" className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-green-600 transition-colors">
-                <Building2 className="w-8 h-8 text-green-600 group-hover:text-white transition-colors" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">VRF Sistemler</h3>
-              <p className="text-gray-600 text-sm mb-4">
-                Büyük binalar ve komple tesisler için merkezi yönetimli ileri teknoloji sistemler.
-              </p>
-              <span className="inline-flex items-center text-green-600 font-semibold text-sm group-hover:text-green-700">
-                Detaylı Bilgi <ArrowRight className="w-4 h-4 ml-1" />
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-700 transition-colors group-hover:border-red-600 group-hover:bg-red-600 group-hover:text-white">
+                <ArrowRight className="h-4 w-4" />
               </span>
             </Link>
           </div>
-        </div>
-      </section>
 
-      <section className="bg-gradient-to-b from-orange-50 to-white py-20">
-        <div className="container mx-auto px-4 max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="inline-block px-4 py-1.5 bg-orange-500 text-white text-xs font-bold tracking-wider rounded-full mb-4">
-              BİLGİ MERKEZİ
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Klima Hakkında
-            </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Klimanızdan maksimum verimi almak için bilmeniz gereken önemli konular
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                <Wrench className="w-6 h-6 text-orange-500" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-3">
-                Klima Bakımı Ne Zaman Yapılmalı?
-              </h3>
-              <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                Klimanızın verimli çalışması ve ömrünü uzatmak için yılda en az 2 kez, mevsim geçişlerinde profesyonel bakım yaptırmanızı öneriyoruz.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                <Zap className="w-6 h-6 text-orange-500" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-3">
-                Inverter Klima ile Enerji Tasarrufu
-              </h3>
-              <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                Inverter klimalar, kompresör hızını ayarlayarak %30-50 arasında enerji tasarrufu sağlar. Daha sessiz çalışır ve konforlu bir ortam sunar.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                <FileText className="w-6 h-6 text-orange-500" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-3">
-                Montajda Dikkat Edilmesi Gereken 5 Kritik Nokta
-              </h3>
-              <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                Doğru konum seçimi, drenaj sistemi, gaz kaçağı kontrolü, elektrik tesisatı ve profesyonel montaj ekibi. Bu 5 maddeye dikkat edin.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-gradient-to-b from-purple-50 to-white py-20">
-        <div className="container mx-auto px-4 max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="inline-block px-4 py-1.5 bg-purple-600 text-white text-xs font-bold tracking-wider rounded-full mb-4">
-              SSS
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Sıkça Sorulan Sorular
-            </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
-              Müşterilerimizden en çok gelen sorular ve cevapları
-            </p>
-          </div>
-
-          <div className="max-w-3xl mx-auto space-y-4">
-            {faqs.map((faq, index) => (
-              <div
-                key={index}
-                className="border border-purple-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+          <ul className="divide-y divide-neutral-200 border-y border-neutral-200">
+            {[
+              {
+                title: 'Yetkili satış',
+                text: 'MHI ve Euroform orijinal ürünleri, resmi dağıtım ve garanti güvencesiyle. İhtiyaca göre doğru kapasite ve seri seçiminde danışmanlık.',
+              },
+              {
+                title: 'Yetkili servis',
+                text: 'Garanti kapsamında uzman müdahale. Arıza anında muhatap bellidir; süreç yetkili servis standartlarıyla yönetilir.',
+              },
+              {
+                title: 'Montaj & kurulum',
+                text: 'Konum, tesisat ve drenaj doğru planlanmadan verimli sistem olmaz. Kurulumdan devreye almaya kadar aynı ekip sorumludur.',
+              },
+              {
+                title: 'Bakım & onarım',
+                text: 'Mevsim geçişlerinde periyodik bakım ve hızlı arıza çözümüyle cihaz ömrünü uzatır, enerji kaybını azaltırız.',
+              },
+            ].map((item, index) => (
+              <li
+                key={item.title}
+                className="grid grid-cols-[auto_minmax(0,1fr)] gap-4 py-5 sm:gap-5 sm:py-6"
               >
-                <button
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
-                  aria-expanded={openFaq === index}
-                  aria-controls={`faq-answer-${index}`}
-                  className="w-full flex items-center justify-between p-5 text-left bg-purple-50 hover:bg-purple-100 transition-colors"
-                >
-                  <span className="font-semibold text-gray-900 pr-4">
-                    {faq.question}
-                  </span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className={`w-5 h-5 text-purple-500 flex-shrink-0 transition-transform duration-300 ${openFaq === index ? 'rotate-180' : ''}`}
-                  />
-                </button>
+                <span className="pt-0.5 font-display text-2xl leading-none text-red-600 sm:text-3xl">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <div>
+                  <h3 className="mb-1.5 text-base font-bold text-neutral-900 sm:text-lg">{item.title}</h3>
+                  <p className="text-sm leading-relaxed text-neutral-600 sm:text-[15px] sm:leading-relaxed">{item.text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section
+        className={
+          CAMPAIGN_HERO_ENABLED
+            ? `${CAMPAIGN_CONTENT_SURFACE_CLASS} border-t ${CAMPAIGN_CONTENT_BORDER_CLASS} py-16 sm:py-20`
+            : 'border-t border-neutral-200/80 bg-[#f5f4f1] py-16 sm:py-20'
+        }
+      >
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto mb-8 max-w-2xl text-center lg:mb-10">
+            <p className="mb-3 text-sm font-semibold tracking-[0.2em] text-red-600">
+              KLİMA SİSTEMLERİ
+            </p>
+            <h2 className="mb-4 text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
+              Ne yapıyoruz?
+            </h2>
+            <p className="text-base leading-relaxed text-neutral-600">
+              Konuttan ticari alana, tek odadan büyük tesislere kadar MHI ve Euroform
+              ürün gamıyla ihtiyaca uygun iklimlendirme çözümleri sunuyoruz. Satışın
+              yanında montaj, bakım ve yetkili servis de aynı çatı altında; doğru
+              sistemi seçmenizden devreye almaya kadar yanınızdayız.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-px overflow-hidden rounded-sm bg-neutral-300/70 sm:grid-cols-2">
+            {[
+              {
+                href: '/urunler/splitsistemler',
+                tag: 'Konut & ofis',
+                title: 'Split',
+                text: "Ev ve küçük ofisler için tek iç üniteyle soğutma ve ısıtma. Trend'den Diamond'a kadar ekonomik giriş ve üst seri seçenekleriyle mekânınıza uygun kapasiteyi birlikte belirliyoruz.",
+              },
+              {
+                href: '/urunler/multisistemler',
+                tag: 'Çoklu oda',
+                title: 'Multi',
+                text: 'Bir dış üniteye birden fazla iç ünite bağlanır. Farklı odaları bağımsız sıcaklıkla yönetmek isteyen ev ve ofisler için esnek, yer tasarruflu bir çözüm sunar.',
+              },
+              {
+                href: '/urunler/profesyonelsistemler',
+                tag: 'Ticari alan',
+                title: 'Profesyonel',
+                text: 'Mağaza, restoran, ofis ve benzeri ticari alanlar için yüksek kapasiteli sistemler. Yoğun kullanımda kesintisiz performans ve enerji verimliliği odaklı seçim.',
+              },
+              {
+                href: '/urunler/vrfsistemler',
+                tag: 'Büyük tesis',
+                title: 'VRF',
+                text: 'Büyük binalar ve komple tesisler için merkezi yönetimli ileri teknoloji. Bölgesel kontrol, düşük işletme maliyeti ve ölçeklenebilir kapasite ile planlanır.',
+              },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="group flex flex-col bg-[#f5f4f1] p-5 transition-colors hover:bg-white sm:p-6"
+              >
+                <p className="mb-2 text-[11px] font-semibold tracking-[0.18em] text-red-600 uppercase">
+                  {item.tag}
+                </p>
+                <h3 className="font-display mb-2 text-2xl tracking-tight text-neutral-900 sm:text-3xl">
+                  {item.title}
+                </h3>
+                <p className="mb-4 flex-1 text-sm leading-relaxed text-neutral-600">
+                  {item.text}
+                </p>
+                <span className="inline-flex items-center gap-2 text-sm font-bold text-neutral-900 transition-colors group-hover:text-red-600">
+                  İncele
+                  <ArrowRight className="h-4 w-4" />
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-neutral-200/80 bg-white py-16 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 max-w-2xl lg:mb-12">
+            <p className="mb-3 text-sm font-semibold tracking-[0.2em] text-red-600">
+              BİLGİ MERKEZİ
+            </p>
+            <h2 className="mb-4 text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
+              Klima hakkında bilmeniz gerekenler
+            </h2>
+            <p className="text-base leading-relaxed text-neutral-600">
+              Klima alırken ve kullanırken en çok merak edilen konular: doğru BTU
+              kapasitesi, inverter teknolojisi ve periyodik bakım. Kısa rehberimizle
+              bilinçli seçim yapmanıza yardımcı oluyoruz.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-3 md:gap-8 lg:gap-12">
+            {[
+              {
+                tag: 'Kapasite',
+                title: 'Klima BTU nedir, nasıl hesaplanır?',
+                text: 'BTU, klimanın soğutma ve ısıtma kapasitesini ifade eder. Yaklaşık hesap için oda metrekaresini 2,2 ile bölebilirsiniz; örneğin 20 m² için yaklaşık 9.000 BTU yeterlidir. Güneş alan cephe, tavan yüksekliği, yalıtım ve kişi sayısı da sonucu değiştirir. Düşük kapasite cihazı sürekli çalıştırır; fazla kapasite ise sık aç-kapa yapıp konforu bozar. Doğru seçim için yerinde keşif önerilir.',
+              },
+              {
+                tag: 'Teknoloji',
+                title: 'Inverter klima nedir, avantajları nelerdir?',
+                text: 'Inverter klima, kompresör hızını ortam yüküne göre ayarlayan sistemdir. Sabit hızlı modellere göre yaklaşık %30-50 daha az enerji tüketebilir; sıcaklığı daha sabit tutar ve daha sessiz çalışır. Alırken SEER ve SCOP değerlerine, enerji sınıfına ve mekânınıza uygun kapasiteye bakmak önemlidir.',
+              },
+              {
+                tag: 'Bakım',
+                title: 'Klima bakımı ne sıklıkla yapılmalı?',
+                text: 'Ev tipi klimalarda yılda en az bir, tercihen yaz ve kış sezonu öncesi iki kez profesyonel bakım önerilir. Yoğun kullanılan iş yerlerinde süre kısalabilir. Filtreleri kullanıcı düzenli temizleyebilir; eşanjör temizliği ve genel kontrol ise yetkili servisle yapılmalıdır. Düzenli bakım enerji tüketimini düşürür, kokuyu önler ve arıza riskini azaltır.',
+              },
+            ].map((item) => (
+              <article
+                key={item.title}
+                className="border-t-2 border-neutral-900 pt-5 transition-colors hover:border-red-600"
+              >
+                <p className="mb-2 text-xs font-semibold tracking-[0.18em] text-red-600 uppercase">
+                  {item.tag}
+                </p>
+                <h3 className="mb-3 text-lg font-bold text-neutral-900 sm:text-xl">
+                  {item.title}
+                </h3>
+                <p className="text-sm leading-relaxed text-neutral-600 sm:text-[15px]">
+                  {item.text}
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-neutral-200/80 bg-[#f5f4f1] py-16 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto mb-10 max-w-2xl text-center lg:mb-12">
+            <p className="mb-3 text-sm font-semibold tracking-[0.2em] text-red-600">SSS</p>
+            <h2 className="mb-4 text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
+              Sıkça sorulan sorular
+            </h2>
+            <p className="text-base leading-relaxed text-neutral-600">
+              Montaj, garanti ve sistem seçimi hakkında en çok gelen sorular.
+            </p>
+          </div>
+
+          <div className="mx-auto max-w-3xl border-y border-neutral-300/80">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaq === index
+              return (
                 <div
-                  id={`faq-answer-${index}`}
-                  role="region"
-                  className={`overflow-hidden transition-all duration-300 ${openFaq === index ? 'max-h-96' : 'max-h-0'}`}
+                  key={faq.question}
+                  className="border-b border-neutral-300/80 last:border-b-0"
                 >
-                  <div className="p-5 text-gray-600 text-sm leading-relaxed border-t border-purple-100">
-                    {faq.answer}
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(isOpen ? null : index)}
+                    aria-expanded={isOpen}
+                    aria-controls={`faq-answer-${index}`}
+                    className="flex w-full items-center justify-between gap-4 py-5 text-left sm:py-6"
+                  >
+                    <span className="pr-2 text-sm font-semibold text-neutral-900 sm:text-base">
+                      {faq.question}
+                    </span>
+                    <ChevronDown
+                      aria-hidden="true"
+                      className={`h-5 w-5 shrink-0 text-red-600 transition-transform duration-300 ${
+                        isOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  <div
+                    id={`faq-answer-${index}`}
+                    role="region"
+                    className={`overflow-hidden transition-all duration-300 ${
+                      isOpen ? 'max-h-96' : 'max-h-0'
+                    }`}
+                  >
+                    <p className="pb-5 text-sm leading-relaxed text-neutral-600 sm:pb-6 sm:text-[15px]">
+                      {faq.answer}
+                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </section>

@@ -1,0 +1,86 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Yeni personel | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Yeni personel</h1>
+      <p class="lead">Kimlik, iletişim, ev adresi ve evraklar aynı kartta açılır.</p>
+    </div>
+    <a class="btn is-ghost" href="{% url 'portal-crew' %}">Listeye dön</a>
+  </div>
+  {% if error %}<p class="flash is-err" role="alert">{{ error }}</p>{% endif %}
+
+  <form class="wizard" method="post" action="{% url 'portal-crew-new' %}" autocomplete="off" enctype="multipart/form-data" data-crew-form>
+    {% csrf_token %}
+    {% include 'portal/_crew_fields.html' %}
+
+    <p class="field-label">Evraklar</p>
+    <div class="crew-docs" data-doc-list>
+      {% for row in doc_rows %}
+        {% include 'portal/_crew_doc_row.html' %}
+      {% endfor %}
+    </div>
+    <div class="line-actions">
+      <button class="btn is-ghost" type="button" data-doc-add>Satır ekle</button>
+    </div>
+
+    <p class="field-label">Not</p>
+    <div class="group">
+      <div class="row">
+        <input id="c_notes" name="notes" placeholder=" " value="{{ form.notes }}" />
+        <label for="c_notes">Personel notu</label>
+      </div>
+    </div>
+
+    <div class="wizard-nav">
+      <button class="btn" type="submit">Kartı kaydet</button>
+    </div>
+  </form>
+
+  <template id="crew-doc-tpl">
+    {% include 'portal/_crew_doc_row.html' with row=empty_doc_row %}
+  </template>
+  <script>
+    (function () {
+      var list = document.querySelector('[data-doc-list]');
+      var add = document.querySelector('[data-doc-add]');
+      var tpl = document.getElementById('crew-doc-tpl');
+      if (!list || !add || !tpl) return;
+      function bind(root) {
+        if (window.initPortalDatepickers) window.initPortalDatepickers(root);
+      }
+      add.addEventListener('click', function () {
+        var node = tpl.content.firstElementChild.cloneNode(true);
+        list.appendChild(node);
+        bind(node);
+      });
+      list.addEventListener('click', function (event) {
+        var btn = event.target.closest('[data-doc-remove]');
+        if (!btn) return;
+        var row = btn.closest('[data-doc-row]');
+        if (!row) return;
+        if (list.querySelectorAll('[data-doc-row]').length === 1) {
+          row.querySelectorAll('input[name="doc_title"], input[type="file"]').forEach(function (el) {
+            el.value = '';
+          });
+          var label = row.querySelector('[data-file-label]');
+          if (label) label.textContent = 'Dosya seç';
+          row.querySelector('.file-pick') && row.querySelector('.file-pick').classList.remove('has-file');
+          return;
+        }
+        row.remove();
+      });
+      list.addEventListener('change', function (event) {
+        var input = event.target.closest('input[type="file"]');
+        if (!input) return;
+        var pick = input.closest('.file-pick');
+        var label = pick && pick.querySelector('[data-file-label]');
+        var name = input.files && input.files[0] ? input.files[0].name : '';
+        if (label) label.textContent = name || 'Dosya seç';
+        if (pick) pick.classList.toggle('has-file', Boolean(name));
+      });
+    })();
+  </script>
+{% endblock %}

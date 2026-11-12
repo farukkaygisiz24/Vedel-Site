@@ -1,0 +1,31 @@
+{% if icon == 'sun' %}
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="1.7"/>
+  <path d="M12 3.2v1.8M12 19v1.8M3.2 12h1.8M19 12h1.8M5.7 5.7l1.3 1.3M17 17l1.3 1.3M18.3 5.7l-1.3 1.3M7 17l-1.3 1.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+</svg>
+{% elif icon == 'cloud-sun' %}
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <circle cx="9.5" cy="9" r="3.1" stroke="currentColor" stroke-width="1.7"/>
+  <path d="M9.5 3.4V4.8M4.2 9H5.6M5.3 5.1l1 1M14.8 5.1l-1 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+  <path d="M8.2 16.6h7.6a3.4 3.4 0 0 0 .3-6.8 4.6 4.6 0 0 0-8.6 1.5A3.1 3.1 0 0 0 8.2 16.6Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+</svg>
+{% elif icon == 'cloud' %}
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <path d="M7.2 17.5h10.2A3.6 3.6 0 0 0 17.8 10a5.1 5.1 0 0 0-9.7 1.6 3.4 3.4 0 0 0-.9 5.9Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+</svg>
+{% elif icon == 'snow' %}
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <path d="M12 4.5v15M6.4 7.2l11.2 9.6M17.6 7.2 6.4 16.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+  <path d="M9.4 5.8 12 8.2l2.6-2.4M9.4 18.2 12 15.8l2.6 2.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+{% elif icon == 'storm' %}
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <path d="M7.4 14.2h8.6A3.3 3.3 0 0 0 16.2 7.6 4.7 4.7 0 0 0 7.3 9.2a3.2 3.2 0 0 0 .1 5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+  <path d="M11.2 13.5 9.4 18h3.1l-1.9 4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+{% else %}
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+  <path d="M7.2 15.2h9.6A3.4 3.4 0 0 0 16.9 8.4 4.8 4.8 0 0 0 7.8 10a3.2 3.2 0 0 0-.6 5.2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+  <path d="M9.2 17.6v1.6M12 17.2v2.4M14.8 17.6v1.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+</svg>
+{% endif %}

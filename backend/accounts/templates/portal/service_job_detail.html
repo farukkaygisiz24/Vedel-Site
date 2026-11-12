@@ -1,0 +1,434 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ job.number }} | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="fis">
+    <div class="toolbar">
+      <div>
+        <h1>{{ job.number }}</h1>
+        <div class="fis-meta">
+          <span class="fis-chip">{{ job.date|date:'d.m.Y' }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}</span>
+          <span class="fis-chip">{{ job.get_status_display }}</span>
+          <span class="fis-chip">{{ job.kind_label }}</span>
+          {% if job.assignee_label %}<span class="fis-chip">{{ job.assignee_label }}</span>{% endif %}
+          {% if not can_service_field %}<span class="fis-chip">{{ job.get_vat_mode_display }}</span>{% endif %}
+          {% if job.sale and not can_service_field %}<a class="fis-chip" href="{{ job.sale.get_absolute_url }}">{{ job.sale.number }}</a>{% endif %}
+        </div>
+      </div>
+      <div class="fis-toolbar-actions">
+        {% if job.sale and not can_service_field %}
+        <a class="btn is-ghost" href="{{ job.sale.get_absolute_url }}">Satış fişi</a>
+        {% endif %}
+        <a class="btn is-ghost" href="{% url 'portal-service' %}">Listeye dön</a>
+      </div>
+    </div>
+    {% if error and not pay_open %}<p class="flash is-err">{{ error }}</p>{% endif %}
+
+    <section class="fis-letter">
+      <div class="fis-letter-head">
+        <div>
+          <span class="fis-kicker">Müşteri</span>
+          <div class="fis-name">{{ job.party.display_name }}</div>
+          <p>{{ job.party.get_kind_display }}</p>
+        </div>
+        {% if can_sales %}
+        <a class="btn is-ghost" href="{{ job.party.get_absolute_url }}">Müşteri</a>
+        {% endif %}
+      </div>
+      <dl class="fis-facts">
+        {% include 'portal/_party_facts.html' with party=job.party %}
+        <div>
+          <dt>Personel</dt>
+          <dd>{% if job.assignee %}{{ job.assignee.display_name }}{% if job.assignee.title %} · {{ job.assignee.title }}{% endif %}{% elif job.assign_all %}Hepsi{% else %}Atanmadı{% endif %}</dd>
+        </div>
+        {% if job.device and not sold_groups %}
+        <div>
+          <dt>Cihaz</dt>
+          <dd>{{ job.device.name }}{% if job.device.place %} · {{ job.device.place }}{% endif %}</dd>
+        </div>
+        <div>
+          <dt>Bakım aralığı</dt>
+          <dd>{{ job.device.get_interval_months_display }}</dd>
+        </div>
+        <div>
+          <dt>Sonraki bakım</dt>
+          <dd>{% if job.device.next_due %}{{ job.device.next_due|date:'d.m.Y' }}{% else %}—{% endif %}</dd>
+        </div>
+        {% endif %}
+      </dl>
+    </section>
+
+    {% if sold_groups %}
+    <section class="fis-block">
+      <p class="field-label">Cihaz</p>
+      {% include 'portal/_job_sold_units.html' with readonly=True %}
+    </section>
+    {% endif %}
+
+    {% if lines and not can_service_field %}
+    <section class="fis-block">
+      <p class="field-label">Kalemler</p>
+      <div class="sheet-wrap">
+        <table class="sheet">
+          <thead>
+            <tr>
+              <th>Kalem</th>
+              <th>Tür</th>
+              <th>Adet</th>
+              <th>Alış</th>
+              <th>Satış</th>
+              <th>Tutar</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for line in lines %}
+            <tr>
+              <td>{{ line.display_name }}</td>
+              <td>{{ line.get_kind_display }}</td>
+              <td class="money">{{ line.qty|tr_qty }}</td>
+              <td class="money">{{ line.cost_price|tr_money }} ₺</td>
+              <td class="money">{{ line.unit_price|tr_money }} ₺</td>
+              <td class="money">{{ line.line_total|tr_money }} ₺</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="totals-stack">
+        <span>Ara toplam</span>
+        <b>{{ job.subtotal|tr_money }} ₺</b>
+        <span>KDV</span>
+        <b>{{ job.vat_total|tr_money }} ₺</b>
+        <span>Genel toplam</span>
+        <b class="is-grand">{{ job.grand_total|tr_money }} ₺</b>
+      </div>
+      <div class="totals-stack">
+        <span>Maliyet</span>
+        <b>{{ job.cost_total|tr_money }} ₺</b>
+        <span>Satış</span>
+        <b>{{ job.grand_total|tr_money }} ₺</b>
+        <span>Kar</span>
+        <b>{{ job.profit|tr_money }} ₺</b>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if show_payment_details %}
+    <div class="fis-settle" id="pay-details">
+      {{ adjust_lines|json_script:"adjust-lines" }}
+      <form method="post" action="{{ job.get_absolute_url }}" class="fis-card" id="adjust-form" novalidate data-paid="{{ job.paid_total }}" data-vat="{{ job.vat_mode }}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="adjust" />
+        <div class="fis-card-head">
+          <p class="field-label">Ödeme detayları</p>
+        </div>
+        <div class="seg" aria-label="KDV">
+          {% for value, label in vat_choices %}
+          <label>
+            <input type="radio" name="vat_mode" value="{{ value }}"{% if job.vat_mode == value %} checked{% endif %} />
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <dl class="fis-facts">
+          <div>
+            <dt>Liste genel</dt>
+            <dd id="adj-list-grand">{{ job.list_grand|tr_money }} ₺</dd>
+          </div>
+          <div>
+            <dt>Genel toplam</dt>
+            <dd class="is-grand is-edit">
+              <input class="adj-input" id="id_grand_total" name="grand_total" inputmode="decimal" autocomplete="off" value="{{ job.grand_total|tr_money }}" />
+              <span class="adj-unit">₺</span>
+            </dd>
+          </div>
+          <div>
+            <dt>İndirim %</dt>
+            <dd class="is-edit">
+              <input class="adj-input" id="id_discount_rate" name="discount_rate" inputmode="decimal" autocomplete="off" value="{{ job.discount_rate|tr_qty }}" />
+            </dd>
+          </div>
+          <div>
+            <dt>İndirim tutarı</dt>
+            <dd class="is-edit">
+              <input class="adj-input" id="id_discount_amount" inputmode="decimal" autocomplete="off" value="{{ job.discount_amount|tr_money }}" />
+              <span class="adj-unit">₺</span>
+            </dd>
+          </div>
+        </dl>
+        <div class="fis-card-foot">
+          <p class="hint" id="adjust-hint">Kalemler kilitli. KDV ve genel toplam satır satışına orantılı yansır.</p>
+          <button class="btn" type="submit" id="save-adjust" form="adjust-form" formaction="{{ job.get_absolute_url }}" formmethod="post">Kaydet</button>
+        </div>
+        <p class="modal-alert" id="adjust-error"{% if not error or pay_open %} hidden{% endif %} role="alert">{% if error and not pay_open %}{{ error }}{% endif %}</p>
+      </form>
+
+      <section class="fis-card">
+        <div class="fis-card-head">
+          <p class="field-label">Tahsilat</p>
+        </div>
+        <div class="fis-flag{% if job.remaining > 0 %} is-due{% endif %}">
+          <div>
+            <b>Tahsil {{ job.paid_total|tr_money }} ₺</b>
+            <small id="adj-flag-grand">Genel {{ job.grand_total|tr_money }} ₺</small>
+          </div>
+          <span class="money" id="adj-remain">Kalan {{ job.remaining|tr_money }} ₺</span>
+        </div>
+        <div class="sheet-wrap is-ops">
+          <table class="sheet">
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Yöntem</th>
+                {% if pay_has_card %}<th>Kart bilgisi</th>{% endif %}
+                {% if pay_has_transfer %}<th>Havale bilgisi</th>{% endif %}
+                {% if pay_has_card %}<th>Taksit</th>{% endif %}
+                <th>Tutar</th>
+                <th>İşleyen</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for alloc in allocations %}
+              {% with pay=alloc.payment %}
+              <tr>
+                <td>{{ pay.date|date:'d.m.Y' }}</td>
+                <td>{{ pay.get_method_display }}</td>
+                {% if pay_has_card %}
+                <td>{% if pay.method == 'card' and pay.card_holder %}{{ pay.card_holder }}{% else %}—{% endif %}</td>
+                {% endif %}
+                {% if pay_has_transfer %}
+                <td>{% if pay.method == 'transfer' and pay.transfer_sender %}{{ pay.transfer_sender }}{% else %}—{% endif %}</td>
+                {% endif %}
+                {% if pay_has_card %}
+                <td>{% if pay.method == 'card' and pay.installment_label %}{{ pay.installment_label }}{% else %}—{% endif %}</td>
+                {% endif %}
+                <td class="money">{{ alloc.amount|tr_money }} ₺</td>
+                <td>{{ pay.created_by.username }}</td>
+                <td class="is-action">
+                  <div class="pay-ops" data-pay-ops>
+                    <button class="pay-ops-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="İşlem">
+                      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                        <circle cx="8" cy="3.2" r="1.4"/>
+                        <circle cx="8" cy="8" r="1.4"/>
+                        <circle cx="8" cy="12.8" r="1.4"/>
+                      </svg>
+                    </button>
+                    <div class="pay-ops-menu" hidden role="menu">
+                      <button
+                        class="pay-ops-item is-danger"
+                        type="button"
+                        role="menuitem"
+                        data-pay-delete
+                        data-pay-id="{{ pay.pk }}"
+                        data-pay-copy="{{ alloc.amount|tr_money }} ₺ · {{ pay.get_method_display }}{% if pay.pay_detail %} · {{ pay.pay_detail }}{% endif %} · {{ pay.date|date:'d.m.Y' }}"
+                      >Sil</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              {% endwith %}
+              {% empty %}
+              <tr><td colspan="{{ pay_colspan }}" class="empty">Tahsilat yok.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="fis-card-foot">
+          {% if job.remaining <= 0 %}
+          <p class="hint">Borç kapandı.</p>
+          {% endif %}
+          {% if job.remaining > 0 %}
+          <button class="btn" type="button" id="open-pay">Ödeme ekle</button>
+          {% endif %}
+        </div>
+      </section>
+    </div>
+    {% include 'portal/_pay_modal.html' %}
+    {% endif %}
+
+    {% if job.notes.strip %}
+    <section class="fis-block">
+      <p class="field-label">İşlem notu</p>
+      <div class="fis-note">{{ job.notes }}</div>
+    </section>
+    {% endif %}
+  </div>
+  {% include 'portal/_photo_modal.html' %}
+  {% if show_payment_details %}
+    {% include 'portal/_pay_script.html' %}
+  {% endif %}
+  <script>
+    (function () {
+      var modal = document.getElementById('photo-modal');
+      var stage = document.getElementById('photo-stage-img');
+      var closeBtn = document.getElementById('close-photo');
+      var timer = 0;
+      function showPhoto(src) {
+        if (!modal || !stage || !src) return;
+        window.clearTimeout(timer);
+        stage.src = src;
+        modal.hidden = false;
+        window.requestAnimationFrame(function () { modal.classList.add('is-on'); });
+      }
+      function hidePhoto() {
+        if (!modal) return;
+        modal.classList.remove('is-on');
+        timer = window.setTimeout(function () {
+          modal.hidden = true;
+          if (stage) stage.src = '';
+        }, 280);
+      }
+      document.addEventListener('click', function (event) {
+        var img = event.target.closest('.device-album-shot');
+        if (img && img.src) showPhoto(img.src);
+      });
+      if (closeBtn) closeBtn.addEventListener('click', hidePhoto);
+      if (modal) modal.addEventListener('click', function (event) {
+        if (event.target === modal) hidePhoto();
+      });
+    })();
+  </script>
+  {% if show_payment_details %}
+  <script>
+    (function () {
+      var form = document.getElementById('adjust-form');
+      if (!form) return;
+      var linesEl = document.getElementById('adjust-lines');
+      var lines = [];
+      try { lines = JSON.parse(linesEl ? linesEl.textContent : '[]'); } catch (err) { lines = []; }
+      var rateEl = document.getElementById('id_discount_rate');
+      var amountEl = document.getElementById('id_discount_amount');
+      var grandEl = document.getElementById('id_grand_total');
+      var listEl = document.getElementById('adj-list-grand');
+      var remainEl = document.getElementById('adj-remain');
+      var hint = document.getElementById('adjust-hint');
+      var lock = false;
+
+      function money(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+      function label(n) {
+        return money(n).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+      function parseMoney(raw) {
+        var text = String(raw || '').trim().replace(/\s/g, '');
+        if (!text) return 0;
+        if (text.indexOf(',') >= 0) return parseFloat(text.replace(/\./g, '').replace(',', '.')) || 0;
+        var parts = text.split('.');
+        if (parts.length > 1 && parts.slice(1).every(function (part) { return part.length === 3; })) {
+          return parseFloat(parts.join('')) || 0;
+        }
+        return parseFloat(text) || 0;
+      }
+      var paid = parseMoney(form.getAttribute('data-paid'));
+      function lineAmounts(qty, unit, vatRate, mode) {
+        var base = money(qty * unit);
+        if (mode === 'none') return { net: base, vat: 0, total: base };
+        if (mode === 'included') {
+          var total = base;
+          var net = vatRate ? money(total / (1 + vatRate / 100)) : total;
+          return { net: net, vat: money(total - net), total: total };
+        }
+        var vat = vatRate ? money(base * vatRate / 100) : 0;
+        return { net: base, vat: vat, total: money(base + vat) };
+      }
+      function vatMode() {
+        var checked = form.querySelector('[name=vat_mode]:checked');
+        return checked ? checked.value : 'none';
+      }
+      function listGrand() {
+        var mode = vatMode();
+        var total = 0;
+        lines.forEach(function (row) {
+          var qty = parseFloat(row.qty) || 0;
+          var unit = parseFloat(row.list) || 0;
+          var rate = parseFloat(row.vat) || 0;
+          if (mode === 'none') rate = 0;
+          else if (!rate) rate = 20;
+          total += lineAmounts(qty, unit, rate, mode).total;
+        });
+        return money(total);
+      }
+      function setRemain(grand) {
+        var rest = money(grand - paid);
+        if (remainEl) {
+          remainEl.textContent = 'Kalan ' + label(rest) + ' ₺';
+          remainEl.classList.toggle('is-over', rest > 0);
+          var flag = remainEl.closest('.fis-flag');
+          if (flag) flag.classList.toggle('is-due', rest > 0);
+        }
+        var grandFlag = document.getElementById('adj-flag-grand');
+        if (grandFlag) grandFlag.textContent = 'Genel ' + label(grand) + ' ₺';
+      }
+      function applyFromGrand(grand, source) {
+        var list = listGrand();
+        if (listEl) listEl.textContent = label(list) + ' ₺';
+        grand = money(grand);
+        if (grand < 0) grand = 0;
+        var disc = money(list - grand);
+        var pct = list ? money(disc / list * 100) : 0;
+        lock = true;
+        if (grandEl && source !== 'grand') grandEl.value = label(grand);
+        if (amountEl && source !== 'amount') amountEl.value = label(disc);
+        if (rateEl && source !== 'rate') rateEl.value = label(pct);
+        lock = false;
+        setRemain(grand);
+        if (hint) {
+          if (grand + 0.001 < paid) {
+            hint.textContent = 'Genel toplam tahsilattan (' + label(paid) + ' ₺) küçük olamaz.';
+            hint.style.color = 'var(--danger)';
+          } else {
+            hint.textContent = 'Kalemler kilitli. KDV ve genel toplam satır satışına orantılı yansır.';
+            hint.style.color = '';
+          }
+        }
+      }
+      function onVatChange() {
+        var list = listGrand();
+        var pct = parseMoney((rateEl || {}).value);
+        var grand = money(list * (1 - pct / 100));
+        applyFromGrand(grand);
+      }
+      form.querySelectorAll('[name=vat_mode]').forEach(function (el) {
+        el.addEventListener('change', onVatChange);
+      });
+      if (rateEl) {
+        rateEl.addEventListener('input', function () {
+          if (lock) return;
+          var list = listGrand();
+          var pct = parseMoney(rateEl.value);
+          applyFromGrand(money(list * (1 - pct / 100)), 'rate');
+        });
+      }
+      if (amountEl) {
+        amountEl.addEventListener('input', function () {
+          if (lock) return;
+          var list = listGrand();
+          var disc = parseMoney(amountEl.value);
+          applyFromGrand(money(list - disc), 'amount');
+        });
+      }
+      if (grandEl) {
+        grandEl.addEventListener('input', function () {
+          if (lock) return;
+          applyFromGrand(parseMoney(grandEl.value), 'grand');
+        });
+      }
+      form.addEventListener('submit', function (event) {
+        var grand = parseMoney((grandEl || {}).value);
+        if (grandEl) grandEl.value = label(grand);
+        if (grand + 0.001 < paid) {
+          event.preventDefault();
+          applyFromGrand(grand);
+          var err = document.getElementById('adjust-error');
+          if (err) {
+            err.hidden = false;
+            err.textContent = 'Genel toplam tahsilattan (' + label(paid) + ' ₺) küçük olamaz.';
+          }
+        }
+      });
+    })();
+  </script>
+  {% endif %}
+{% endblock %}

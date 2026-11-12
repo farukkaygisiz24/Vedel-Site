@@ -1,0 +1,24 @@
+{% if paginator.count %}
+<p class="pager-meta">{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ paginator.count }}</p>
+{% endif %}
+<nav class="pager" aria-label="Sayfa"{% if paginator.num_pages <= 1 %} hidden{% endif %}>
+  {% if page_obj.has_previous %}
+  <a href="{{ prev_href }}">‹</a>
+  {% else %}
+  <span class="is-off">‹</span>
+  {% endif %}
+  {% for item in page_links %}
+    {% if item.gap %}
+    <span class="is-off">{{ item.label }}</span>
+    {% elif item.on %}
+    <a href="{{ item.href }}" class="is-on" aria-current="page">{{ item.label }}</a>
+    {% else %}
+    <a href="{{ item.href }}">{{ item.label }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page_obj.has_next %}
+  <a href="{{ next_href }}">›</a>
+  {% else %}
+  <span class="is-off">›</span>
+  {% endif %}
+</nav>

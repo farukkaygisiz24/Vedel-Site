@@ -1,0 +1,318 @@
+<script>
+  (function bindPortalServiceCal() {
+    document.querySelectorAll('[data-service-cal]').forEach(function (root) {
+      if (root._boundServiceCal) return;
+      root._boundServiceCal = true;
+      var input = root.querySelector('input[name="service_date"], input[name="date"]');
+      var monthEl = root.querySelector('[data-cal-month]');
+      var grid = root.querySelector('[data-cal-grid]');
+      var meta = root.querySelector('[data-cal-meta]');
+      var hours = root.querySelector('[data-cal-hours]');
+      var hoursClip = root.querySelector('[data-cal-hours-clip]') || hours;
+      var warn = root.querySelector('[data-cal-warn]');
+      var jobsTitle = root.querySelector('[data-cal-jobs-title]');
+      var jobsCount = root.querySelector('[data-cal-jobs-count]');
+      var jobsList = root.querySelector('[data-cal-jobs-list]');
+      if (!input || !monthEl || !grid) return;
+      var serviceUrl = root.getAttribute('data-service-url') || '';
+      var hoursOptional = root.hasAttribute('data-hours-optional');
+      var months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+      var shorts = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+      var load = {};
+      var jobsByMonth = {};
+      var cap = 4;
+      var lastDay = input.value || '';
+      var hoursTimer = 0;
+      var view = new Date();
+      if (lastDay) {
+        var seedDate = lastDay.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (seedDate) view = new Date(Number(seedDate[1]), Number(seedDate[2]) - 1, 1);
+      } else {
+        view = new Date(view.getFullYear(), view.getMonth(), 1);
+      }
+      try {
+        var seedNode = document.getElementById('service-load');
+        var seed = seedNode ? JSON.parse(seedNode.textContent) : null;
+        if (seed && seed.month) {
+          cap = seed.cap || cap;
+          load[seed.month] = seed.days || {};
+          jobsByMonth[seed.month] = seed.jobs || {};
+        }
+      } catch (err) {}
+      function reduceMotion() {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+      function ymd(date) {
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        return date.getFullYear() + '-' + month + '-' + day;
+      }
+      function monthKey(date) {
+        return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
+      }
+      function pretty(iso) {
+        var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return '';
+        return Number(m[3]) + ' ' + shorts[Number(m[2]) - 1] + ' ' + m[1];
+      }
+      function todayStart() {
+        var now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      }
+      function remember(key, data) {
+        if (data && data.ok) {
+          cap = data.cap || cap;
+          load[data.month || key] = data.days || {};
+          jobsByMonth[data.month || key] = data.jobs || {};
+        } else {
+          load[key] = load[key] || {};
+          jobsByMonth[key] = jobsByMonth[key] || {};
+        }
+        return load[key];
+      }
+      function ensure(key) {
+        if (load[key] && jobsByMonth[key]) return Promise.resolve(load[key]);
+        return fetch(serviceUrl + '?month=' + encodeURIComponent(key), {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) { return remember(key, data); })
+          .catch(function () { return remember(key, null); });
+      }
+      function jobsFor(iso) {
+        if (!iso) return [];
+        return (jobsByMonth[iso.slice(0, 7)] || {})[iso] || [];
+      }
+      function chosenTime() {
+        if (!hours) return '';
+        var picked = hours.querySelector('input:checked');
+        return picked && !picked.disabled ? picked.value : '';
+      }
+      function emptyJobs(copy) {
+        if (!jobsList) return;
+        jobsList.innerHTML = '';
+        var note = document.createElement('p');
+        note.className = 'day-jobs-empty';
+        note.textContent = copy;
+        jobsList.appendChild(note);
+      }
+      function paintJobs() {
+        if (!jobsTitle || !jobsList) return;
+        var chosen = input.value;
+        if (!chosen) {
+          jobsTitle.textContent = 'Gün seçilmedi';
+          if (jobsCount) jobsCount.textContent = '';
+          emptyJobs('Takvimden gün seçin. Atanan işler ve saatleri burada.');
+          return;
+        }
+        var items = jobsFor(chosen);
+        jobsTitle.textContent = pretty(chosen);
+        if (jobsCount) {
+          jobsCount.textContent = items.length
+            ? (items.length + ' iş' + (items.length >= cap ? ' · kapasite dolu' : ''))
+            : 'Boş';
+        }
+        if (!items.length) {
+          emptyJobs('Bu güne atanmış iş yok.');
+          return;
+        }
+        jobsList.innerHTML = '';
+        var picked = chosenTime();
+        items.forEach(function (item) {
+          var row = document.createElement('div');
+          row.className = 'day-job';
+          if (item.pending) row.classList.add('is-wait');
+          if (item.time && item.time === picked) row.classList.add('is-on');
+          var body = document.createElement('div');
+          var name = document.createElement('b');
+          name.textContent = item.party || 'Müşteri';
+          body.appendChild(name);
+          var bits = [];
+          if (item.kind) bits.push(item.kind);
+          if (item.number) bits.push(item.number);
+          if (item.pending) bits.push('Bekleyen');
+          if (bits.length) {
+            var metaLine = document.createElement('small');
+            metaLine.textContent = bits.join(' · ');
+            body.appendChild(metaLine);
+          }
+          if (item.time) {
+            var clock = document.createElement('time');
+            clock.textContent = item.time;
+            row.appendChild(clock);
+          }
+          row.appendChild(body);
+          jobsList.appendChild(row);
+        });
+      }
+      function hoursAreOpen() {
+        return Boolean(hoursClip && hoursClip.classList.contains('is-open') && !hoursClip.hidden);
+      }
+      function setHoursOpen(open, animate) {
+        if (!hoursClip) return;
+        window.clearTimeout(hoursTimer);
+        hoursClip.style.overflow = 'hidden';
+        if (!animate || reduceMotion()) {
+          hoursClip.classList.toggle('is-open', open);
+          hoursClip.hidden = !open;
+          hoursClip.style.height = '';
+          hoursClip.style.overflow = open ? 'visible' : '';
+          return;
+        }
+        if (open) {
+          hoursClip.hidden = false;
+          hoursClip.style.height = '0px';
+          hoursClip.classList.remove('is-open');
+          hoursClip.offsetHeight;
+          hoursClip.classList.add('is-open');
+          hoursClip.style.height = hoursClip.scrollHeight + 'px';
+          hoursTimer = window.setTimeout(function () {
+            if (!hoursClip.classList.contains('is-open')) return;
+            hoursClip.style.height = '';
+            hoursClip.style.overflow = 'visible';
+          }, 360);
+          return;
+        }
+        hoursClip.style.height = hoursClip.scrollHeight + 'px';
+        hoursClip.offsetHeight;
+        hoursClip.classList.remove('is-open');
+        hoursClip.style.height = '0px';
+        hoursTimer = window.setTimeout(function () {
+          hoursClip.style.height = '';
+          hoursClip.style.overflow = '';
+          hoursClip.hidden = true;
+        }, 360);
+      }
+      function syncHours() {
+        if (!hours) return;
+        var on = Boolean(input.value);
+        var dayChanged = input.value !== lastDay;
+        if (dayChanged) {
+          hours.querySelectorAll('input').forEach(function (el) { el.checked = false; });
+          lastDay = input.value;
+        }
+        var taken = {};
+        jobsFor(input.value).forEach(function (item) {
+          if (!item.time) return;
+          taken[item.time] = (taken[item.time] || 0) + 1;
+        });
+        hours.querySelectorAll('label').forEach(function (label) {
+          var el = label.querySelector('input');
+          var chip = label.querySelector('span');
+          if (!el || !chip) return;
+          var n = taken[el.value] || 0;
+          el.disabled = !on;
+          el.required = on && !hoursOptional;
+          label.classList.toggle('is-taken', Boolean(on && n));
+          label.title = on && n ? 'Dolu' : '';
+          chip.textContent = el.value;
+          if (on && n) {
+            var mark = document.createElement('em');
+            mark.textContent = String(n);
+            chip.appendChild(mark);
+          }
+        });
+        var wantOpen = on;
+        var isOpen = hoursAreOpen();
+        if (wantOpen !== isOpen) setHoursOpen(wantOpen, true);
+      }
+      function setMeta() {
+        syncHours();
+        paintJobs();
+        var chosen = input.value;
+        var count = jobsFor(chosen).length;
+        var full = Boolean(chosen && count >= cap);
+        if (warn) warn.hidden = !full;
+        if (!meta) return;
+        if (!chosen) {
+          meta.textContent = 'Gün seçilmedi.';
+          return;
+        }
+        var clock = chosenTime();
+        meta.textContent = pretty(chosen)
+          + (clock ? ' · ' + clock : ' · saat seçin')
+          + (count ? ' · ' + count + '/' + cap + ' iş' : ' · boş')
+          + (full ? ' · kapasite dolu' : '');
+      }
+      function paint() {
+        var key = monthKey(view);
+        var days = load[key] || {};
+        var chosen = input.value;
+        var today = todayStart();
+        monthEl.textContent = months[view.getMonth()] + ' ' + view.getFullYear();
+        grid.innerHTML = '';
+        var start = new Date(view.getFullYear(), view.getMonth(), 1);
+        var pad = (start.getDay() + 6) % 7;
+        start.setDate(start.getDate() - pad);
+        for (var i = 0; i < 42; i += 1) {
+          var cell = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+          var iso = ymd(cell);
+          var count = days[iso] || 0;
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = String(cell.getDate());
+          if (count) {
+            var mark = document.createElement('em');
+            mark.textContent = String(count);
+            btn.appendChild(mark);
+          }
+          if (cell.getMonth() !== view.getMonth()) btn.classList.add('is-muted');
+          if (iso === ymd(today)) btn.classList.add('is-today');
+          if (cell < today) btn.classList.add('is-past');
+          if (count > 0 && count < cap) btn.classList.add('is-busy');
+          if (count >= cap) btn.classList.add('is-full');
+          if (chosen && iso === chosen) btn.classList.add('is-on');
+          btn.addEventListener('click', function (dayIso) {
+            return function () {
+              input.value = input.value === dayIso ? '' : dayIso;
+              var needed = input.value ? input.value.slice(0, 7) : '';
+              if (needed && needed !== monthKey(view)) {
+                ensure(needed).then(function () {
+                  paint();
+                  setMeta();
+                });
+                return;
+              }
+              paint();
+              setMeta();
+            };
+          }(iso));
+          grid.appendChild(btn);
+        }
+        setMeta();
+      }
+      function showMonth() {
+        ensure(monthKey(view)).then(paint);
+      }
+      root.refreshServiceCal = function () {
+        window.clearTimeout(hoursTimer);
+        if (hoursClip) {
+          hoursClip.classList.remove('is-open');
+          hoursClip.hidden = true;
+          hoursClip.style.height = '';
+          hoursClip.style.overflow = '';
+        }
+        paint();
+      };
+      var prev = root.querySelector('[data-cal-prev]');
+      var next = root.querySelector('[data-cal-next]');
+      if (prev) prev.addEventListener('click', function () {
+        view = new Date(view.getFullYear(), view.getMonth() - 1, 1);
+        showMonth();
+      });
+      if (next) next.addEventListener('click', function () {
+        view = new Date(view.getFullYear(), view.getMonth() + 1, 1);
+        showMonth();
+      });
+      if (hours) hours.addEventListener('change', function (event) {
+        var target = event.target;
+        if (target && target.focus) {
+          try { target.focus({ preventScroll: true }); } catch (err) {}
+        }
+        setMeta();
+      });
+      showMonth();
+    });
+  })();
+</script>

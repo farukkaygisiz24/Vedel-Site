@@ -1,0 +1,142 @@
+{% load portal_fmt %}
+
+{% if archive and year_links %}
+<nav class="sale-years" aria-label="Yıl">
+  {% for item in year_links %}
+  <a href="{{ item.href }}"{% if item.on %} class="is-on" aria-current="page"{% endif %}>{{ item.year }}</a>
+  {% endfor %}
+</nav>
+{% endif %}
+
+<form class="sale-filters" method="get" data-sale-filters>
+  {% if archive and year %}<input type="hidden" name="year" value="{{ year }}" />{% endif %}
+  {% if party_id %}<input type="hidden" name="party" value="{{ party_id }}" />{% endif %}
+  <div class="sale-filters-top">
+    <input type="search" name="q" value="{{ query }}" placeholder="Müşteri, fiş no, fatura no veya cihaz / SKU" autocomplete="off" />
+    {% include 'portal/_datepicker.html' with date_name='from' date_value=date_from date_kicker='Başlangıç' date_optional=True %}
+    {% include 'portal/_datepicker.html' with date_name='to' date_value=date_to date_kicker='Bitiş' date_optional=True %}
+  </div>
+  <div class="sale-filters-bar">
+    <div class="sale-filter">
+      <span class="sale-filter-kicker">Fatura</span>
+      <div class="sale-filter-opts">
+        <label>
+          <input type="radio" name="invoice" value=""{% if not invoice %} checked{% endif %} />
+          <span>Tümü</span>
+        </label>
+        <label>
+          <input type="radio" name="invoice" value="issued"{% if invoice == 'issued' %} checked{% endif %} />
+          <span>Kesildi</span>
+        </label>
+        <label>
+          <input type="radio" name="invoice" value="not_issued"{% if invoice == 'not_issued' %} checked{% endif %} />
+          <span>Kesilmedi</span>
+        </label>
+      </div>
+    </div>
+    <div class="sale-filter">
+      <span class="sale-filter-kicker">Müşteri</span>
+      <div class="sale-filter-opts">
+        <label>
+          <input type="radio" name="kind" value=""{% if not kind %} checked{% endif %} />
+          <span>Tümü</span>
+        </label>
+        <label>
+          <input type="radio" name="kind" value="legal"{% if kind == 'legal' %} checked{% endif %} />
+          <span>Tüzel</span>
+        </label>
+        <label>
+          <input type="radio" name="kind" value="real"{% if kind == 'real' %} checked{% endif %} />
+          <span>Gerçek</span>
+        </label>
+      </div>
+    </div>
+  </div>
+</form>
+
+{% if party_filter %}
+<nav class="sale-years" aria-label="Müşteri süzgeci">
+  <a class="is-on" href="{{ clear_party_href }}">{{ party_filter.display_name }}</a>
+</nav>
+{% endif %}
+
+<div class="sheet-wrap sale-sheet">
+  <table class="sheet">
+    <thead>
+      <tr>
+        <th>Tarih</th>
+        <th>No</th>
+        <th>Müşteri</th>
+        <th>İş</th>
+        <th>Genel</th>
+        <th>Tahsil</th>
+        <th>Kalan</th>
+        <th>Fatura</th>
+        <th>Giren</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sale in sales %}
+      <tr class="sale-row">
+        <td>{{ sale.date|date:'d.m.Y' }}</td>
+        <td><a class="sale-row-go" href="{{ sale.get_absolute_url }}">{{ sale.number }}</a></td>
+        <td>{{ sale.party.display_name }}</td>
+        <td>{{ sale.get_work_type_display }}</td>
+        <td class="money">{{ sale.grand_total|tr_money }} ₺</td>
+        <td class="money">{{ sale.paid_sum|tr_money }} ₺</td>
+        <td class="money{% if sale.remain_sum > 0 %} is-over{% endif %}">{{ sale.remain_sum|tr_money }} ₺</td>
+        <td>{{ sale.get_invoice_status_display }}</td>
+        <td>{{ sale.created_by.username }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="9" class="empty">{{ empty_copy }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if paginator.count %}
+<p class="pager-meta">{{ page_obj.start_index }}–{{ page_obj.end_index }} / {{ paginator.count }}</p>
+{% endif %}
+<nav class="pager" aria-label="Sayfa"{% if paginator.num_pages <= 1 %} hidden{% endif %}>
+  {% if page_obj.has_previous %}
+  <a href="{{ prev_href }}">‹</a>
+  {% else %}
+  <span class="is-off">‹</span>
+  {% endif %}
+  {% for item in page_links %}
+    {% if item.gap %}
+    <span class="is-off">{{ item.label }}</span>
+    {% elif item.on %}
+    <a href="{{ item.href }}" class="is-on" aria-current="page">{{ item.label }}</a>
+    {% else %}
+    <a href="{{ item.href }}">{{ item.label }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page_obj.has_next %}
+  <a href="{{ next_href }}">›</a>
+  {% else %}
+  <span class="is-off">›</span>
+  {% endif %}
+</nav>
+
+<script>
+  (function () {
+    var form = document.querySelector('[data-sale-filters]');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      form.querySelectorAll('input').forEach(function (el) {
+        if (el.disabled) return;
+        if (!String(el.value || '').trim()) el.disabled = true;
+      });
+    });
+    form.querySelectorAll('.sale-filter input').forEach(function (el) {
+      el.addEventListener('change', function () {
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.submit();
+      });
+    });
+  })();
+</script>

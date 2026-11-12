@@ -1,0 +1,93 @@
+{% load portal_fmt %}
+{% if pay_remaining > 0 %}
+<div class="modal" id="pay-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <span class="fis-kicker">Tahsilat</span>
+      <h2>{{ pay_title|default:'Ödeme ekle' }}</h2>
+      <p class="step-copy">{{ pay_copy }}</p>
+    </div>
+    <form method="post" id="pay-form" novalidate data-remaining="{{ pay_remaining }}" data-grand="{{ pay_grand }}" data-paid="{{ pay_paid }}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="payment" />
+      <div class="modal-seg">
+        <div class="seg">
+          {% for value, label in pay_choices %}
+          <label>
+            <input type="radio" name="pay_method" value="{{ value }}"{% if pay_method == value or not pay_method and forloop.first %} checked{% endif %} />
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="totals">
+          <span>Genel <b>{{ pay_grand|tr_money }} ₺</b></span>
+          <span>Tahsil <b>{{ pay_paid|tr_money }} ₺</b></span>
+          <span>Kalan <b class="is-over" id="pay-rest-label">{{ pay_remaining|tr_money }} ₺</b></span>
+        </div>
+        {% include 'portal/_datepicker.html' with date_name='pay_date' date_value=pay_date|default:today date_kicker='Tarih' %}
+        <div class="group">
+          <div class="row">
+            <input id="id_pay_amount" name="pay_amount" inputmode="decimal" placeholder=" " required value="{{ pay_amount }}" autocomplete="off" />
+            <label for="id_pay_amount">Tutar (kalan {{ pay_remaining|tr_money }} ₺)</label>
+          </div>
+        </div>
+        <div id="card-pay-meta" class="{% if pay_method == 'card' %}is-open{% endif %}"{% if pay_method != 'card' %} hidden{% endif %}>
+          <div class="pay-meta-inner">
+            <p class="field-label">Mail order</p>
+            <div class="group">
+              <div class="row">
+                <input id="id_card_holder" name="card_holder" placeholder=" " data-upper autocomplete="off" value="{{ card_holder }}"{% if pay_method == 'card' %} required{% endif %} />
+                <label for="id_card_holder">Kart üzerindeki ad soyad</label>
+              </div>
+            </div>
+            <p class="field-label">Taksit</p>
+            {% include 'portal/_card_installments.html' %}
+          </div>
+        </div>
+        <div id="transfer-pay-meta" class="{% if pay_method == 'transfer' %}is-open{% endif %}"{% if pay_method != 'transfer' %} hidden{% endif %}>
+          <div class="pay-meta-inner">
+            <p class="field-label">Havale</p>
+            <div class="group">
+              <div class="row">
+                <input id="id_transfer_sender" name="transfer_sender" placeholder=" " data-upper autocomplete="off" value="{{ transfer_sender }}"{% if pay_method == 'transfer' %} required{% endif %} />
+                <label for="id_transfer_sender">Havale eden ad soyad</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="hint" id="pay-after">Bu ödeme sonrası kalan {{ pay_remaining|tr_money }} ₺.</p>
+      </div>
+      <p class="modal-alert" id="pay-error"{% if not pay_open or not error %} hidden{% endif %} role="alert">{% if pay_open %}{{ error }}{% endif %}</p>
+      <div class="wizard-nav modal-foot">
+        <button class="btn is-ghost" type="button" id="close-pay">Vazgeç</button>
+        <button class="btn" type="submit" id="save-pay">Kaydet</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="modal" id="delete-pay-modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <span class="fis-kicker">Tahsilat</span>
+      <h2>Tahsilatı sil</h2>
+      <p class="step-copy" id="delete-pay-copy">Bu tahsilat silinecek. Kalan borç güncellenir.</p>
+    </div>
+    <form method="post" id="delete-pay-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_payment" />
+      <input type="hidden" name="payment_id" id="delete-pay-id" value="" />
+      <p class="modal-alert" id="delete-pay-error" hidden role="alert"></p>
+      <div class="wizard-nav modal-foot">
+        <button class="btn is-ghost" type="button" id="close-delete-pay">Vazgeç</button>
+        <button class="btn" type="submit" id="delete-pay-btn">
+          <span class="btn-label">Sil</span>
+          <span class="btn-spin" aria-hidden="true"></span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

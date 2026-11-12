@@ -13,6 +13,7 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  skipTrailingSlashRedirect: true,
   output: 'standalone',
   productionBrowserSourceMaps: false,
   experimental: {

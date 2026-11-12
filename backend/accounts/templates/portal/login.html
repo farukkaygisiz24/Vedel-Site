@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    {% include 'portal/_viewport.html' %}
+    <title>Giriş | Vedel Servis</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg0: #e8eaef;
+        --bg1: #f5f5f7;
+        --label: #1d1d1f;
+        --secondary: #6e6e73;
+        --hairline: rgba(0, 0, 0, 0.08);
+        --fill: rgba(255, 255, 255, 0.72);
+        --field: #fff;
+        --accent: #dc2626;
+        --danger: #e30000;
+        --vedel: #1f4a44;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { background: #eeecea; zoom: 1; }
+
+      html { width: 100%; min-height: 100%; }
+
+      body {
+        position: relative;
+        isolation: isolate;
+        width: 100%;
+        margin: 0;
+        min-height: 100vh;
+        min-height: 100dvh;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+          "Helvetica Neue", Helvetica, Arial, sans-serif;
+        color: var(--label);
+        background: #eeecea;
+        display: grid;
+        place-items: center;
+        padding: 32px 20px;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+        transition: padding 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(720px 380px at 12% -8%, rgba(220, 38, 38, 0.12), transparent 58%),
+          radial-gradient(640px 420px at 96% 108%, rgba(31, 74, 68, 0.16), transparent 55%);
+      }
+
+      @media (max-width: 860px) {
+        /* Safari üst/alt çubukları düz renkle boyar: katman çubukların arkasına taşar, ışıltılar
+           ekran kenarına varmadan söner ki çubuklarla sayfa arasında çizgi oluşmasın. */
+        body::before {
+          --bleed-top: calc(env(safe-area-inset-top, 0px) + 120px);
+          --bleed-bottom: calc(env(safe-area-inset-bottom, 0px) + 160px);
+          inset: calc(-1 * var(--bleed-top)) 0 calc(-1 * var(--bleed-bottom));
+          background:
+            radial-gradient(720px 380px at 12% calc(var(--bleed-top) + 230px), rgba(220, 38, 38, 0.12), transparent 58%),
+            radial-gradient(640px 420px at 96% calc(100% - var(--bleed-bottom) - 240px), rgba(31, 74, 68, 0.16), transparent 55%);
+        }
+      }
+
+      .stage {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: stretch;
+        width: min(100%, 420px);
+        background: var(--fill);
+        backdrop-filter: saturate(180%) blur(40px);
+        -webkit-backdrop-filter: saturate(180%) blur(40px);
+        border-radius: 4px;
+        box-shadow:
+          0 0 0 0.5px rgba(0, 0, 0, 0.06),
+          0 18px 50px rgba(0, 0, 0, 0.14),
+          0 2px 8px rgba(0, 0, 0, 0.04);
+        overflow: hidden;
+        transition:
+          width 0.72s cubic-bezier(0.22, 1, 0.36, 1),
+          border-radius 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+          box-shadow 0.8s ease;
+      }
+
+      .stage.has-weather.is-open {
+        width: min(100%, 700px);
+      }
+
+      .weather {
+        flex: 0 0 0;
+        width: 0;
+        max-width: 0;
+        min-width: 0;
+        overflow: hidden;
+        color: var(--vedel);
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.42) 0%, rgba(232, 236, 240, 0.88) 100%);
+        border-right: 0 solid transparent;
+        transition: flex-basis 0.72s cubic-bezier(0.22, 1, 0.36, 1),
+          width 0.72s cubic-bezier(0.22, 1, 0.36, 1),
+          max-width 0.72s cubic-bezier(0.22, 1, 0.36, 1),
+          border-color 0.3s ease;
+      }
+
+      .stage.is-open .weather {
+        flex-basis: 280px;
+        width: 280px;
+        max-width: 280px;
+        border-right: 0.5px solid var(--hairline);
+      }
+
+      .weather-inner {
+        width: 280px;
+        height: 100%;
+        padding: 28px 22px 24px;
+        display: flex;
+        flex-direction: column;
+        opacity: 0;
+        transform: translateX(-18px);
+        transition: opacity 0.45s ease 0.18s, transform 0.72s cubic-bezier(0.22, 1, 0.36, 1) 0.08s;
+      }
+
+      .stage.is-open .weather-inner {
+        opacity: 1;
+        transform: none;
+      }
+
+      .weather-city {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 590;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--secondary);
+      }
+
+      .weather-now {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .weather-icon {
+        width: 42px;
+        height: 42px;
+        color: var(--vedel);
+      }
+
+      .weather-icon svg,
+      .weather-days svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .weather-temp {
+        font-size: 56px;
+        font-weight: 590;
+        letter-spacing: -0.05em;
+        line-height: 0.9;
+        color: var(--label);
+      }
+
+      .weather-label {
+        margin: 8px 0 0;
+        font-size: 16px;
+        font-weight: 510;
+        letter-spacing: -0.02em;
+        color: var(--label);
+      }
+
+      .weather-meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 12px;
+        margin: 22px 0 0;
+      }
+
+      .weather-meta div {
+        margin: 0;
+      }
+
+      .weather-meta dt {
+        font-size: 11px;
+        color: var(--secondary);
+        letter-spacing: -0.01em;
+      }
+
+      .weather-meta dd {
+        margin: 2px 0 0;
+        font-size: 15px;
+        font-weight: 590;
+        letter-spacing: -0.02em;
+        color: var(--label);
+      }
+
+      .weather-days {
+        list-style: none;
+        margin: auto 0 0;
+        padding: 16px 0 0;
+        border-top: 0.5px solid var(--hairline);
+      }
+
+      .weather-days li {
+        display: grid;
+        grid-template-columns: 52px 18px 1fr;
+        align-items: center;
+        gap: 10px;
+        min-height: 32px;
+        font-size: 13px;
+        letter-spacing: -0.01em;
+      }
+
+      .weather-days li span:last-child {
+        text-align: right;
+        color: var(--secondary);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .weather-days svg {
+        width: 18px;
+        height: 18px;
+        color: var(--vedel);
+      }
+
+      .window {
+        flex: 0 0 420px;
+        width: 420px;
+        max-width: 100%;
+        background: transparent;
+        transition: flex-basis 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+          width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      html.vedel-device-preview .stage,
+      html.vedel-device-preview .stage.has-weather.is-open {
+        flex-direction: column;
+        width: min(100%, 358px);
+      }
+
+      html.vedel-device-preview .weather,
+      html.vedel-device-preview .stage.is-open .weather,
+      html.vedel-device-preview .weather-inner,
+      html.vedel-device-preview .window {
+        width: 100%;
+      }
+
+      html.vedel-device-preview .weather {
+        flex-basis: 0;
+        max-height: 0;
+        border-right: 0;
+        border-bottom: 0;
+      }
+
+      html.vedel-device-preview .stage.is-open .weather {
+        flex-basis: auto;
+        max-width: none;
+        max-height: 96px;
+        border-bottom: 0.5px solid var(--hairline);
+      }
+
+      html.vedel-device-preview .weather-inner {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-rows: auto auto;
+        column-gap: 12px;
+        row-gap: 2px;
+        align-items: center;
+        width: 100%;
+        height: auto;
+        padding: 16px 20px 14px;
+        transform: none;
+      }
+
+      html.vedel-device-preview .weather-now {
+        display: contents;
+        margin: 0;
+      }
+
+      html.vedel-device-preview .weather-icon {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+        width: 36px;
+        height: 36px;
+        align-self: center;
+      }
+
+      html.vedel-device-preview .weather-city {
+        grid-column: 2;
+        grid-row: 1;
+      }
+
+      html.vedel-device-preview .weather-label {
+        grid-column: 2;
+        grid-row: 2;
+        margin: 0;
+        font-size: 15px;
+      }
+
+      html.vedel-device-preview .weather-temp {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        display: block;
+        align-self: center;
+        justify-self: end;
+        font-size: 28px;
+        font-weight: 590;
+        letter-spacing: -0.04em;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+
+      html.vedel-device-preview .weather-meta,
+      html.vedel-device-preview .weather-days {
+        display: none;
+      }
+
+      html.vedel-device-preview .window {
+        flex: 0 0 auto;
+      }
+
+      @media (max-width: 860px) {
+        .stage.has-weather.is-open {
+          flex-direction: column;
+          width: min(100%, 420px);
+        }
+
+        .weather,
+        .stage.is-open .weather,
+        .weather-inner,
+        .window {
+          width: 100%;
+        }
+
+        .weather {
+          flex-basis: 0;
+          max-height: 0;
+          border-right: 0;
+          border-bottom: 0;
+          transition: max-height 0.72s cubic-bezier(0.22, 1, 0.36, 1),
+            flex-basis 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        .stage.is-open .weather {
+          flex-basis: auto;
+          max-width: none;
+          max-height: 96px;
+          border-bottom: 0.5px solid var(--hairline);
+        }
+
+        .weather-inner {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          grid-template-rows: auto auto;
+          column-gap: 12px;
+          row-gap: 2px;
+          align-items: center;
+          width: 100%;
+          height: auto;
+          padding: 16px 20px 14px;
+          transform: none;
+        }
+
+        .weather-now {
+          display: contents;
+          margin: 0;
+        }
+
+        .weather-icon {
+          grid-column: 1;
+          grid-row: 1 / span 2;
+          width: 36px;
+          height: 36px;
+          align-self: center;
+        }
+
+        .weather-city {
+          grid-column: 2;
+          grid-row: 1;
+        }
+
+        .weather-label {
+          grid-column: 2;
+          grid-row: 2;
+          margin: 0;
+          font-size: 15px;
+        }
+
+        .weather-temp {
+          grid-column: 3;
+          grid-row: 1 / span 2;
+          display: block;
+          align-self: center;
+          justify-self: end;
+          font-size: 28px;
+          font-weight: 590;
+          letter-spacing: -0.04em;
+          line-height: 1;
+          font-variant-numeric: tabular-nums;
+        }
+
+        .weather-meta,
+        .weather-days {
+          display: none;
+        }
+
+        .window {
+          flex: 0 0 auto;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .stage,
+        .weather,
+        .weather-inner {
+          transition: none;
+        }
+      }
+
+      .body {
+        padding: 40px 32px 32px;
+      }
+
+      .mark {
+        width: 88px;
+        height: 88px;
+        margin: 0 auto 18px;
+      }
+
+      .mark img {
+        display: block;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      h1 {
+        margin: 0;
+        text-align: center;
+        font-size: 28px;
+        font-weight: 590;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+      }
+
+      .lead {
+        margin: 8px 0 28px;
+        text-align: center;
+        color: var(--secondary);
+        font-size: 15px;
+        line-height: 1.45;
+        letter-spacing: -0.01em;
+      }
+
+      .group {
+        background: var(--field);
+        border-radius: 4px;
+        box-shadow: 0 0 0 0.5px var(--hairline);
+        overflow: hidden;
+      }
+
+      .row {
+        position: relative;
+      }
+
+      .row + .row {
+        border-top: 0.5px solid var(--hairline);
+      }
+
+      .row label {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 17px;
+        font-weight: 400;
+        color: #c7c7cc;
+        letter-spacing: -0.022em;
+        pointer-events: none;
+        transition: top 0.18s ease, transform 0.18s ease, font-size 0.18s ease, color 0.18s ease;
+      }
+
+      #id_username {
+        text-transform: lowercase;
+      }
+
+      input {
+        width: 100%;
+        height: 56px;
+        border: 0;
+        background: transparent;
+        padding: 16px 14px;
+        font-size: 17px;
+        letter-spacing: -0.022em;
+        color: var(--label);
+        outline: none;
+        font-family: inherit;
+        transition: padding 0.18s ease, background 0.18s ease;
+      }
+
+      input:focus,
+      input:not(:placeholder-shown) {
+        padding: 24px 14px 8px;
+      }
+
+      input:focus + label,
+      input:not(:placeholder-shown) + label {
+        top: 8px;
+        transform: none;
+        font-size: 11px;
+        color: #aeaeb2;
+      }
+
+      input:focus + label {
+        color: var(--accent);
+      }
+
+      input:focus {
+        background: rgba(220, 38, 38, 0.05);
+      }
+
+      .error {
+        margin: 12px 0 0;
+        min-height: 18px;
+        color: var(--danger);
+        font-size: 13px;
+        line-height: 18px;
+        text-align: center;
+        visibility: hidden;
+      }
+
+      .error.is-visible {
+        visibility: visible;
+      }
+
+      .submit-row {
+        display: flex;
+        justify-content: center;
+        margin-top: 18px;
+      }
+
+      button {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex: 1 1 auto;
+        width: 100%;
+        height: 44px;
+        padding: 0;
+        overflow: hidden;
+        border: 0;
+        border-radius: 980px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 17px;
+        font-weight: 590;
+        letter-spacing: -0.022em;
+        font-family: inherit;
+        cursor: pointer;
+        transition:
+          flex-basis 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+          width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+          max-width 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+          filter 0.15s ease;
+      }
+
+      button:hover { filter: brightness(1.06); }
+      button:active:not(.is-loading) { transform: scale(0.99); }
+
+      button .label {
+        position: relative;
+        z-index: 1;
+        white-space: nowrap;
+        transition: opacity 0.16s ease;
+      }
+
+      button .spinner {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      button .spinner-disc {
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.28);
+        border-top-color: #fff;
+        border-radius: 50%;
+      }
+
+      button.is-loading {
+        flex: 0 0 44px;
+        width: 44px;
+        max-width: 44px;
+        height: 44px;
+        transform: none;
+        cursor: progress;
+        pointer-events: none;
+      }
+
+      button.is-loading .label {
+        opacity: 0;
+      }
+
+      button.is-loading .spinner {
+        opacity: 1;
+      }
+
+      button.is-loading .spinner-disc {
+        animation: spin 0.65s linear infinite;
+      }
+
+      @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage{% if weather %} has-weather{% endif %}{% if error %} is-open{% endif %}">
+      {% if weather %}
+      <aside class="weather" aria-label="Bursa hava durumu">
+        <div class="weather-inner">
+          <p class="weather-city">{{ weather.city }}</p>
+          <div class="weather-now">
+            <span class="weather-icon">{% include 'portal/weather_icon.html' with icon=weather.icon %}</span>
+            <span class="weather-temp">{{ weather.temp }}°</span>
+          </div>
+          <p class="weather-label">{{ weather.label }}</p>
+          <dl class="weather-meta">
+            <div>
+              <dt>Hissedilen</dt>
+              <dd>{{ weather.feels }}°</dd>
+            </div>
+            <div>
+              <dt>Nem</dt>
+              <dd>%{{ weather.humidity }}</dd>
+            </div>
+            <div>
+              <dt>Rüzgar</dt>
+              <dd>{{ weather.wind }} km/s</dd>
+            </div>
+          </dl>
+          <ul class="weather-days">
+            {% for day in weather.days %}
+            <li>
+              <span>{{ day.name }}</span>
+              {% include 'portal/weather_icon.html' with icon=day.icon %}
+              <span>{{ day.max }}° / {{ day.min }}°</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </aside>
+      {% endif %}
+      <main class="window" role="dialog" aria-labelledby="login-title">
+      <div class="body">
+        <div class="mark">
+          <img src="{% url 'portal-logo' %}" alt="Vedel Klima" width="88" height="88" />
+        </div>
+        <h1 id="login-title">Giriş yapın</h1>
+        <p class="lead">Servis paneline devam etmek için hesabınızla giriş yapın.</p>
+        <form method="post" action="{% url 'portal-login' %}" id="login-form">
+          {% csrf_token %}
+          <div class="group">
+            <div class="row">
+              <input id="id_username" name="username" value="{{ username|lower }}" placeholder=" " autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" data-lower required />
+              <label for="id_username">Kullanıcı adı</label>
+            </div>
+            <div class="row">
+              <input id="id_password" name="password" type="password" placeholder=" " autocomplete="current-password" required />
+              <label for="id_password">Şifre</label>
+            </div>
+          </div>
+          <p class="error{% if error %} is-visible{% endif %}" id="login-error" role="alert">{{ error }}</p>
+          <div class="submit-row">
+            <button type="submit" id="login-submit">
+              <span class="label">Giriş yap</span>
+              <span class="spinner" aria-hidden="true"><span class="spinner-disc"></span></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </main>
+        <script>
+          (function () {
+            var form = document.getElementById('login-form');
+            var button = document.getElementById('login-submit');
+            var errorEl = document.getElementById('login-error');
+            var userEl = document.getElementById('id_username');
+            var stage = document.querySelector('.stage');
+            function foldUsername() {
+              if (!userEl) return;
+              // İ -> i: JS turns it into "i" plus a combining dot otherwise
+              var next = String(userEl.value || '').replace(/İ/g, 'i').toLowerCase();
+              if (next === userEl.value) return;
+              var start = userEl.selectionStart;
+              var end = userEl.selectionEnd;
+              userEl.value = next;
+              try { userEl.setSelectionRange(start, end); } catch (err) {}
+            }
+            if (userEl) {
+              // Rewriting the value while typing breaks the iOS keyboard (suggestions, cursor);
+              // CSS shows it lowercase, the value is folded on blur and before submit.
+              foldUsername();
+              userEl.addEventListener('blur', foldUsername);
+            }
+            var weatherKey = 'vedel-portal-weather-open';
+            function setError(message) {
+              errorEl.textContent = message || '';
+              errorEl.classList.toggle('is-visible', Boolean(message));
+            }
+            function fieldFocused() {
+              return Boolean(document.activeElement && form.contains(document.activeElement));
+            }
+            // Telefonda klavye açılınca kartı küçültmeden, alanlar ve buton klavyenin hemen üstünde
+            // kalacak kadar tek hareketle yukarı kaydır; klavye kapanınca geri indir.
+            var touchQuery = window.matchMedia ? window.matchMedia('(pointer: coarse) and (max-width: 860px)') : null;
+            var group = form.querySelector('.group');
+            var lifted = 0;
+            var liftTimer;
+            function setLift(next) {
+              if (Math.abs(next - lifted) < 2) return;
+              lifted = next;
+              window.clearTimeout(liftTimer);
+              stage.style.transition = 'transform 0.32s cubic-bezier(0.22, 1, 0.36, 1)';
+              stage.style.transform = next ? 'translateY(' + (-next) + 'px)' : '';
+              liftTimer = window.setTimeout(function () {
+                stage.style.transition = '';
+              }, 340);
+            }
+            // Sayfadaki konum: transform'dan etkilenmez, animasyon sürerken de aynı sonucu verir.
+            function pageTop(el) {
+              var top = 0;
+              while (el) {
+                top += el.offsetTop;
+                el = el.offsetParent;
+              }
+              return top;
+            }
+            var fullHeight = window.visualViewport ? window.visualViewport.height : 0;
+            function syncLift() {
+              var vv = window.visualViewport;
+              if (!vv || !touchQuery || !touchQuery.matches) return;
+              if (!fieldFocused()) fullHeight = Math.max(vv.height, window.innerHeight);
+              var keyboardOpen = fullHeight - vv.height > 120;
+              if (document.body.classList.contains('is-app') || !fieldFocused() || !keyboardOpen) {
+                setLift(0);
+                return;
+              }
+              // iOS sayfayı kendisi de kaydırabilir; vv.pageTop bunu hesaba katar.
+              var visibleTop = vv.pageTop + 12;
+              var visibleBottom = vv.pageTop + vv.height - 12;
+              var next = Math.max(0, pageTop(button) + button.offsetHeight - visibleBottom);
+              next = Math.min(next, Math.max(0, pageTop(group) - visibleTop));
+              setLift(next);
+            }
+            if (window.visualViewport) {
+              window.visualViewport.addEventListener('resize', syncLift);
+              window.visualViewport.addEventListener('scroll', syncLift);
+            }
+            form.addEventListener('focusin', function () {
+              window.setTimeout(syncLift, 60);
+            });
+            form.addEventListener('focusout', function () {
+              // Alanlar arasında geçerken focusout/focusin arka arkaya gelir; kart yerinde kalsın.
+              window.setTimeout(syncLift, 150);
+            });
+            form.addEventListener('submit', function (event) {
+              event.preventDefault();
+              if (button.classList.contains('is-loading')) return;
+              foldUsername();
+              // Klavyeyi kapat; kart spinner öncesi yerine insin.
+              if (touchQuery && touchQuery.matches && fieldFocused()) document.activeElement.blur();
+              button.classList.add('is-loading');
+              button.setAttribute('aria-busy', 'true');
+              var minWait = new Promise(function (resolve) {
+                window.setTimeout(resolve, 2000);
+              });
+              var request = fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: {
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'Accept': 'application/json'
+                },
+                credentials: 'same-origin'
+              }).then(function (response) {
+                return response.json().then(function (data) {
+                  return { ok: response.ok && data.ok, data: data };
+                });
+              }).catch(function () {
+                return { ok: false, data: { error: 'Bağlantı kurulamadı. Yeniden deneyin.' } };
+              });
+              request.then(function (result) {
+                if (result.ok && result.data && result.data.redirect) {
+                  if (result.data.field) {
+                    window.location.replace(result.data.redirect);
+                    return;
+                  }
+                  return minWait.then(function () {
+                    window.location.replace(result.data.redirect);
+                  });
+                }
+                return minWait.then(function () { return result; });
+              }).then(function (result) {
+                if (!result) return;
+                button.classList.remove('is-loading');
+                button.removeAttribute('aria-busy');
+                setError((result.data && result.data.error) || 'Kullanıcı adı veya şifre hatalı.');
+              });
+            });
+
+            if (!stage || !stage.classList.contains('has-weather')) return;
+            function rememberWeather() {
+              try { sessionStorage.setItem(weatherKey, '1'); } catch (err) {}
+            }
+            function weatherWasOpen() {
+              try { return sessionStorage.getItem(weatherKey) === '1'; } catch (err) { return false; }
+            }
+            function openWeather() {
+              if (stage.classList.contains('is-open') || weatherWasOpen()) {
+                stage.classList.add('is-open');
+                rememberWeather();
+                return;
+              }
+              function reveal() {
+                // Klavye açıkken panelin büyümesi kartı kaydırır; odak bitene kadar bekle.
+                if (fieldFocused()) {
+                  form.addEventListener('focusout', function () {
+                    window.setTimeout(reveal, 150);
+                  }, { once: true });
+                  return;
+                }
+                stage.classList.add('is-open');
+                rememberWeather();
+              }
+              window.setTimeout(reveal, 1000);
+            }
+            if (document.readyState === 'complete') {
+              openWeather();
+            } else {
+              window.addEventListener('load', openWeather);
+            }
+          })();
+        </script>
+    </div>
+  </body>
+</html>

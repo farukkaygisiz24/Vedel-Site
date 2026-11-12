@@ -1,0 +1,269 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}{{ account.username }} | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="fis">
+    <div class="toolbar">
+      <div>
+        <h1>{{ account.username }}</h1>
+        <div class="fis-meta">
+          <span class="fis-chip">{{ account.role_label }}</span>
+          <span class="fis-chip">{% if account.is_active %}Aktif{% else %}Pasif{% endif %}</span>
+        </div>
+      </div>
+      <div class="fis-toolbar-actions">
+        <a class="btn is-ghost" href="{% url 'portal-users' %}">Listeye dön</a>
+      </div>
+    </div>
+    {% if error and not edit_open %}<p class="flash is-err" role="alert">{{ error }}</p>{% endif %}
+
+    <section class="fis-letter">
+      <div class="fis-letter-head">
+        <div>
+          <span class="fis-kicker">Sistem kullanıcısı</span>
+          <div class="fis-name">{{ account.display_name }}</div>
+          <p>{{ account.username }}</p>
+        </div>
+        {% if can_edit %}
+        <button class="btn is-ghost" type="button" id="open-user-edit">Düzenle</button>
+        {% endif %}
+      </div>
+      <dl class="fis-facts">
+        <div>
+          <dt>Kullanıcı adı</dt>
+          <dd>{{ account.username }}</dd>
+        </div>
+        <div>
+          <dt>Rol</dt>
+          <dd>{{ account.role_label }}</dd>
+        </div>
+        <div>
+          <dt>Durum</dt>
+          <dd>{% if account.is_active %}Aktif{% else %}Pasif{% endif %}</dd>
+        </div>
+        {% if account.email %}
+        <div>
+          <dt>E-posta</dt>
+          <dd>{{ account.email }}</dd>
+        </div>
+        {% endif %}
+        {% if account.phone %}
+        <div>
+          <dt>Telefon</dt>
+          <dd>{{ account.phone|tel_link }}</dd>
+        </div>
+        {% endif %}
+        <div>
+          <dt>Son giriş</dt>
+          <dd>{% if account.last_login %}{{ account.last_login|date:'d.m.Y H:i' }}{% else %}—{% endif %}</dd>
+        </div>
+        <div>
+          <dt>Kayıt</dt>
+          <dd>{{ account.date_joined|date:'d.m.Y' }}</dd>
+        </div>
+        {% if account.role == 'service' or account.role == 'service_lead' %}
+        <div>
+          <dt>Personel</dt>
+          <dd>
+            {% if account.crew_profile %}
+            <a href="{{ account.crew_profile.get_absolute_url }}">{{ account.crew_profile.display_name }} · {{ account.crew_profile.number }}</a>
+            {% else %}
+            Atanmadı
+            {% endif %}
+          </dd>
+        </div>
+        {% endif %}
+        {% if account.role == 'service' %}
+        <div>
+          <dt>Depo</dt>
+          <dd>{% for item in account.stock_categories.all %}{{ item.name }}{% if not forloop.last %}, {% endif %}{% empty %}Atanmadı{% endfor %}</dd>
+        </div>
+        {% endif %}
+      </dl>
+    </section>
+
+    {% if can_manage %}
+    <div class="fis-settle">
+      <section class="fis-card is-split">
+        <div>
+          <p class="field-label">Giriş</p>
+          <div class="fis-flag{% if not account.is_active %} is-due{% endif %}">
+            <div>
+              <b>{% if account.is_active %}Açık{% else %}Kapalı{% endif %}</b>
+              <small>{% if account.is_active %}Panele giriş yapabilir.{% else %}Pasif hesap giriş yapamaz.{% endif %}</small>
+            </div>
+          </div>
+        </div>
+        {% if account.is_active %}
+        <button
+          class="btn is-ghost"
+          type="button"
+          data-user-action="deactivate"
+          data-user-title="Hesabı pasife al"
+          data-user-copy="{{ account.username }} panele giremez. Kayıt listede kalır; sonra yeniden açılabilir."
+        >Pasife al</button>
+        {% else %}
+        <form method="post" action="{{ account.get_absolute_url }}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="activate" />
+          <button class="btn" type="submit">Aktif et</button>
+        </form>
+        {% endif %}
+      </section>
+    </div>
+    {% if not account.is_superuser %}
+    <div class="fis-delete">
+      <button
+        class="btn is-ghost is-danger"
+        type="button"
+        data-user-action="delete"
+        data-user-title="Hesabı sil"
+        data-user-copy="{{ account.username }} silinecek. Satış veya stok kaydı varsa silinemez; pasife alın."
+      >Hesabı sil</button>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+
+  {% if can_edit %}
+  <div class="modal" id="user-edit-modal"{% if not edit_open %} hidden{% endif %}>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Sistem kullanıcısı</span>
+        <h2>Hesabı düzenle</h2>
+        <p class="step-copy">Ad, iletişim, personel ve şifre.</p>
+      </div>
+      <form id="user-edit-form" method="post" action="{{ account.get_absolute_url }}" autocomplete="off">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save" />
+        <div class="modal-body">
+          {% include 'portal/_user_fields.html' %}
+        </div>
+        <p class="modal-alert" id="user-edit-error"{% if not edit_open or not error %} hidden{% endif %} role="alert">{% if edit_open %}{{ error }}{% endif %}</p>
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-user-edit">Vazgeç</button>
+          <button class="btn" type="submit">Kaydet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {% if can_manage %}
+  <div class="modal" id="user-action-modal" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <span class="fis-kicker">Sistem kullanıcısı</span>
+        <h2 id="user-action-title">Hesabı pasife al</h2>
+        <p class="step-copy" id="user-action-copy"></p>
+      </div>
+      <form method="post" action="{{ account.get_absolute_url }}" id="user-action-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="user-action-field" value="" />
+        <div class="wizard-nav modal-foot">
+          <button class="btn is-ghost" type="button" id="close-user-action">Vazgeç</button>
+          <button class="btn" type="submit" id="user-action-submit">Onayla</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <script>
+    (function () {
+      function reduceMotion() {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+      function bindModal(modal, onHide) {
+        if (!modal) return { reveal: function () {}, hide: function () {}, isOpen: function () { return false; } };
+        function reveal() {
+          modal.hidden = false;
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { modal.classList.add('is-on'); });
+          });
+        }
+        function hide() {
+          modal.classList.remove('is-on');
+          var done = function () { modal.hidden = true; };
+          if (reduceMotion()) { done(); return; }
+          window.setTimeout(done, 280);
+        }
+        modal.addEventListener('click', function (event) {
+          if (event.target === modal && onHide) onHide();
+        });
+        return { reveal: reveal, hide: hide, isOpen: function () { return !modal.hidden; } };
+      }
+
+      var editModal = document.getElementById('user-edit-modal');
+      var editForm = document.getElementById('user-edit-form');
+      var openEdit = document.getElementById('open-user-edit');
+      var closeEdit = document.getElementById('close-user-edit');
+      var editCtl;
+      var editDirty = function () { return false; };
+      if (editModal && editForm && openEdit) {
+        function snapshot() {
+          var snap = {};
+          editForm.querySelectorAll('input, select, textarea').forEach(function (el) {
+            if (el.disabled || el.type === 'hidden' || el.type === 'submit') return;
+            snap[el.name || el.id] = el.type === 'checkbox' ? el.checked : el.value;
+          });
+          editForm._snap = snap;
+        }
+        editDirty = function () {
+          if (!editForm._snap) return false;
+          var changed = false;
+          editForm.querySelectorAll('input, select, textarea').forEach(function (el) {
+            if (changed || el.disabled || el.type === 'hidden' || el.type === 'submit') return;
+            var now = el.type === 'checkbox' ? el.checked : el.value;
+            if (editForm._snap[el.name || el.id] !== now) changed = true;
+          });
+          return changed;
+        };
+        function requestHideEdit() {
+          if (editDirty() && !window.confirm('Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?')) return;
+          editCtl.hide();
+        }
+        editCtl = bindModal(editModal, requestHideEdit);
+        openEdit.addEventListener('click', function () {
+          editCtl.reveal();
+          snapshot();
+        });
+        if (closeEdit) closeEdit.addEventListener('click', requestHideEdit);
+        if (!editModal.hidden) {
+          requestAnimationFrame(function () { editModal.classList.add('is-on'); });
+          snapshot();
+        }
+      }
+
+      var actionModal = document.getElementById('user-action-modal');
+      var actionField = document.getElementById('user-action-field');
+      var actionTitle = document.getElementById('user-action-title');
+      var actionCopy = document.getElementById('user-action-copy');
+      var actionSubmit = document.getElementById('user-action-submit');
+      var closeAction = document.getElementById('close-user-action');
+      var actionCtl = bindModal(actionModal, function () { actionCtl.hide(); });
+      document.querySelectorAll('[data-user-action]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (!actionModal || !actionField) return;
+          actionField.value = btn.getAttribute('data-user-action') || '';
+          if (actionTitle) actionTitle.textContent = btn.getAttribute('data-user-title') || '';
+          if (actionCopy) actionCopy.textContent = btn.getAttribute('data-user-copy') || '';
+          if (actionSubmit) actionSubmit.classList.toggle('is-ghost', false);
+          actionCtl.reveal();
+        });
+      });
+      if (closeAction) closeAction.addEventListener('click', function () { actionCtl.hide(); });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== 'Escape') return;
+        if (actionCtl.isOpen()) { actionCtl.hide(); return; }
+        if (editCtl && editCtl.isOpen()) {
+          if (editDirty() && !window.confirm('Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?')) return;
+          editCtl.hide();
+        }
+      });
+    })();
+  </script>
+  {% endif %}
+{% endblock %}
