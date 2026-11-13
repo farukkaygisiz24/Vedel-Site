@@ -26,6 +26,8 @@ from stock.services import SERVICE_CATEGORY_SLUG
 from .models import Device, Job, JobLine
 from .services import (
     DAY_CAP,
+    due_maintenance,
+    missed_jobs,
     SERVICE_HOUR_LABELS,
     _resolve_assignment,
     _resolve_device,
@@ -42,6 +44,7 @@ from .services import (
     sale_line_is_device,
     save_field_job,
     save_job,
+    copper_mount_summary,
     sold_unit_groups,
     unassigned_sold_units,
     unit_photo_response,
@@ -49,7 +52,7 @@ from .services import (
 )
 
 JOB_PAGE_SIZE = 20
-REMINDER_WINDOW_DAYS = 14
+from .services import MAINTENANCE_WINDOW_DAYS as REMINDER_WINDOW_DAYS  # noqa: E402
 TR_MONTHS = [
     'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
     'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara',
@@ -394,10 +397,7 @@ def schedule(request: HttpRequest) -> HttpResponse:
             .order_by('date', 'time', 'id')
         )
         missed = (
-            Job.objects.filter(
-                Q(status=Job.STATUS_PENDING, date__lt=today)
-                | Q(status=Job.STATUS_OPEN, date__lt=today)
-            )
+            missed_jobs(today)
             .select_related(*related)
             .order_by('date', 'time', 'id')
         )
@@ -589,9 +589,11 @@ def _job_form_context(request: HttpRequest, job: Job | None = None, error=''):
             work_id = str(work_line.product_id)
             work_name = work_line.product.name
     assignee_id, assignee_name = assignment_form_values(job)
+    copper_summary = copper_mount_summary(job) if job and job.sale_id else None
     return {
         'job': job,
         'error': error,
+        'copper_summary': copper_summary,
         'office_close': office_close,
         'initial_party': {
             'id': party.pk,
@@ -874,6 +876,7 @@ def job_detail(request: HttpRequest, number: str) -> HttpResponse:
             sold_groups=sold_groups,
             unassigned_units=unassigned_units,
             multi_packs=[group['pack'] for group in sold_groups if group.get('kind') == 'multi'],
+            copper_summary=copper_mount_summary(job),
             error=error,
             allocations=allocations,
             payments=payments,
@@ -900,12 +903,43 @@ def job_detail(request: HttpRequest, number: str) -> HttpResponse:
     )
 
 
+BELL_LIMIT = 8
+
+
+@role_required(Customer.ROLE_SERVICE_LEAD)
+def reminders_summary(request: HttpRequest) -> JsonResponse:
+    """Topbar bell: overdue + upcoming (14 days) maintenance."""
+    today = timezone.localdate()
+    qs = due_maintenance(today, REMINDER_WINDOW_DAYS).select_related('party').order_by('next_due', 'name')
+    overdue = qs.filter(next_due__lt=today).count()
+    total = qs.count()
+    items = [
+        {
+            'party': item.party.display_name if item.party_id else '',
+            'device': item.name,
+            'interval': item.interval_months,
+            'due': item.next_due.strftime('%d.%m.%Y'),
+            'overdue': item.next_due < today,
+        }
+        for item in qs[:BELL_LIMIT]
+    ]
+    return JsonResponse(
+        {
+            'ok': True,
+            'overdue': overdue,
+            'soon': total - overdue,
+            'total': total,
+            'items': items,
+            'url': reverse('portal-service-reminders'),
+        }
+    )
+
+
 @role_required(Customer.ROLE_SERVICE_LEAD)
 def reminders(request: HttpRequest) -> HttpResponse:
     today = timezone.localdate()
-    horizon = today + timedelta(days=REMINDER_WINDOW_DAYS)
     qs = (
-        Device.objects.filter(next_due__isnull=False, next_due__lte=horizon)
+        due_maintenance(today, REMINDER_WINDOW_DAYS)
         .select_related('party')
         .order_by('next_due', 'name')
     )

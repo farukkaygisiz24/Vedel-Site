@@ -1,0 +1,36 @@
+{% load portal_fmt %}
+<section class="dash-block">
+  <div class="dash-head">
+    <p class="field-label">{{ title }} · {{ rev.current.label }}</p>
+    <a class="btn is-ghost" href="{% url link_name %}">Liste</a>
+  </div>
+  <div class="party-stats">
+    <div class="party-stat">
+      <span>Bu ay</span>
+      <b class="money">{{ rev.current.total|tr_money }} ₺</b>
+      <small>{{ rev.current.count }} kayıt</small>
+    </div>
+    <div class="party-stat">
+      <span>{{ rev.previous.label }}</span>
+      <b class="money">{{ rev.previous.total|tr_money }} ₺</b>
+      <small>{{ rev.previous.count }} kayıt</small>
+    </div>
+    <div class="party-stat">
+      <span>Fark</span>
+      {% if rev.delta_pct is None %}
+      <b>—</b>
+      {% elif rev.delta_pct >= 0 %}
+      <b class="is-up">↑ %{{ rev.delta_pct }}</b>
+      {% else %}
+      <b class="is-over">↓ %{{ rev.delta_abs }}</b>
+      {% endif %}
+      <small>geçen aya göre</small>
+    </div>
+    {% if rev.collected is not None %}
+    <div class="party-stat">
+      <span>Tahsil (bu ay)</span>
+      <b class="money">{{ rev.collected|tr_money }} ₺</b>
+    </div>
+    {% endif %}
+  </div>
+</section>

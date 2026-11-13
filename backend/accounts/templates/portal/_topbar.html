@@ -13,6 +13,23 @@
     </span>
     <input type="search" name="q" placeholder="Ara" autocomplete="off" />
   </form>
+  <div class="topbar-end">
+  {% if can_service_lead %}
+  <div class="bell" data-bell data-bell-url="{% url 'portal-service-reminders-summary' %}">
+    <button type="button" class="bell-btn" aria-expanded="false" aria-haspopup="true" aria-label="Bakım bildirimleri">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5l1.5-2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M10 21h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+      <span class="bell-count" data-bell-count hidden></span>
+    </button>
+    <div class="profile-pop bell-pop" hidden>
+      <p class="bell-title">Bakımlar</p>
+      <div data-bell-list><p class="bell-empty">Yükleniyor…</p></div>
+      <a class="bell-all" href="{% url 'portal-service-reminders' %}">Tümünü gör</a>
+    </div>
+  </div>
+  {% endif %}
   <div class="profile" data-profile>
     <button type="button" class="profile-btn" aria-expanded="false" aria-haspopup="true">
       <span class="avatar" data-profile-avatar>{{ user.username|slice:":1"|upper|default:"V" }}</span>
@@ -23,6 +40,7 @@
       <a class="is-danger" href="{% url 'portal-logout' %}">Çıkış yap</a>
     </div>
   </div>
+  </div>
 </header>
 <script>
   (function () {
@@ -31,6 +49,68 @@
       search.addEventListener('submit', function (event) {
         event.preventDefault();
       });
+    }
+    var bell = document.querySelector('[data-bell]');
+    if (bell) {
+      var bellBtn = bell.querySelector('.bell-btn');
+      var bellPop = bell.querySelector('.bell-pop');
+      var bellCount = bell.querySelector('[data-bell-count]');
+      var bellList = bell.querySelector('[data-bell-list]');
+      var bellBusy = null;
+      var esc = function (value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+      };
+      var paint = function (data) {
+        var total = data.total || 0;
+        bellCount.hidden = !total;
+        bellCount.textContent = total > 99 ? '99+' : String(total);
+        bellCount.classList.toggle('is-over', !!data.overdue);
+        bellBtn.setAttribute('aria-label', 'Bakım bildirimleri: ' + (data.overdue || 0) + ' geciken, ' + (data.soon || 0) + ' yaklaşan');
+        if (!data.items || !data.items.length) {
+          bellList.innerHTML = '<p class="bell-empty">Yaklaşan bakım yok.</p>';
+          return;
+        }
+        bellList.innerHTML = data.items.map(function (item) {
+          return '<a class="bell-item" href="' + esc(data.url) + '">' +
+            '<span><b>' + esc(item.party) + '</b><small>' + esc(item.device) + ' · ' + esc(item.interval) + ' ay</small></span>' +
+            '<em class="' + (item.overdue ? 'is-over' : '') + '">' + esc(item.due) + '</em></a>';
+        }).join('');
+      };
+      var bellAt = 0;
+      window.portalBellRefresh = function (force) {
+        if (bellBusy) return bellBusy;
+        if (!force && Date.now() - bellAt < 15000) return Promise.resolve();
+        bellAt = Date.now();
+        bellBusy = fetch(bell.getAttribute('data-bell-url'), {
+          credentials: 'same-origin',
+          cache: 'no-store',
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        })
+          .then(function (response) { return response.ok ? response.json() : null; })
+          .then(function (data) { if (data && data.ok) paint(data); })
+          .catch(function () {})
+          .then(function () { bellBusy = null; });
+        return bellBusy;
+      };
+      var closeBell = function () {
+        bellPop.hidden = true;
+        bellBtn.setAttribute('aria-expanded', 'false');
+      };
+      bellBtn.addEventListener('click', function (event) {
+        event.stopPropagation();
+        var open = bellPop.hidden;
+        bellPop.hidden = !open;
+        bellBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) window.portalBellRefresh(true);
+      });
+      bellPop.addEventListener('click', function (event) {
+        if (!event.target.closest('a')) event.stopPropagation();
+        else closeBell();
+      });
+      document.addEventListener('click', closeBell);
+      window.portalBellRefresh(true);
     }
     var root = document.querySelector('[data-profile]');
     if (!root) return;

@@ -13,9 +13,22 @@ from django.http import FileResponse, Http404
 from django.utils import timezone
 
 from sales.models import Sale, SaleLine
-from sales.services import line_amounts, money, parse_decimal, tr_upper
+from sales.services import (
+    COPPER_LINE_DESCRIPTION,
+    line_amounts,
+    money,
+    parse_decimal,
+    sale_agreed_copper_meters,
+    tr_upper,
+)
 from stock.models import Product, StockMovement
-from stock.services import MOUNT_CATEGORY_SLUG, SERVICE_CATEGORY_SLUG, StockError, apply_movement
+from stock.services import (
+    MOUNT_CATEGORY_SLUG,
+    SERVICE_CATEGORY_SLUG,
+    StockError,
+    apply_movement,
+    mount_material_filter,
+)
 
 from .models import Device, Job, JobLine, JobPhoto, JobSoldPack, JobSoldUnit, JobSoldUnitMaterial, JobSoldUnitPhoto
 
@@ -597,12 +610,18 @@ def _product_kind(product) -> str:
 
 
 def sale_line_is_device(line: SaleLine, sale: Sale | None = None) -> bool:
+    from sales.services import is_copper_sale_line
+
+    if is_copper_sale_line(line):
+        return False
     product = line.product
     if not product:
         return False
+    category = getattr(product, 'category', None)
+    if category and getattr(category, 'is_copper_pipe', False):
+        return False
     if _product_kind(product) or getattr(product, 'is_device', False):
         return True
-    category = getattr(product, 'category', None)
     if category and category.slug == MOUNT_CATEGORY_SLUG:
         return False
     # Legacy klima kartları: bayrak yoksa cihaz satışında seri ister.
@@ -613,6 +632,10 @@ def sale_line_is_device(line: SaleLine, sale: Sale | None = None) -> bool:
 
 
 def _line_role(line: SaleLine, sale: Sale | None = None) -> str:
+    from sales.services import is_copper_sale_line
+
+    if is_copper_sale_line(line):
+        return ''
     kind = _product_kind(line.product)
     if kind:
         return kind
@@ -999,7 +1022,7 @@ def _parse_unit_materials(post, pk) -> dict[int, Decimal]:
         if not str(raw_id).isdigit():
             continue
         raw_qty = qtys[index] if index < len(qtys) else '1'
-        qty = parse_decimal(raw_qty or '1', 'Adet')
+        qty = parse_decimal(raw_qty or '1', 'Adet', thousands=False)
         if qty <= 0:
             raise ValueError('Montaj adedi pozitif olmalı.')
         product_id = int(raw_id)
@@ -1026,7 +1049,7 @@ def _parse_field_materials(post) -> dict[int, Decimal]:
         if not str(raw_id).isdigit():
             continue
         raw_qty = qtys[index] if index < len(qtys) else '1'
-        qty = parse_decimal(raw_qty or '1', 'Adet')
+        qty = parse_decimal(raw_qty or '1', 'Adet', thousands=False)
         if qty <= 0:
             raise ValueError('Montaj adedi pozitif olmalı.')
         product_id = int(raw_id)
@@ -1082,18 +1105,96 @@ def field_mount_payload(job: Job) -> list[dict]:
     return payload
 
 
+COPPER_METER_UNITS = frozenset({'MT', 'M', 'METRE', 'MTR'})
+
+
+def _split_included_copper_meters(job: Job) -> Decimal:
+    total = Decimal('0.00')
+    packs = job.sold_packs.select_related('outdoor_product__category').prefetch_related(
+        'units__product__category'
+    )
+    for pack in packs:
+        if pack.kind != JobSoldPack.KIND_SPLIT:
+            continue
+        category = None
+        product = pack.outdoor_product
+        if product is not None:
+            category = getattr(product, 'category', None)
+        if category is None:
+            for unit in pack.units.all():
+                if unit.product_id:
+                    category = getattr(unit.product, 'category', None)
+                    break
+        meters = Decimal('0.00')
+        if category is not None:
+            meters = category.included_copper_meters or Decimal('0.00')
+        total += meters
+    return money(total)
+
+
+def copper_mount_summary(job: Job | None) -> dict | None:
+    """Office-only bakır used / included / agreed / excess for mount jobs."""
+    if job is None or not job.sale_id:
+        return None
+    used = Decimal('0.00')
+    estimate = Decimal('0.00')
+    non_meter = False
+    rows = JobSoldUnitMaterial.objects.filter(Q(pack__job=job) | Q(unit__job=job)).select_related(
+        'product__category'
+    )
+    for item in rows:
+        category = getattr(item.product, 'category', None) if item.product_id else None
+        if not category or not category.is_copper_pipe:
+            continue
+        qty = item.qty or Decimal('0.00')
+        used += qty
+        price = item.product.sale_price or Decimal('0.00')
+        estimate += qty * price
+        unit = (item.product.unit or item.unit_label or '').strip().upper()
+        if unit and unit not in COPPER_METER_UNITS:
+            non_meter = True
+    included = _split_included_copper_meters(job)
+    agreed = sale_agreed_copper_meters(job.sale)
+    agreed_lines = [line for line in job.sale.lines.all() if line.is_copper and line.qty]
+    excess = money(max(Decimal('0.00'), used - included - agreed))
+    if used <= 0 and included <= 0 and agreed <= 0:
+        return None
+    # Weighted estimate only on excess meters when sale prices exist.
+    excess_estimate = Decimal('0.00')
+    if excess > 0 and agreed_lines:
+        # Price the excess at what was agreed with the customer on this sale.
+        agreed_qty = sum((line.qty for line in agreed_lines), Decimal('0.00'))
+        agreed_sum = sum((line.qty * line.unit_price for line in agreed_lines), Decimal('0.00'))
+        excess_estimate = money(agreed_sum / agreed_qty * excess)
+    elif used > 0 and excess > 0:
+        unit_avg = estimate / used if used else Decimal('0.00')
+        excess_estimate = money(unit_avg * excess)
+    return {
+        'used': money(used),
+        'included': money(included),
+        'agreed': money(agreed),
+        'excess': excess,
+        'excess_estimate': excess_estimate,
+        'has_excess': excess > 0,
+        'non_meter': non_meter,
+        'label': COPPER_LINE_DESCRIPTION,
+    }
+
+
 def _set_pack_materials(pack: JobSoldPack, wanted: dict[int, Decimal], user=None) -> None:
     products = {
         item.pk: item
         for item in Product.objects.filter(
+            mount_material_filter(),
             pk__in=wanted.keys(),
             is_active=True,
             is_device=False,
-            category__slug=MOUNT_CATEGORY_SLUG,
         )
     }
     if user is not None and getattr(user, 'can_service_field', False) and not getattr(user, 'can_service_lead', False):
-        allowed = set(user.stock_categories.values_list('pk', flat=True))
+        from accounts.http import field_stock_categories
+
+        allowed = set(field_stock_categories(user).values_list('pk', flat=True))
         products = {pk: item for pk, item in products.items() if item.category_id in allowed}
     missing = set(wanted) - set(products)
     if missing:
@@ -2021,3 +2122,25 @@ def delete_job(*, job: Job, user, allow_closed: bool = False) -> None:
         raise ValueError('Kapalı iş silinemez.')
     _sync_mount_stock(job=job, user=user, wanted={})
     job.delete()
+
+
+MAINTENANCE_WINDOW_DAYS = 14
+
+
+def missed_jobs(today: date | None = None):
+    """Jobs whose day passed without being done: pending or open, date before today."""
+    from service.models import Job
+
+    today = today or timezone.localdate()
+    return Job.objects.filter(
+        Q(status=Job.STATUS_PENDING, date__lt=today) | Q(status=Job.STATUS_OPEN, date__lt=today)
+    )
+
+
+def due_maintenance(today: date | None = None, window: int = MAINTENANCE_WINDOW_DAYS):
+    """Devices whose next care date is overdue or within `window` days."""
+    from service.models import Device
+
+    today = today or timezone.localdate()
+    return Device.objects.filter(next_due__isnull=False, next_due__lte=today + timedelta(days=window))
+

@@ -55,7 +55,9 @@ def stock_nav(request):
     from stock.models import Category
     from stock.services import (
         DEFAULT_CATEGORY_SLUG,
+        COPPER_CATEGORY_SLUG,
         MOUNT_CATEGORY_SLUG,
+        copper_category,
         default_category,
         mount_category,
     )
@@ -63,8 +65,9 @@ def stock_nav(request):
     if getattr(user, 'can_stock_manage', False):
         default_category(user)
         mount_category(user)
+        copper_category(user)
     scope = stock_scope(user)
     cats = list(Category.objects.all() if scope is None else scope)
-    order = {DEFAULT_CATEGORY_SLUG: 0, MOUNT_CATEGORY_SLUG: 1}
-    cats.sort(key=lambda item: (order.get(item.slug, 2), item.name))
+    order = {DEFAULT_CATEGORY_SLUG: 0, MOUNT_CATEGORY_SLUG: 1, COPPER_CATEGORY_SLUG: 2}
+    cats.sort(key=lambda item: (order.get(item.slug, 3), item.name))
     return {'stock_categories': cats}

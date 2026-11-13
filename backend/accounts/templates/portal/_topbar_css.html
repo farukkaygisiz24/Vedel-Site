@@ -127,3 +127,59 @@
 
       .profile-pop a:hover { background: rgba(0, 0, 0, 0.05); }
       .profile-pop a.is-danger { color: var(--accent); }
+
+      .topbar-end { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+      .bell { position: relative; }
+      .bell-btn {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 36px;
+        height: 36px;
+        border: 0;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--label);
+        cursor: pointer;
+      }
+      .bell-btn:hover { background: rgba(0, 0, 0, 0.045); }
+      .bell-btn svg { width: 20px; height: 20px; }
+      .bell-count {
+        position: absolute;
+        top: 2px;
+        right: 0;
+        min-width: 17px;
+        height: 17px;
+        padding: 0 4px;
+        border-radius: 980px;
+        background: var(--vedel);
+        color: #fff;
+        font-size: 10.5px;
+        font-weight: 650;
+        line-height: 17px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+      }
+      .bell-count.is-over { background: var(--danger); }
+      .bell-pop { width: min(340px, calc(100vw - 32px)); }
+      .bell-title {
+        margin: 6px 12px 4px;
+        color: var(--secondary);
+        font-size: 11px;
+        font-weight: 590;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .bell-empty { margin: 8px 12px 10px; color: var(--secondary); font-size: 13px; }
+      .profile-pop a.bell-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .bell-item span { min-width: 0; }
+      .bell-item b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 590; }
+      .bell-item small { display: block; color: var(--secondary); font-size: 12px; font-weight: 400; }
+      .bell-item em { flex: 0 0 auto; font-style: normal; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--secondary); }
+      .bell-item em.is-over { color: var(--danger); font-weight: 590; }
+      .profile-pop a.bell-all { color: var(--vedel); border-top: 0.5px solid var(--hairline); border-radius: 0 0 8px 8px; }

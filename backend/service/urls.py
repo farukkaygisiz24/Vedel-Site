@@ -22,5 +22,6 @@ urlpatterns = [
     path('jobs/new/', views.job_new, name='portal-service-job-new'),
     path('jobs/<job_no:number>/', views.job_detail, name='portal-service-job-detail'),
     path('reminders/', views.reminders, name='portal-service-reminders'),
+    path('reminders/summary/', views.reminders_summary, name='portal-service-reminders-summary'),
     path('devices/', views.device_list_json, name='portal-service-devices'),
 ]

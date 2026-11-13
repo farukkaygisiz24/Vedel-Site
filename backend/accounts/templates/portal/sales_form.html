@@ -107,6 +107,22 @@
             <div class="line-actions">
               <button class="btn is-ghost" type="button" id="add-line">Kalem ekle</button>
             </div>
+            <div id="sale-copper-wrap" style="margin-top:16px">
+              <p class="field-label">Anlaşma kalemi</p>
+              <div class="line-table" id="sale-copper-panel">
+                <div class="line-head">
+                  <span>Bakır boru</span>
+                  <span>Metre</span>
+                  <span>Birim fiyat</span>
+                  <span>KDV %</span>
+                  <span>Satır tutarı</span>
+                  <span></span>
+                </div>
+              </div>
+              <div class="line-actions">
+                <button class="btn is-ghost" type="button" id="add-copper-line">Bakır kalemi ekle</button>
+              </div>
+            </div>
           </div>
           <div class="totals-bar">
             <div>
@@ -380,6 +396,21 @@
     </div>
   </template>
 
+  <template id="copper-line-tpl">
+    <div class="line-row" data-copper-line="1">
+      <div class="prod-pick">
+        <input type="hidden" name="copper_product_id" />
+        <input type="search" class="prod-q" placeholder="Bakır boru ürünü" autocomplete="off" />
+        <div class="prod-menu" hidden></div>
+      </div>
+      <input name="copper_qty" inputmode="decimal" placeholder="0" autocomplete="off" />
+      <input name="copper_unit_price" inputmode="decimal" placeholder="0,00" autocomplete="off" />
+      <input name="copper_vat_rate" inputmode="decimal" value="20" autocomplete="off" />
+      <span class="money" data-copper-total>0,00 ₺</span>
+      <button class="icon-btn" type="button" data-copper-remove aria-label="Bakır kalemini sil" tabindex="-1">×</button>
+    </div>
+  </template>
+
   <div class="modal" id="product-modal" hidden>
     <div class="modal-card">
       <div class="modal-head">
@@ -464,6 +495,8 @@
       var picked = document.getElementById('picked-party');
       var tools = document.getElementById('party-tools');
       var lines = document.getElementById('sale-lines');
+      var copperPanel = document.getElementById('sale-copper-panel');
+      var copperTpl = document.getElementById('copper-line-tpl');
       var pays = document.getElementById('pay-lines');
       var modal = document.getElementById('party-modal');
       var MODAL_DISCARD_CONFIRM = 'Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?';
@@ -715,6 +748,25 @@
         }
         setLineStockOpen(wrap, true, fromH);
       }
+      function lineAmounts(qty, price, rate) {
+        var base = qty * price;
+        var n, v, t;
+        var mode = vatMode();
+        if (mode === 'included') {
+          t = base;
+          n = t / (1 + rate / 100);
+          v = t - n;
+        } else if (mode === 'plus') {
+          n = base;
+          v = n * rate / 100;
+          t = n + v;
+        } else {
+          n = base;
+          v = 0;
+          t = base;
+        }
+        return { net: n, vat: v, total: t };
+      }
       function lineSum() {
         var net = 0, vat = 0, grand = 0;
         lines.querySelectorAll('.line-row').forEach(function (row) {
@@ -725,25 +777,23 @@
           var stock = parseFloat(row.getAttribute('data-stock') || '0') || 0;
           row.classList.toggle('is-warn', Boolean(pid && pid.value && qty > stock));
           paintLineStock(row);
-          var base = qty * price;
-          var n, v, t;
-          var mode = vatMode();
-          if (mode === 'included') {
-            t = base;
-            n = t / (1 + rate / 100);
-            v = t - n;
-          } else if (mode === 'plus') {
-            n = base;
-            v = n * rate / 100;
-            t = n + v;
-          } else {
-            n = base;
-            v = 0;
-            t = base;
-          }
-          net += n; vat += v; grand += t;
-          row.querySelector('[data-line-total]').textContent = money(t);
+          var parts = lineAmounts(qty, price, rate);
+          net += parts.net; vat += parts.vat; grand += parts.total;
+          row.querySelector('[data-line-total]').textContent = money(parts.total);
         });
+        if (copperPanel) {
+          copperPanel.querySelectorAll('[data-copper-line]').forEach(function (row) {
+            var cQty = parseFloat(String((row.querySelector('[name=copper_qty]') || {}).value || '').replace(',', '.')) || 0;
+            var cPrice = parseMoney((row.querySelector('[name=copper_unit_price]') || {}).value || '');
+            var cRate = parseFloat(String((row.querySelector('[name=copper_vat_rate]') || {}).value || '').replace(',', '.')) || 0;
+            var cParts = lineAmounts(cQty, cPrice, cRate);
+            if (cQty > 0 || cPrice > 0) {
+              net += cParts.net; vat += cParts.vat; grand += cParts.total;
+            }
+            var cTotalEl = row.querySelector('[data-copper-total]');
+            if (cTotalEl) cTotalEl.textContent = money(cQty > 0 || cPrice > 0 ? cParts.total : 0);
+          });
+        }
         document.getElementById('sum-net').textContent = money(net);
         document.getElementById('sum-vat').textContent = money(vat);
         document.getElementById('sum-grand').textContent = money(grand);
@@ -1107,7 +1157,10 @@
           });
       }
       function closeProdMenus(except) {
-        lines.querySelectorAll('.prod-menu').forEach(function (menu) {
+        var menus = [];
+        if (lines) menus = menus.concat(Array.prototype.slice.call(lines.querySelectorAll('.prod-menu')));
+        if (copperPanel) menus = menus.concat(Array.prototype.slice.call(copperPanel.querySelectorAll('.prod-menu')));
+        menus.forEach(function (menu) {
           if (menu === except) return;
           menu.hidden = true;
           menu.innerHTML = '';
@@ -1126,9 +1179,21 @@
         var qty = row.querySelector('[name=qty]');
         if (qty) qty.focus();
       }
-      function paintProdMenu(row, results, query) {
+      function applyCopperProduct(row, p) {
+        if (!row || !p) return;
+        row.querySelector('[name=copper_product_id]').value = p.id;
+        row.querySelector('.prod-q').value = p.label || p.name || '';
+        row.querySelector('[name=copper_unit_price]').value = formatMoneyNumber(parseFloat(p.price) || 0);
+        row.querySelector('[name=copper_vat_rate]').value = String(p.vat || '20');
+        lineSum();
+        var qty = row.querySelector('[name=copper_qty]');
+        if (qty) qty.focus();
+      }
+      function paintProdMenu(row, results, query, opts) {
         var menu = row.querySelector('.prod-menu');
         menu.innerHTML = '';
+        opts = opts || {};
+        var pick = opts.onPick || applyProduct;
         (results || []).forEach(function (p) {
           var btn = document.createElement('button');
           btn.type = 'button';
@@ -1139,7 +1204,7 @@
           btn.querySelector('small').textContent = (p.sku || '') + ' · ' + (p.stock || '0') + ' ' + (p.unit || 'adet');
           btn.addEventListener('mousedown', function (event) {
             event.preventDefault();
-            applyProduct(row, p);
+            pick(row, p);
             menu.hidden = true;
             menu.innerHTML = '';
           });
@@ -1151,17 +1216,19 @@
           empty.textContent = query ? 'Depoda eşleşen ürün yok.' : 'Depoda ürün yok.';
           menu.appendChild(empty);
         }
-        var add = document.createElement('button');
-        add.type = 'button';
-        add.tabIndex = -1;
-        add.className = 'prod-add';
-        add.textContent = 'Depoya ürün ekle';
-        add.addEventListener('mousedown', function (event) {
-          event.preventDefault();
-          menu.hidden = true;
-          openProductModal(row, query);
-        });
-        menu.appendChild(add);
+        if (!opts.copperOnly) {
+          var add = document.createElement('button');
+          add.type = 'button';
+          add.tabIndex = -1;
+          add.className = 'prod-add';
+          add.textContent = 'Depoya ürün ekle';
+          add.addEventListener('mousedown', function (event) {
+            event.preventDefault();
+            menu.hidden = true;
+            openProductModal(row, query);
+          });
+          menu.appendChild(add);
+        }
         menu.hidden = false;
       }
       function saleFamily() {
@@ -1237,7 +1304,7 @@
         var ctl = row._prodCtl;
         if (ctl) ctl.abort();
         row._prodCtl = new AbortController();
-        var url = stockUrl + '?q=' + encodeURIComponent(query) + '&page=1';
+        var url = stockUrl + '?q=' + encodeURIComponent(query) + '&page=1&sale=1';
         var family = saleFamily();
         var category = saleCategory();
         if (family) url += '&device_family=' + encodeURIComponent(family);
@@ -1252,6 +1319,29 @@
             if (data && data.ok) {
               cacheNextSku(data);
               paintProdMenu(row, data.results || [], query);
+            }
+          })
+          .catch(function (err) {
+            if (err && err.name === 'AbortError') return;
+          });
+      }
+      function searchCopperProducts(row, query) {
+        var ctl = row._prodCtl;
+        if (ctl) ctl.abort();
+        row._prodCtl = new AbortController();
+        var url = stockUrl + '?q=' + encodeURIComponent(query) + '&page=1&copper=1';
+        fetch(url, {
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin',
+          signal: row._prodCtl.signal
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (data && data.ok) {
+              paintProdMenu(row, data.results || [], query, {
+                copperOnly: true,
+                onPick: applyCopperProduct
+              });
             }
           })
           .catch(function (err) {
@@ -1297,6 +1387,61 @@
             menu.innerHTML = '';
           }
         });
+      }
+      function bindCopperPick(row) {
+        var hid = row.querySelector('[name=copper_product_id]');
+        var q = row.querySelector('.prod-q');
+        var menu = row.querySelector('.prod-menu');
+        if (!hid || !q || !menu) return;
+        q.addEventListener('focus', function () {
+          closeProdMenus(menu);
+          searchCopperProducts(row, q.value.trim());
+        });
+        q.addEventListener('input', function () {
+          hid.value = '';
+          window.clearTimeout(row._prodTimer);
+          row._prodTimer = window.setTimeout(function () {
+            searchCopperProducts(row, q.value.trim());
+          }, 400);
+        });
+        q.addEventListener('keydown', function (event) {
+          if (event.key === 'Tab') {
+            menu.hidden = true;
+            menu.innerHTML = '';
+            return;
+          }
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            var first = menu.querySelector('.prod-opt');
+            if (first) first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          }
+          if (event.key === 'Escape') {
+            menu.hidden = true;
+            menu.innerHTML = '';
+          }
+        });
+      }
+      function bindCopperLine(row) {
+        bindCopperPick(row);
+        var priceEl = row.querySelector('[name=copper_unit_price]');
+        if (priceEl && typeof bindMoneyInput === 'function') bindMoneyInput(priceEl);
+        row.querySelectorAll('[name=copper_qty], [name=copper_unit_price], [name=copper_vat_rate]').forEach(function (el) {
+          el.addEventListener('input', lineSum);
+        });
+        var remove = row.querySelector('[data-copper-remove]');
+        if (remove) {
+          remove.addEventListener('click', function () {
+            row.remove();
+            lineSum();
+          });
+        }
+      }
+      function addCopperLine() {
+        if (!copperPanel || !copperTpl) return null;
+        var node = copperTpl.content.firstElementChild.cloneNode(true);
+        copperPanel.appendChild(node);
+        bindCopperLine(node);
+        return node;
       }
       document.addEventListener('mousedown', function (event) {
         if (event.target && event.target.closest && event.target.closest('.prod-pick')) return;
@@ -1410,6 +1555,13 @@
         addSaleLine();
         lineSum();
       });
+      var addCopperBtn = document.getElementById('add-copper-line');
+      if (addCopperBtn) {
+        addCopperBtn.addEventListener('click', function () {
+          addCopperLine();
+          lineSum();
+        });
+      }
       document.querySelectorAll('input[name=vat_mode]').forEach(function (el) {
         el.addEventListener('change', function () {
           lineSum();
@@ -1479,9 +1631,10 @@
             alert('+ KDV, KDV dahil veya KDV yok seçin.');
             return;
           }
-          var ok = Array.prototype.some.call(lines.querySelectorAll('[name=product_id]'), function (el) {
-            return el.value;
-          });
+          var ok = Array.prototype.some.call(
+            document.querySelectorAll('#sale-form [name=product_id], #sale-form [name=copper_product_id]'),
+            function (el) { return el.value; }
+          );
           if (!ok) {
             alert('En az bir ürün kalemi seçin.');
             return;

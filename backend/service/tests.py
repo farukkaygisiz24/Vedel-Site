@@ -2026,3 +2026,331 @@ class MountActivationBackfillTests(TestCase):
         self.assertContains(page, sale.number)
         self.assertContains(page, 'Bakım aralığı')
         self.assertContains(page, 'value="12" checked')
+
+
+class CopperMountSummaryTests(TestCase):
+    def setUp(self):
+        self.lead = Customer.objects.create_user(
+            username='copper-sum-lead',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE_LEAD,
+        )
+        self.member = CrewMember.objects.create(
+            number='CRWCU1',
+            first_name='Saha',
+            last_name='Bakır',
+            phone='05551113344',
+            created_by=self.lead,
+        )
+        self.party = Party.objects.create(
+            kind=Party.KIND_REAL,
+            number='CUSTCU100',
+            first_name='Ravil',
+            last_name='Test',
+            phone='05550006677',
+            address='Test',
+            created_by=self.lead,
+        )
+        self.klima = Category.objects.create(
+            name='Mitsubishi Copper',
+            slug='mitsubishi-copper',
+            sku_prefix='MHC',
+            is_klima=True,
+            included_copper_meters=Decimal('5.00'),
+            created_by=self.lead,
+        )
+        self.copper_cat, _ = Category.objects.get_or_create(
+            slug='bakir-boru-test',
+            defaults={
+                'name': 'Bakır Boru Test',
+                'sku_prefix': 'BBT',
+                'is_copper_pipe': True,
+                'created_by': self.lead,
+            },
+        )
+        if not self.copper_cat.is_copper_pipe:
+            self.copper_cat.is_copper_pipe = True
+            self.copper_cat.save(update_fields=['is_copper_pipe'])
+        self.mount, _ = Category.objects.get_or_create(
+            slug=MOUNT_CATEGORY_SLUG,
+            defaults={
+                'name': 'Klima Montaj Malzemesi',
+                'sku_prefix': MOUNT_SKU_PREFIX,
+                'created_by': self.lead,
+            },
+        )
+        self.split = Product.objects.create(
+            sku='MHC-0001',
+            brand='Mitsubishi',
+            name='Split',
+            category=self.klima,
+            is_device=True,
+            device_kind=Product.KIND_SPLIT,
+            outdoor_name='Outdoor',
+            created_by=self.lead,
+        )
+        self.pipe = Product.objects.create(
+            sku='BBT-0001',
+            brand='Anadolu',
+            name='1/4-1/2 Bakır Boru',
+            category=self.copper_cat,
+            unit='MT',
+            stock_qty=Decimal('100.00'),
+            sale_price=Decimal('40.00'),
+            created_by=self.lead,
+        )
+        self.foot = Product.objects.create(
+            sku=f'{MOUNT_SKU_PREFIX}-0098',
+            brand='Genel',
+            name='Yer Takozu',
+            category=self.mount,
+            unit='ADET',
+            stock_qty=Decimal('50.00'),
+            created_by=self.lead,
+        )
+        zero = Decimal('0.00')
+        self.sale = Sale.objects.create(
+            number='SALCU0001',
+            date=date.today(),
+            party=self.party,
+            work_type=Sale.WORK_DEVICE,
+            vat_mode=Sale.VAT_NONE,
+            grand_total=zero,
+            created_by=self.lead,
+            updated_by=self.lead,
+        )
+        SaleLine.objects.create(
+            sale=self.sale,
+            product=self.split,
+            qty=Decimal('1.00'),
+            unit_price=zero,
+            cost_price=zero,
+            vat_rate=zero,
+            line_net=zero,
+            line_vat=zero,
+            line_total=zero,
+        )
+        self.job = Job.objects.create(
+            number='SRV20990101',
+            date=date.today(),
+            party=self.party,
+            sale=self.sale,
+            status=Job.STATUS_OPEN,
+            assignee=self.member,
+            created_by=self.lead,
+            updated_by=self.lead,
+        )
+        ensure_sold_packs(self.job)
+
+    def test_excess_without_agreed_copper(self):
+        from service.services import copper_mount_summary
+
+        pack = self.job.sold_packs.get()
+        JobSoldUnitMaterial.objects.create(
+            pack=pack,
+            product=self.pipe,
+            qty=Decimal('23.00'),
+            name=self.pipe.name,
+            unit_label='MT',
+        )
+        JobSoldUnitMaterial.objects.create(
+            pack=pack,
+            product=self.foot,
+            qty=Decimal('4.00'),
+            name=self.foot.name,
+            unit_label='ADET',
+        )
+        summary = copper_mount_summary(self.job)
+        self.assertIsNotNone(summary)
+        self.assertEqual(summary['used'], Decimal('23.00'))
+        self.assertEqual(summary['included'], Decimal('5.00'))
+        self.assertEqual(summary['agreed'], Decimal('0.00'))
+        self.assertEqual(summary['excess'], Decimal('18.00'))
+        self.assertTrue(summary['has_excess'])
+
+    def test_excess_cleared_by_sale_agreed_meters(self):
+        from sales.services import COPPER_LINE_DESCRIPTION
+        from service.services import copper_mount_summary
+
+        zero = Decimal('0.00')
+        SaleLine.objects.create(
+            sale=self.sale,
+            product=None,
+            description=COPPER_LINE_DESCRIPTION,
+            is_copper=True,
+            qty=Decimal('18.00'),
+            unit_price=Decimal('50.00'),
+            cost_price=zero,
+            vat_rate=zero,
+            line_net=Decimal('900.00'),
+            line_vat=zero,
+            line_total=Decimal('900.00'),
+        )
+        pack = self.job.sold_packs.get()
+        JobSoldUnitMaterial.objects.create(
+            pack=pack,
+            product=self.pipe,
+            qty=Decimal('23.00'),
+            name=self.pipe.name,
+            unit_label='MT',
+        )
+        summary = copper_mount_summary(self.job)
+        self.assertEqual(summary['excess'], Decimal('0.00'))
+        self.assertFalse(summary['has_excess'])
+        self.assertEqual(summary['agreed'], Decimal('18.00'))
+
+    def test_multi_pack_adds_no_included_meters(self):
+        from service.models import JobSoldPack
+        from service.services import copper_mount_summary
+
+        pack = self.job.sold_packs.get()
+        pack.kind = JobSoldPack.KIND_MULTI
+        pack.save(update_fields=['kind'])
+        JobSoldUnitMaterial.objects.create(
+            pack=pack,
+            product=self.pipe,
+            qty=Decimal('10.00'),
+            name=self.pipe.name,
+            unit_label='MT',
+        )
+        summary = copper_mount_summary(self.job)
+        self.assertEqual(summary['included'], Decimal('0.00'))
+        self.assertEqual(summary['excess'], Decimal('10.00'))
+
+    def test_field_mount_search_includes_copper_category(self):
+        field = Customer.objects.create_user(
+            username='copper-field',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE,
+        )
+        member = CrewMember.objects.create(
+            number='CRWCU2',
+            first_name='Field',
+            last_name='Cu',
+            phone='05551114455',
+            user=field,
+            created_by=self.lead,
+        )
+        field.stock_categories.add(self.mount, self.copper_cat)
+        self.job.assignee = member
+        self.job.save(update_fields=['assignee'])
+        self.client.force_login(field)
+        products = self.client.get(reverse('portal-field-products'), {'mount': '1'})
+        self.assertEqual(products.status_code, 200)
+        skus = {item['sku'] for item in products.json()['results']}
+        self.assertIn('BBT-0001', skus)
+        self.assertIn(f'{MOUNT_SKU_PREFIX}-0098', skus)
+        page = self.client.get(reverse('portal-field-job', kwargs={'number': self.job.number}))
+        self.assertEqual(page.status_code, 200)
+        self.assertNotContains(page, 'data-copper-excess')
+
+    def test_field_mount_access_covers_copper_without_explicit_grant(self):
+        field = Customer.objects.create_user(
+            username='copper-field-mount-only',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE,
+        )
+        field.stock_categories.add(self.mount)
+        self.client.force_login(field)
+        products = self.client.get(reverse('portal-field-products'), {'mount': '1'})
+        skus = {item['sku'] for item in products.json()['results']}
+        self.assertIn('BBT-0001', skus)
+        nobody = Customer.objects.create_user(
+            username='copper-field-none',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE,
+        )
+        self.client.force_login(nobody)
+        products = self.client.get(reverse('portal-field-products'), {'mount': '1'})
+        self.assertNotIn('BBT-0001', {item['sku'] for item in products.json()['results']})
+
+    def test_copper_material_moves_stock_and_returns(self):
+        from service.services import _set_pack_materials, _sync_mount_stock
+
+        pack = self.job.sold_packs.get()
+        _set_pack_materials(pack, {self.pipe.pk: Decimal('7.50')}, user=self.lead)
+        _sync_mount_stock(job=self.job, user=self.lead)
+        self.pipe.refresh_from_db()
+        self.assertEqual(self.pipe.stock_qty, Decimal('92.50'))
+        _sync_mount_stock(job=self.job, user=self.lead, wanted={})
+        self.pipe.refresh_from_db()
+        self.assertEqual(self.pipe.stock_qty, Decimal('100.00'))
+
+    def test_excess_estimate_uses_agreed_price(self):
+        from service.services import copper_mount_summary
+
+        zero = Decimal('0.00')
+        SaleLine.objects.create(
+            sale=self.sale,
+            product=self.pipe,
+            description='Bakır boru',
+            is_copper=True,
+            qty=Decimal('3.00'),
+            unit_price=Decimal('60.00'),
+            cost_price=zero,
+            vat_rate=zero,
+            line_net=Decimal('180.00'),
+            line_vat=zero,
+            line_total=Decimal('180.00'),
+        )
+        JobSoldUnitMaterial.objects.create(
+            pack=self.job.sold_packs.get(),
+            product=self.pipe,
+            qty=Decimal('10.00'),
+            name=self.pipe.name,
+            unit_label='MT',
+        )
+        summary = copper_mount_summary(self.job)
+        self.assertEqual(summary['excess'], Decimal('2.00'))
+        self.assertEqual(summary['excess_estimate'], Decimal('120.00'))
+        self.assertFalse(summary['non_meter'])
+
+    def test_field_qty_dot_is_decimal(self):
+        from service.services import _parse_field_materials
+
+        post = QueryDict(mutable=True)
+        post.setlist('field_mat_product', [str(self.pipe.pk)])
+        post.setlist('field_mat_qty', ['2.500'])
+        self.assertEqual(_parse_field_materials(post), {self.pipe.pk: Decimal('2.50')})
+
+
+class MaintenanceBellTests(TestCase):
+    def setUp(self):
+        self.lead = Customer.objects.create_user(
+            username='bell-lead', password='pass-word', is_staff=True, role=Customer.ROLE_SERVICE_LEAD
+        )
+        self.sales = Customer.objects.create_user(
+            username='bell-sales', password='pass-word', is_staff=True, role=Customer.ROLE_SALES
+        )
+        party = Party.objects.create(
+            kind=Party.KIND_REAL, number='CUSTBELL1', first_name='Bell', last_name='Test',
+            phone='05550009988', address='Test', created_by=self.lead,
+        )
+        today = timezone.localdate()
+        for name, offset in (('Geciken', -3), ('Yakın', 5), ('Uzak', 40)):
+            Device.objects.create(
+                party=party, name=name, interval_months=6,
+                next_due=today + timedelta(days=offset), created_by=self.lead,
+            )
+
+    def test_summary_counts_and_items(self):
+        self.client.force_login(self.lead)
+        data = self.client.get(reverse('portal-service-reminders-summary')).json()
+        self.assertEqual((data['overdue'], data['soon'], data['total']), (1, 1, 2))
+        self.assertEqual([item['device'] for item in data['items']], ['Geciken', 'Yakın'])
+        self.assertTrue(data['items'][0]['overdue'])
+
+    def test_summary_lead_only_and_bell_render(self):
+        self.client.force_login(self.sales)
+        self.assertNotEqual(self.client.get(reverse('portal-service-reminders-summary')).status_code, 200)
+        page = self.client.get(reverse('portal-dashboard'))
+        self.assertNotContains(page, 'class="bell"')
+        self.assertNotContains(page, 'Bakımlar</a>')
+        self.client.force_login(self.lead)
+        page = self.client.get(reverse('portal-dashboard'))
+        self.assertContains(page, 'class="bell"')
+        self.assertContains(page, reverse('portal-service-reminders'))

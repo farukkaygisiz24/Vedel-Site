@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'channels',
     'accounts.apps.AccountsConfig',
     'stock.apps.StockConfig',
     'sales.apps.SalesConfig',
@@ -68,10 +69,21 @@ MIDDLEWARE = [
 if not DEBUG:
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
-if DEBUG:
-    MIDDLEWARE.append('accounts.http.DisableBrowserCacheMiddleware')
+MIDDLEWARE.append('accounts.http.DisableBrowserCacheMiddleware')
 
 ROOT_URLCONF = 'vedelb2c.urls'
+ASGI_APPLICATION = 'vedelb2c.asgi.application'
+
+# Live portal updates (websockets). Redis when REDIS_URL is set; in-memory otherwise
+# (in-memory only reaches sockets in the same process — fine for a single dev worker / tests).
+_REDIS_URL = os.environ.get('REDIS_URL', '').strip()
+CHANNEL_LAYERS = {
+    'default': (
+        {'BACKEND': 'channels_redis.core.RedisChannelLayer', 'CONFIG': {'hosts': [_REDIS_URL]}}
+        if _REDIS_URL
+        else {'BACKEND': 'channels.layers.InMemoryChannelLayer'}
+    )
+}
 APPEND_SLASH = False
 
 _TEMPLATE_LOADERS = [

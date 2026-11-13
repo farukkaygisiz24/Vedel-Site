@@ -234,6 +234,31 @@
         transition: none;
       }
 
+      /* Loading skeleton (slow soft-nav only; never on quiet swaps) */
+      .workspace.is-skel { opacity: 1; transform: none; pointer-events: none; }
+      .skel { display: flex; flex-direction: column; gap: 12px; }
+      .skel-line,
+      .skel-card {
+        border-radius: 8px;
+        background: linear-gradient(90deg, var(--fill) 0%, var(--field) 45%, var(--fill) 90%);
+        background-size: 240% 100%;
+        animation: skel-shine 1.3s ease-in-out infinite;
+      }
+      .skel-line { height: 14px; }
+      .skel-line.is-h1 { width: min(320px, 70%); height: 38px; margin-bottom: 14px; }
+      .skel-line.is-row { height: 44px; border-radius: 10px; }
+      .skel-line.is-short { width: 40%; }
+      .skel-card { height: 112px; border-radius: 12px; }
+      .skel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; }
+      .skel-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-bottom: 8px; }
+      .skel-stats .skel-line { height: 64px; border-radius: 4px; }
+      @keyframes skel-shine { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+      @media (prefers-reduced-motion: reduce) { .skel-line, .skel-card { animation: none; } }
+      @media (max-width: 860px) {
+        .skel-grid { grid-template-columns: minmax(0, 1fr); }
+        .skel-stats { grid-template-columns: 1fr 1fr; }
+      }
+
       h1 {
         margin: 0;
         font-size: 40px;
@@ -2699,6 +2724,45 @@
       }
 
       .party-stat b.is-over { color: var(--danger); }
+      .party-stat b.is-up { color: var(--ok); }
+      .party-stat small {
+        display: block;
+        margin-top: 4px;
+        color: var(--secondary);
+        font-size: 12px;
+      }
+      .party-stats.is-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+      /* Office home (dashboard) */
+      .dash-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px 24px;
+        margin: 0 0 8px;
+      }
+      .dash-block { min-width: 0; }
+      .dash-block .party-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-bottom: 12px;
+      }
+      .dash-block .party-stat:nth-child(3) { box-shadow: inset 0 0.5px 0 var(--hairline); }
+      .dash-block .party-stat:nth-child(4) { box-shadow: inset 0.5px 0.5px 0 var(--hairline); }
+      .dash-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 0 0 8px;
+      }
+      .dash-head .field-label { margin: 0; }
+      .dash .wait-card { color: inherit; text-decoration: none; }
+      .dash a.wait-card:hover { box-shadow: 0 0 0 0.5px var(--secondary); }
+      .dash .wait-card .money { flex: 0 0 auto; font-weight: 590; }
+      .dash .wait-card .money.is-over { color: var(--danger); }
+      .dash .wait-list { margin-bottom: 12px; }
+      @media (max-width: 1100px) {
+        .dash-grid { grid-template-columns: minmax(0, 1fr); }
+      }
 
       .party-sheet td:nth-child(1) { white-space: nowrap; }
 
@@ -4637,7 +4701,7 @@
       {% include 'portal/_mobile_css.html' %}
     </style>
   </head>
-  <body{% if field_board %} class="is-field"{% endif %}>
+  <body{% if field_board %} class="is-field"{% endif %}{% if user.is_authenticated %} data-user-id="{{ user.pk }}"{% endif %}>
     <div class="stage">
       <div class="nav-scrim" data-nav-scrim aria-hidden="true"></div>
       <aside class="window" id="portal-nav">
@@ -4698,7 +4762,7 @@
           return [];
         }
 
-        function portalToast(text, fromServer) {
+        function portalToast(text, fromServer, kickerText) {
           text = String(text || '').trim();
           if (!text || !host) return;
           if (fromServer) {
@@ -4711,7 +4775,7 @@
           el.setAttribute('role', 'status');
           var kicker = document.createElement('span');
           kicker.className = 'fis-kicker';
-          kicker.textContent = 'Tamamlandı';
+          kicker.textContent = kickerText || 'Tamamlandı';
           var copy = document.createElement('p');
           copy.textContent = text;
           el.appendChild(kicker);
@@ -5932,6 +5996,29 @@
           initPortalPicks(workspace);
           initOutdoorPicks(workspace);
           restoreSearchFocus(focusSnap);
+          if (window.portalBellRefresh) window.portalBellRefresh();
+        }
+
+        var SKEL_DELAY = 300;
+        function skeletonKind(url) {
+          var path = pathOf(url);
+          if (path === '/dashboard/') return 'dashboard';
+          if (/^\/(stock\/items|service\/jobs|sales\/customers)\/[^/]+\/?$/.test(path) && !/\/new\/?$/.test(path)) return 'detail';
+          if (/^\/sales\/(?!customers|new|mount-activation)[a-z0-9]+\/?$/i.test(path)) return 'detail';
+          return 'list';
+        }
+        function skeletonHtml(kind) {
+          var line = function (cls) { return '<div class="skel-line' + (cls ? ' ' + cls : '') + '"></div>'; };
+          var html = '<div class="skel" aria-busy="true" aria-label="Yükleniyor">' + line('is-h1');
+          if (kind === 'dashboard') {
+            html += '<div class="skel-grid"><div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div><div class="skel-card"></div></div>';
+          } else if (kind === 'detail') {
+            html += line('is-short') + '<div class="skel-card"></div><div class="skel-card"></div>';
+          } else {
+            html += '<div class="skel-stats">' + line() + line() + line() + line() + '</div>';
+            for (var i = 0; i < 8; i += 1) html += line('is-row');
+          }
+          return html + '</div>';
         }
 
         function openPage(url, push, opts) {
@@ -5939,18 +6026,32 @@
           var quiet = !!opts.quiet;
           var replaceHist = !!opts.replace;
           var focusSearch = !!opts.focusSearch;
+          var force = !!opts.force;
           if (!quiet) {
             if (busy) return Promise.resolve();
-            if (urlKey(url) === shownKey) return Promise.resolve();
+            // Same page clicked again: refresh its data quietly instead of doing nothing.
+            if (urlKey(url) === shownKey) return openPage(url, false, { quiet: true, force: true });
             if (filterAbort) {
               try { filterAbort.abort(); } catch (err) {}
               filterAbort = null;
             }
             busy = true;
             var started = Date.now();
+            var skelShown = false;
+            var skelTimer = window.setTimeout(function () {
+              skelShown = true;
+              workspace.innerHTML = skeletonHtml(skeletonKind(url));
+              workspace.classList.remove('is-leaving');
+              workspace.classList.add('is-skel');
+            }, SKEL_DELAY);
+            var clearSkel = function () {
+              window.clearTimeout(skelTimer);
+              workspace.classList.remove('is-skel');
+            };
             if (!reduceMotion()) workspace.classList.add('is-leaving');
             return fetch(url, {
               credentials: 'same-origin',
+              cache: 'no-store',
               headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
             })
               .then(function (response) {
@@ -5961,8 +6062,10 @@
                 var doc = new DOMParser().parseFromString(text, 'text/html');
                 var next = doc.querySelector('.workspace');
                 if (!next) throw new Error('nav');
-                var leaveWait = reduceMotion() ? 0 : Math.max(0, 320 - (Date.now() - started));
+                window.clearTimeout(skelTimer);
+                var leaveWait = (reduceMotion() || skelShown) ? 0 : Math.max(0, 320 - (Date.now() - started));
                 return wait(leaveWait).then(function () {
+                  clearSkel();
                   applyWorkspace(next.innerHTML, doc.title, url, push ? 'push' : '', null);
                   return playArrive().then(function () {
                     syncNav(doc, url);
@@ -5971,13 +6074,14 @@
                 });
               })
               .catch(function () {
+                clearSkel();
                 busy = false;
                 workspace.classList.remove('is-leaving', 'is-arrive');
                 location.href = url;
               });
           }
 
-          if (urlKey(url) === shownKey) return Promise.resolve();
+          if (!force && urlKey(url) === shownKey) return Promise.resolve();
           if (filterAbort) {
             try { filterAbort.abort(); } catch (err) {}
           }
@@ -5987,6 +6091,7 @@
           return fetch(url, {
             credentials: 'same-origin',
             signal: signal,
+            cache: 'no-store',
             headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
           })
             .then(function (response) {
@@ -6044,6 +6149,7 @@
           return fetch(url, {
             credentials: 'same-origin',
             signal: signal,
+            cache: 'no-store',
             headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
           })
             .then(function (response) {
@@ -6142,6 +6248,8 @@
           if (url.origin !== location.origin) return;
           if (url.pathname.indexOf('/cikis') !== -1) return;
           if (url.pathname.indexOf('/field/') === 0) return;
+          // In-page anchors (#...) on the same page are not navigation.
+          if (url.hash && urlKey(url.href) === shownKey) return;
           if (link.hasAttribute('data-cal-month-swap')) {
             event.preventDefault();
             swapServiceBrowse(url.href, true);
@@ -6191,6 +6299,103 @@
             openPage(href, false, { quiet: true, replace: true, focusSearch: true });
           }, 320));
         });
+
+        // ---- Live updates (websocket /ws/portal/) ------------------------------------
+        // Another user's write → refresh the list on screen quietly, or toast if we can't.
+        (function liveUpdates() {
+          if (!window.WebSocket || document.body.classList.contains('is-field')) return;
+          var me = String(document.body.getAttribute('data-user-id') || '');
+          if (!me) return;
+          var sock = null;
+          var retry = 1000;
+          var pingTimer = null;
+          var dirty = {};
+          var flushTimer = null;
+          var toastText = [];
+
+          function pageKinds() {
+            var path = location.pathname;
+            if (path === '/dashboard/') return ['sales', 'jobs', 'stock', 'maintenance'];
+            if (path === '/sales/' || path === '/sales/customers/' || path === '/sales/mount-activation/') return ['sales', 'stock'];
+            if (path === '/service/' || path === '/service/jobs/' || path === '/service/clients/') return ['jobs'];
+            if (path === '/service/reminders/') return ['maintenance'];
+            if (path === '/stock/') return ['stock'];
+            return [];
+          }
+          function userBusy() {
+            if (busy || document.visibilityState !== 'visible') return true;
+            if (document.querySelector('.modal:not([hidden]), .sheet-modal:not([hidden]), dialog[open]')) return true;
+            var el = document.activeElement;
+            if (!el || !workspace.contains(el)) return false;
+            if (el.matches('input[type=search][name=q]')) return false; // quiet swap keeps search focus
+            return el.matches('input, textarea, select, [contenteditable]');
+          }
+          function flush() {
+            flushTimer = null;
+            var kinds = Object.keys(dirty);
+            if (!kinds.length) return;
+            var wanted = pageKinds();
+            var relevant = kinds.some(function (k) { return wanted.indexOf(k) !== -1; });
+            if (relevant && userBusy()) {
+              flushTimer = window.setTimeout(flush, 2000);
+              return;
+            }
+            dirty = {};
+            if (kinds.indexOf('maintenance') !== -1 && window.portalBellRefresh) window.portalBellRefresh(true);
+            if (relevant) {
+              var search = workspace.querySelector('input[type=search][name=q]');
+              var focusSearch = !!(search && document.activeElement === search);
+              openPage(location.pathname + location.search, false, { quiet: true, force: true, focusSearch: focusSearch });
+            }
+            if (toastText.length && window.portalToast) {
+              window.portalToast(toastText.length === 1 ? toastText[0] : toastText.length + ' yeni kayıt', false, 'Canlı');
+            }
+            toastText = [];
+          }
+          function onEvent(msg) {
+            if (!msg || msg.type !== 'live' || !msg.kind) return;
+            if (msg.actor != null && String(msg.actor) === me) return;
+            dirty[msg.kind] = true;
+            if (msg.text && toastText.indexOf(msg.text) === -1) toastText.push(msg.text);
+            if (!flushTimer) flushTimer = window.setTimeout(flush, 600);
+          }
+          function connect() {
+            var scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+            try { sock = new WebSocket(scheme + location.host + '/ws/portal/'); } catch (err) { return; }
+            sock.onopen = function () {
+              retry = 1000;
+              window.clearInterval(pingTimer);
+              pingTimer = window.setInterval(function () {
+                if (sock && sock.readyState === 1) sock.send('{"type":"ping"}');
+              }, 25000);
+            };
+            sock.onmessage = function (event) {
+              try { onEvent(JSON.parse(event.data)); } catch (err) {}
+            };
+            sock.onclose = function (event) {
+              window.clearInterval(pingTimer);
+              sock = null;
+              if (event.code === 4401 || event.code === 4403) return; // not allowed: don't hammer
+              window.setTimeout(connect, retry);
+              retry = Math.min(retry * 2, 30000);
+            };
+          }
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState !== 'visible') return;
+            if (!sock) { retry = 1000; connect(); }
+            if (Object.keys(dirty).length && !flushTimer) flushTimer = window.setTimeout(flush, 200);
+          });
+          connect();
+        })();
+
+        // Back/forward cache restore: page HTML may be stale, refresh workspace quietly.
+        window.addEventListener('pageshow', function (event) {
+          if (!event.persisted) return;
+          openPage(location.pathname + location.search, false, { quiet: true, force: true });
+        });
+        window.portalRefresh = function () {
+          return openPage(location.pathname + location.search, false, { quiet: true, force: true });
+        };
 
         window.addEventListener('popstate', function () {
           if (window.portalCloseNav) window.portalCloseNav();

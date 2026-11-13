@@ -10,3 +10,7 @@ class AccountsConfig(AppConfig):
         from .search import register_search_lookups
 
         register_search_lookups()
+
+        from .signals import connect_live_signals
+
+        connect_live_signals()

@@ -177,6 +177,21 @@
               <i></i>
             </span>
           </label>
+          <div class="row" id="s-copper-meters-wrap" hidden style="margin-top:16px">
+            <input id="s_included_copper" name="included_copper_meters" placeholder=" " inputmode="decimal" autocomplete="off" />
+            <label for="s_included_copper">Split dahil bakır (mt)</label>
+          </div>
+          <p class="hint" id="s-copper-meters-hint" hidden>Boş veya 0 = dahil yok. Yalnız split cihazlar için.</p>
+          <label class="switch" for="s_is_copper" style="margin-top:16px" id="s-copper-switch-wrap">
+            <span>
+              <b>Bakır boru kategorisi</b>
+              <small class="hint">Montaj malzemesinde bakır metre bu kategoriden sayılır.</small>
+            </span>
+            <span class="toggle">
+              <input type="checkbox" name="is_copper_pipe" id="s_is_copper" value="1" />
+              <i></i>
+            </span>
+          </label>
           <p class="hint" id="s-cat-hint">Önek 2–6 harf. Marka bu kategorideki yeni ürüne gelir.</p>
         </div>
         <p class="modal-alert" id="stock-settings-error" hidden role="alert"></p>
@@ -201,6 +216,11 @@
       var prefixEl = document.getElementById('s_prefix');
       var brandEl = document.getElementById('s_brand');
       var klimaEl = document.getElementById('s_is_klima');
+      var copperEl = document.getElementById('s_is_copper');
+      var copperMetersEl = document.getElementById('s_included_copper');
+      var copperMetersWrap = document.getElementById('s-copper-meters-wrap');
+      var copperMetersHint = document.getElementById('s-copper-meters-hint');
+      var copperSwitchWrap = document.getElementById('s-copper-switch-wrap');
       var deleteBtn = document.getElementById('delete-stock-settings');
       var hintEl = document.getElementById('s-cat-hint');
       var csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
@@ -210,6 +230,18 @@
         try { cat = JSON.parse(catNode.textContent) || null; } catch (e) { cat = null; }
       }
       if (!cat) return;
+      function syncCatFlags() {
+        var klimaOn = !!(klimaEl && klimaEl.checked);
+        var copperOn = !!(copperEl && copperEl.checked);
+        if (klimaOn && copperEl) copperEl.checked = false;
+        if (copperOn && !klimaOn && klimaEl) { /* ok */ }
+        if (klimaOn && copperEl && copperEl.checked) copperEl.checked = false;
+        klimaOn = !!(klimaEl && klimaEl.checked);
+        if (copperMetersWrap) copperMetersWrap.hidden = !klimaOn;
+        if (copperMetersHint) copperMetersHint.hidden = !klimaOn;
+        if (copperSwitchWrap) copperSwitchWrap.hidden = klimaOn;
+        if (!klimaOn && copperMetersEl) copperMetersEl.value = '';
+      }
       function lockPrefix(on) {
         prefixEl.readOnly = !!on;
         prefixEl.tabIndex = on ? -1 : 0;
@@ -225,9 +257,17 @@
         prefixEl.value = cat.prefix || '';
         brandEl.value = cat.brand || '';
         if (klimaEl) klimaEl.checked = !!cat.is_klima;
+        if (copperEl) copperEl.checked = !!cat.is_copper_pipe && !cat.is_klima;
+        if (copperMetersEl) copperMetersEl.value = cat.included_copper_meters || '';
+        syncCatFlags();
         lockPrefix(!!cat.locked);
         if (deleteBtn) deleteBtn.hidden = false;
       }
+      if (klimaEl) klimaEl.addEventListener('change', syncCatFlags);
+      if (copperEl) copperEl.addEventListener('change', function () {
+        if (copperEl.checked && klimaEl) klimaEl.checked = false;
+        syncCatFlags();
+      });
       function reveal() {
         fillCat();
         modal.hidden = false;

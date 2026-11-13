@@ -268,3 +268,60 @@ class DeviceSerialTrackingTests(TestCase):
         )
         self.assertFalse(sale_line_is_device(acc_line, sale))
         self.assertTrue(sale_line_is_device(curtain_line, sale))
+
+
+class CopperCategoryTests(TestCase):
+    def setUp(self):
+        self.lead = Customer.objects.create_user(
+            username='copper-cat-lead',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE_LEAD,
+        )
+
+    def test_klima_included_meters_and_copper_flag(self):
+        klima = create_category(
+            name='Mitsubishi Heavy',
+            prefix='MHI',
+            user=self.lead,
+            is_klima=True,
+            included_copper_meters='5',
+        )
+        self.assertEqual(klima.included_copper_meters, Decimal('5.00'))
+        self.assertFalse(klima.is_copper_pipe)
+        copper = create_category(
+            name='Bakır Test',
+            prefix='BKT',
+            user=self.lead,
+            is_copper_pipe=True,
+        )
+        self.assertTrue(copper.is_copper_pipe)
+        self.assertEqual(copper.included_copper_meters, Decimal('0.00'))
+
+    def test_protected_copper_category_keeps_flag(self):
+        from stock.services import copper_category, update_category
+
+        copper = copper_category(self.lead)
+        update_category(item=copper, name=copper.name, prefix=copper.sku_prefix, is_copper_pipe=False)
+        copper.refresh_from_db()
+        self.assertTrue(copper.is_copper_pipe)
+
+    def test_included_meters_capped(self):
+        with self.assertRaisesMessage(ValueError, 'en fazla 1000'):
+            create_category(
+                name='Huge Klima',
+                prefix='HGK',
+                user=self.lead,
+                is_klima=True,
+                included_copper_meters='5000',
+            )
+
+    def test_klima_and_copper_mutually_exclusive(self):
+        with self.assertRaisesMessage(ValueError, 'Klima ve bakır boru aynı kategoride olamaz.'):
+            create_category(
+                name='Bad Mix',
+                prefix='BAD',
+                user=self.lead,
+                is_klima=True,
+                is_copper_pipe=True,
+            )

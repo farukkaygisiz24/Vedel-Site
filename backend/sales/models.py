@@ -214,6 +214,7 @@ class SaleLine(models.Model):
         blank=True,
     )
     description = models.CharField('Açıklama', max_length=200, blank=True)
+    is_copper = models.BooleanField('Anlaşılan bakır boru', default=False)
     qty = models.DecimalField('Adet', max_digits=12, decimal_places=2)
     unit_price = models.DecimalField('Birim fiyat', max_digits=12, decimal_places=2)
     cost_price = models.DecimalField('Alış', max_digits=12, decimal_places=2, default=Decimal('0.00'))

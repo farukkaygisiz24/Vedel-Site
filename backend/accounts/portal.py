@@ -71,11 +71,11 @@ def portal_dashboard(request: HttpRequest) -> HttpResponse:
     home = home_url_name(request.user)
     if home != 'portal-dashboard':
         return redirect(home)
-    return render(
-        request,
-        'portal/dashboard.html',
-        {'weather': get_weather()},
-    )
+    from accounts.dashboard import dashboard_context
+
+    ctx = dashboard_context(request.user)
+    ctx['weather'] = get_weather()
+    return render(request, 'portal/dashboard.html', ctx)
 
 
 @login_required
