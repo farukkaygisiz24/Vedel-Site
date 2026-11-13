@@ -53,8 +53,8 @@
           <dd>{{ product.vat_rate|tr_qty }}%</dd>
         </div>
         <div>
-          <dt>Cihaz</dt>
-          <dd>{% if product.device_kind == 'split' %}Split{% elif product.device_kind == 'multi_indoor' %}Multi iç ünite{% elif product.device_kind == 'multi_outdoor' %}Multi dış ünite{% elif product.is_device %}Evet{% else %}Hayır{% endif %}</dd>
+          <dt>Seri no</dt>
+          <dd>{% if product.device_kind == 'split' %}Split · takipte{% elif product.device_kind == 'multi_indoor' %}Multi iç · takipte{% elif product.device_kind == 'multi_outdoor' %}Multi dış · takipte{% elif product.is_device %}Takipte{% else %}Gerekmez{% endif %}</dd>
         </div>
         {% if product.device_kind == 'split' %}
         <div>
@@ -178,7 +178,7 @@
               <label for="id_qty">Giriş adedi</label>
             </div>
             <div class="row">
-              <input id="id_in_buy_price" name="buy_price" inputmode="decimal" placeholder=" " value="{% if product.buy_price %}{{ product.buy_price }}{% endif %}" />
+              <input id="id_in_buy_price" name="buy_price" inputmode="decimal" placeholder=" " value="{% if product.buy_price %}{{ product.buy_price|tr_money }}{% endif %}" />
               <label for="id_in_buy_price">Alış fiyatı</label>
             </div>
             <div class="row prod-pick">
@@ -262,20 +262,20 @@
               <label for="p_unit">Birim</label>
             </div>
           </div>
-          {% include 'portal/_product_klima.html' with category_is_klima=product.category.is_klima form_device_kind=product.device_kind outdoor_name=product.outdoor_name %}
+          {% include 'portal/_product_klima.html' with category_is_klima=product.category.is_klima form_tracks_serial=product.is_device form_device_kind=product.device_kind outdoor_name=product.outdoor_name %}
           <p class="field-label">Fiyat</p>
           <div class="pay-grid">
             <label class="pay-card">
               <span class="pay-kicker">Alış</span>
-              <input id="p_buy_price" name="buy_price" inputmode="decimal" placeholder="0,00" autocomplete="off" value="{% if product.buy_price %}{{ product.buy_price }}{% endif %}" />
+              <input id="p_buy_price" name="buy_price" inputmode="decimal" placeholder="0,00" autocomplete="off" value="{% if product.buy_price %}{{ product.buy_price|tr_money }}{% endif %}" />
             </label>
             <label class="pay-card">
               <span class="pay-kicker">Satış</span>
-              <input id="p_sale_price" name="sale_price" inputmode="decimal" placeholder="0,00" autocomplete="off" value="{% if product.sale_price %}{{ product.sale_price }}{% endif %}" />
+              <input id="p_sale_price" name="sale_price" inputmode="decimal" placeholder="0,00" autocomplete="off" value="{% if product.sale_price %}{{ product.sale_price|tr_money }}{% endif %}" />
             </label>
             <label class="pay-card">
               <span class="pay-kicker">KDV %</span>
-              <input id="p_vat_rate" name="vat_rate" inputmode="decimal" placeholder="20" value="{{ product.vat_rate }}" />
+              <input id="p_vat_rate" name="vat_rate" inputmode="decimal" placeholder="20" value="{{ product.vat_rate|tr_qty }}" />
             </label>
           </div>
         </div>
@@ -310,6 +310,78 @@
       var supplierCtl = null;
       var MODAL_DISCARD_CONFIRM = 'Pencere kapatılacak. Değişiklikler iptal edilecek. Onaylıyor musun?';
 
+      function formatMoneyInput(raw, complete) {
+        var text = String(raw || '');
+        if (!text.trim()) return '';
+        if (text.indexOf(',') < 0 && /^\d+\.\d{1,2}$/.test(text.trim())) {
+          text = text.trim().replace('.', ',');
+        }
+        text = text.replace(/[^\d,]/g, '');
+        var comma = text.indexOf(',');
+        var intPart;
+        var decPart;
+        var hasComma = comma >= 0;
+        if (hasComma) {
+          intPart = text.slice(0, comma).replace(/\D/g, '');
+          decPart = text.slice(comma + 1).replace(/\D/g, '').slice(0, 2);
+        } else {
+          intPart = text.replace(/\D/g, '');
+          decPart = '';
+        }
+        if (!intPart && !decPart && !hasComma) return '';
+        intPart = intPart.replace(/^0+(?=\d)/, '').slice(0, 10);
+        if (!intPart) intPart = '0';
+        var grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        if (complete) return grouped + ',' + (decPart + '00').slice(0, 2);
+        return hasComma ? grouped + ',' + decPart : grouped;
+      }
+      function caretAfterDigits(value, count) {
+        var pos = 0;
+        var seen = 0;
+        while (pos < value.length && seen < count) {
+          if (/\d/.test(value.charAt(pos))) seen += 1;
+          pos += 1;
+        }
+        return pos;
+      }
+      function bindMoneyInput(el) {
+        if (!el || el._moneyBound) return;
+        el._moneyBound = true;
+        el.addEventListener('keydown', function (event) {
+          if (event.key !== '.' && event.key !== ',') return;
+          if (String(el.value).indexOf(',') >= 0) {
+            event.preventDefault();
+            return;
+          }
+          if (event.key !== '.') return;
+          event.preventDefault();
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = el.value.slice(0, start) + ',' + el.value.slice(end);
+          el.setSelectionRange(start + 1, start + 1);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        el.addEventListener('input', function () {
+          var start = el.selectionStart;
+          var old = el.value;
+          var typedComma = start > 0 && old.charAt(start - 1) === ',';
+          var digitsBefore = old.slice(0, start).replace(/\D/g, '').length;
+          var next = formatMoneyInput(old);
+          el.value = next;
+          if (typedComma && next.indexOf(',') >= 0) {
+            var commaAt = next.indexOf(',');
+            el.setSelectionRange(commaAt + 1, commaAt + 1);
+          } else {
+            var pos = caretAfterDigits(next, digitsBefore);
+            el.setSelectionRange(pos, pos);
+          }
+        });
+        el.addEventListener('blur', function () {
+          var next = formatMoneyInput(el.value, true);
+          if (el.value !== next) el.value = next;
+        });
+        if (el.value.trim()) el.value = formatMoneyInput(el.value, true);
+      }
       function reduceMotion() {
         return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       }
@@ -559,7 +631,11 @@
       }
       function openEditModal() {
         resetEditForm();
-        if (window.syncKlimaFields) window.syncKlimaFields({{ product.category.is_klima|yesno:'true,false' }});
+        if (window.syncKlimaFields) window.syncKlimaFields({{ product.category.is_klima|yesno:'true,false' }}, {{ product.is_device|yesno:'true,false' }});
+        ['p_buy_price', 'p_sale_price'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el && el.value.trim()) el.value = formatMoneyInput(el.value, true);
+        });
         snapshotModalForm(editForm);
         revealModal(editModal);
         window.setTimeout(function () {
@@ -633,6 +709,10 @@
         }
       });
 
+      bindMoneyInput(document.getElementById('p_buy_price'));
+      bindMoneyInput(document.getElementById('p_sale_price'));
+      bindMoneyInput(document.getElementById('id_in_buy_price'));
+
       {% if stock_modal == 'in' %}
       openInModal();
       showAlert(inErr, '{{ error|escapejs }}');
@@ -645,7 +725,7 @@
       if (editModal) {
         revealModal(editModal);
         snapshotModalForm(editForm);
-        if (window.syncKlimaFields) window.syncKlimaFields({{ product.category.is_klima|yesno:'true,false' }});
+        if (window.syncKlimaFields) window.syncKlimaFields({{ product.category.is_klima|yesno:'true,false' }}, {{ product.is_device|yesno:'true,false' }});
       }
       {% endif %}
     })();

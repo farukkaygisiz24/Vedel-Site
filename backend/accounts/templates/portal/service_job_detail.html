@@ -59,6 +59,7 @@
         {% endif %}
       </dl>
     </section>
+    {% include 'portal/_sale_mount_facts.html' with sale=job.sale %}
 
     {% if sold_groups %}
     <section class="fis-block">
@@ -118,7 +119,7 @@
     {% if show_payment_details %}
     <div class="fis-settle" id="pay-details">
       {{ adjust_lines|json_script:"adjust-lines" }}
-      <form method="post" action="{{ job.get_absolute_url }}" class="fis-card" id="adjust-form" novalidate data-paid="{{ job.paid_total }}" data-vat="{{ job.vat_mode }}">
+      <form method="post" action="{{ job.get_absolute_url }}" class="fis-card" id="adjust-form" novalidate data-paid="{{ job.paid_total|plain_money }}" data-vat="{{ job.vat_mode }}">
         {% csrf_token %}
         <input type="hidden" name="action" value="adjust" />
         <div class="fis-card-head">

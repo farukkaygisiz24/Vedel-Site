@@ -18,12 +18,14 @@ from stock.services import MOUNT_CATEGORY_SLUG, MOUNT_SKU_PREFIX, SERVICE_LABOR_
 
 from .models import Device, Job, JobLine, JobSoldUnit, JobSoldUnitMaterial, JobSoldUnitPhoto
 from .services import (
+    activate_sale_mount,
     adjust_closed_job,
     apply_sold_units,
     close_job,
     confirm_job,
     ensure_sold_packs,
     relabel_mount_job,
+    sale_mount_preview_rows,
     save_field_job,
     save_job,
     schedule_sale_job,
@@ -1573,7 +1575,7 @@ class SaleMountJobTests(TestCase):
         self.assertEqual(closed.status, Job.STATUS_CLOSED)
         self.assertEqual(closed.device_id, devices[0].pk)
         self.assertEqual(devices[0].place, 'SALON')
-        self.assertEqual(devices[0].interval_months, 6)
+        self.assertEqual(devices[0].interval_months, 9)
         self.assertEqual(devices[0].last_serviced_on, job.date)
         self.assertIn('OUT-1', devices[0].name)
         units[0].refresh_from_db()
@@ -1838,3 +1840,189 @@ class SaleMountJobTests(TestCase):
         self.assertEqual(unit.serial, 'IN-1')
         self.assertEqual(pack.outdoor_serial, 'OUT-1')
         self.assertEqual(Device.objects.filter(party=self.party).count(), 1)
+
+    def test_legal_mount_visible_on_service_field_and_device_place(self):
+        legal = Party.objects.create(
+            kind=Party.KIND_LEGAL,
+            number='CUSTC9010',
+            company_name='Beztas Montaj',
+            first_name='Ali',
+            last_name='Yetkili',
+            tax_no='1234567890',
+            phone='05550001122',
+            address='Fatura mah',
+            city='BURSA',
+            district='OSMANGAZİ',
+            created_by=self.lead,
+        )
+        sale = self._sale(number='SAL20990110', qty='1')
+        sale.party = legal
+        sale.mount_contact_name = 'ŞANTİYE AHMET'
+        sale.mount_phone = '0 (555) 111 22 33'
+        sale.mount_city = 'BURSA'
+        sale.mount_district = 'NİLÜFER'
+        sale.mount_address = 'ŞANTİYE KAPI 2'
+        sale.mount_notes = 'Akşam gelin'
+        sale.save(
+            update_fields=[
+                'party',
+                'mount_contact_name',
+                'mount_phone',
+                'mount_city',
+                'mount_district',
+                'mount_address',
+                'mount_notes',
+            ]
+        )
+        job = schedule_sale_job(sale=sale, when=date.today(), user=self.lead, clock=time(10, 0))
+        self.client.force_login(self.lead)
+        pending = self.client.get(job.get_absolute_url())
+        self.assertContains(pending, 'Montaj yeri')
+        self.assertContains(pending, 'ŞANTİYE AHMET')
+        self.assertContains(pending, 'ŞANTİYE KAPI 2')
+        self.assertContains(pending, 'Akşam gelin')
+        confirm_job(job=job, user=self.lead, when=date.today(), clock=time(10, 0), assignee=self.member)
+        self.client.force_login(self.tech)
+        field = self.client.get(job.get_field_url())
+        self.assertContains(field, 'Montaj yeri')
+        self.assertContains(field, 'ŞANTİYE AHMET')
+        self.assertContains(field, 'Akşam gelin')
+        pack = job.sold_packs.get()
+        unit = job.sold_units.get()
+        unit.room = 'SALON'
+        unit.serial = 'IN-MT-1'
+        unit.save(update_fields=['room', 'serial'])
+        pack.outdoor_serial = 'OUT-MT-1'
+        pack.interval_months = 6
+        pack.last_serviced_on = job.date
+        pack.save(update_fields=['outdoor_serial', 'interval_months', 'last_serviced_on'])
+        job.status = Job.STATUS_SUBMITTED
+        job.save(update_fields=['status'])
+        closed = close_job(job=job, user=self.lead)
+        device = closed.device
+        self.assertIsNotNone(device)
+        self.assertIn('NİLÜFER / BURSA', device.place)
+        self.assertIn('ŞANTİYE KAPI 2', device.place)
+        self.client.force_login(self.lead)
+        customer = self.client.get(legal.get_absolute_url() + '?tab=devices')
+        self.assertContains(customer, 'NİLÜFER / BURSA')
+        self.assertContains(customer, 'ŞANTİYE KAPI 2')
+        self.assertContains(customer, 'ŞANTİYE AHMET')
+        self.assertIn('NİLÜFER / BURSA', device.place)
+        self.assertIn('ŞANTİYE KAPI 2', device.place)
+
+
+class MountActivationBackfillTests(TestCase):
+    def setUp(self):
+        self.lead = Customer.objects.create_user(
+            username='act-lead',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE_LEAD,
+        )
+        self.party = Party.objects.create(
+            kind=Party.KIND_REAL,
+            number='CUSTC8111',
+            first_name='Ali',
+            last_name='Aktif',
+            phone='05550001122',
+            address='Test',
+            city='BURSA',
+            district='NİLÜFER',
+            created_by=self.lead,
+        )
+        self.category = Category.objects.create(
+            name='Klima Split Act',
+            slug='klima-split-act',
+            sku_prefix='KA',
+            is_klima=True,
+            created_by=self.lead,
+        )
+        self.split = Product.objects.create(
+            sku='KASPL1',
+            brand='Daikin',
+            name='FTXM25',
+            category=self.category,
+            is_device=True,
+            device_kind=Product.KIND_SPLIT,
+            outdoor_name='RXM25',
+            stock_qty=Decimal('5.00'),
+            created_by=self.lead,
+        )
+
+    def _past_sale(self):
+        when = date.today() - timedelta(days=40)
+        sale = Sale.objects.create(
+            number='SAL20998801',
+            date=when,
+            party=self.party,
+            work_type=Sale.WORK_DEVICE,
+            vat_mode=Sale.VAT_NONE,
+            subtotal=Decimal('1000.00'),
+            vat_total=Decimal('0.00'),
+            grand_total=Decimal('1000.00'),
+            created_by=self.lead,
+            updated_by=self.lead,
+        )
+        zero = Decimal('0.00')
+        SaleLine.objects.create(
+            sale=sale,
+            product=self.split,
+            qty=Decimal('1'),
+            unit_price=Decimal('1000.00'),
+            cost_price=zero,
+            vat_rate=zero,
+            line_net=Decimal('1000.00'),
+            line_vat=zero,
+            line_total=Decimal('1000.00'),
+        )
+        return sale
+
+    def test_activate_past_sale_creates_closed_device(self):
+        sale = self._past_sale()
+        rows = sale_mount_preview_rows(sale)
+        self.assertEqual(len(rows), 1)
+        key = rows[0]['source_key']
+        post = {
+            'interval_months': '9',
+            f'serial_{key}': 'in-past-1',
+            f'outdoor_{key}': 'out-past-1',
+        }
+        job = activate_sale_mount(sale=sale, user=self.lead, post=post)
+        self.assertEqual(job.status, Job.STATUS_CLOSED)
+        self.assertEqual(job.date, sale.date)
+        self.assertIsNotNone(job.device_id)
+        pack = job.sold_packs.get()
+        self.assertEqual(pack.outdoor_serial, 'OUT-PAST-1')
+        self.assertEqual(pack.interval_months, 9)
+        self.assertEqual(pack.last_serviced_on, sale.date)
+        unit = pack.units.get()
+        self.assertEqual(unit.serial, 'İN-PAST-1')
+        device = job.device
+        self.assertEqual(device.last_serviced_on, sale.date)
+        self.assertEqual(device.interval_months, 9)
+        from service.services import add_months
+
+        self.assertEqual(device.next_due, add_months(sale.date, 9))
+
+    def test_activate_twice_rejected(self):
+        sale = self._past_sale()
+        rows = sale_mount_preview_rows(sale)
+        key = rows[0]['source_key']
+        post = {
+            'interval_months': '6',
+            f'serial_{key}': 'in-1',
+            f'outdoor_{key}': 'out-1',
+        }
+        activate_sale_mount(sale=sale, user=self.lead, post=post)
+        with self.assertRaisesMessage(ValueError, 'Bu satış zaten aktif edilmiş.'):
+            activate_sale_mount(sale=sale, user=self.lead, post=post)
+
+    def test_mount_activation_page_lists_past_sale(self):
+        sale = self._past_sale()
+        self.client.force_login(self.lead)
+        page = self.client.get('/sales/mount-activation/')
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, sale.number)
+        self.assertContains(page, 'Bakım aralığı')
+        self.assertContains(page, 'value="12" checked')

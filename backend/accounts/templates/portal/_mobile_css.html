@@ -266,6 +266,21 @@
 
         .mount-row > :first-child { grid-column: 1 / -1; }
 
+        .mount-act-row {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 8px;
+        }
+
+        .mount-act-foot {
+          flex-wrap: wrap;
+          align-items: stretch;
+        }
+
+        .mount-act-foot .btn {
+          width: 100%;
+          min-width: 0;
+        }
+
         /* Line editors: description on its own row, numbers below */
         .line-head { display: none; }
 

@@ -37,6 +37,7 @@
         {% include 'portal/_party_facts.html' with party=job.party %}
       </dl>
     </section>
+    {% include 'portal/_sale_mount_facts.html' with sale=job.sale %}
 
     <form method="post" action="{{ job.get_absolute_url }}" id="pending-job-form" autocomplete="off">
       {% csrf_token %}

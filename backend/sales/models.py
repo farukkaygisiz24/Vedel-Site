@@ -2,7 +2,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Q, Sum
 
 
 class Party(models.Model):
@@ -42,6 +42,13 @@ class Party(models.Model):
         verbose_name = 'Cari'
         verbose_name_plural = 'Cariler'
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tax_no'],
+                condition=Q(kind='legal') & ~Q(tax_no=''),
+                name='uniq_party_legal_tax_no',
+            ),
+        ]
 
     def __str__(self):
         return self.display_name
@@ -109,6 +116,12 @@ class Sale(models.Model):
     )
     invoice_no = models.CharField('Fatura no', max_length=40, blank=True)
     notes = models.TextField('Not', blank=True)
+    mount_contact_name = models.CharField('Montaj kişi', max_length=160, blank=True)
+    mount_phone = models.CharField('Montaj telefon', max_length=20, blank=True)
+    mount_city = models.CharField('Montaj il', max_length=80, blank=True)
+    mount_district = models.CharField('Montaj ilçe', max_length=80, blank=True)
+    mount_address = models.TextField('Montaj adres', blank=True)
+    mount_notes = models.TextField('Montaj açıklama', blank=True)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     vat_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -135,6 +148,27 @@ class Sale(models.Model):
     def __str__(self):
         return self.number
 
+    @property
+    def has_mount(self) -> bool:
+        return bool(
+            (self.mount_contact_name or '').strip()
+            or (self.mount_phone or '').strip()
+            or (self.mount_city or '').strip()
+            or (self.mount_district or '').strip()
+            or (self.mount_address or '').strip()
+            or (self.mount_notes or '').strip()
+        )
+
+    @property
+    def mount_place_summary(self) -> str:
+        loc = ' / '.join(
+            part for part in ((self.mount_district or '').strip(), (self.mount_city or '').strip()) if part
+        )
+        address = (self.mount_address or '').strip()
+        if loc and address:
+            return f'{loc} · {address}'
+        return loc or address
+
     def get_absolute_url(self) -> str:
         from django.urls import reverse
         if self.is_archived:
@@ -160,7 +194,8 @@ class Sale(models.Model):
 
     @property
     def remaining(self) -> Decimal:
-        return self.grand_total - self.paid_total
+        value = self.grand_total - self.paid_total
+        return value.quantize(Decimal('0.01'))
 
 
 class SaleLine(models.Model):

@@ -53,7 +53,7 @@
       </div>
     </div>
 
-    {% include 'portal/_product_klima.html' with category_is_klima=category_is_klima form_device_kind=form_device_kind outdoor_name=form_outdoor_name %}
+    {% include 'portal/_product_klima.html' with category_is_klima=category_is_klima form_tracks_serial=form_tracks_serial form_device_kind=form_device_kind outdoor_name=form_outdoor_name %}
 
     <p class="field-label">Fiyat</p>
     <div class="pay-grid">
@@ -218,7 +218,9 @@
         applySku();
         applyBrand(item, !!closePick);
         paintPick();
-        if (window.syncKlimaFields) window.syncKlimaFields(!!item.is_klima);
+        if (window.syncKlimaFields) {
+          window.syncKlimaFields(!!item.is_klima, item.is_klima ? true : false);
+        }
         if (closePick) closePickPop();
       }
       function paintPick() {
@@ -368,6 +370,81 @@
           err.hidden = false;
         });
       });
+
+      function formatMoneyInput(raw, complete) {
+        var text = String(raw || '');
+        if (!text.trim()) return '';
+        if (text.indexOf(',') < 0 && /^\d+\.\d{1,2}$/.test(text.trim())) {
+          text = text.trim().replace('.', ',');
+        }
+        text = text.replace(/[^\d,]/g, '');
+        var comma = text.indexOf(',');
+        var intPart;
+        var decPart;
+        var hasComma = comma >= 0;
+        if (hasComma) {
+          intPart = text.slice(0, comma).replace(/\D/g, '');
+          decPart = text.slice(comma + 1).replace(/\D/g, '').slice(0, 2);
+        } else {
+          intPart = text.replace(/\D/g, '');
+          decPart = '';
+        }
+        if (!intPart && !decPart && !hasComma) return '';
+        intPart = intPart.replace(/^0+(?=\d)/, '').slice(0, 10);
+        if (!intPart) intPart = '0';
+        var grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        if (complete) return grouped + ',' + (decPart + '00').slice(0, 2);
+        return hasComma ? grouped + ',' + decPart : grouped;
+      }
+      function caretAfterDigits(value, count) {
+        var pos = 0;
+        var seen = 0;
+        while (pos < value.length && seen < count) {
+          if (/\d/.test(value.charAt(pos))) seen += 1;
+          pos += 1;
+        }
+        return pos;
+      }
+      function bindMoneyInput(el) {
+        if (!el || el._moneyBound) return;
+        el._moneyBound = true;
+        el.addEventListener('keydown', function (event) {
+          if (event.key !== '.' && event.key !== ',') return;
+          if (String(el.value).indexOf(',') >= 0) {
+            event.preventDefault();
+            return;
+          }
+          if (event.key !== '.') return;
+          event.preventDefault();
+          var start = el.selectionStart;
+          var end = el.selectionEnd;
+          el.value = el.value.slice(0, start) + ',' + el.value.slice(end);
+          el.setSelectionRange(start + 1, start + 1);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        el.addEventListener('input', function () {
+          var start = el.selectionStart;
+          var old = el.value;
+          var typedComma = start > 0 && old.charAt(start - 1) === ',';
+          var digitsBefore = old.slice(0, start).replace(/\D/g, '').length;
+          var next = formatMoneyInput(old);
+          el.value = next;
+          if (typedComma && next.indexOf(',') >= 0) {
+            var commaAt = next.indexOf(',');
+            el.setSelectionRange(commaAt + 1, commaAt + 1);
+          } else {
+            var pos = caretAfterDigits(next, digitsBefore);
+            el.setSelectionRange(pos, pos);
+          }
+        });
+        el.addEventListener('blur', function () {
+          var next = formatMoneyInput(el.value, true);
+          if (el.value !== next) el.value = next;
+        });
+        if (el.value.trim()) el.value = formatMoneyInput(el.value, true);
+      }
+      bindMoneyInput(document.getElementById('p_buy_price'));
+      bindMoneyInput(document.getElementById('p_sale_price'));
     })();
   </script>
 {% endblock %}

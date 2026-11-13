@@ -44,6 +44,27 @@
       <div class="party-list" id="party-list"></div>
       <div class="pager" id="party-pager" hidden></div>
       <p class="pager-meta" id="party-meta"></p>
+      <div class="mount-block" id="mount-block" hidden>
+        <p class="field-label">Montaj yeri</p>
+        <p class="step-copy">Tüzel satışta montaj kişi ve adres bilgisi. Hiçbiri zorunlu değil; doldurulanlar servis ve sahada görünür.</p>
+        <div class="row">
+          <input type="text" name="mount_contact_name" id="mount_contact_name" placeholder=" " autocomplete="off" />
+          <label for="mount_contact_name">Ad soyad</label>
+        </div>
+        <div class="row">
+          <input type="tel" name="mount_phone" id="mount_phone" inputmode="tel" placeholder=" " autocomplete="off" />
+          <label for="mount_phone">Telefon</label>
+        </div>
+        {% include 'portal/_city_district_picks.html' with city_id='mount_city' district_id='mount_district' city_name='mount_city' district_name='mount_district' required=False no_default=True %}
+        <div class="row is-wide">
+          <textarea name="mount_address" id="mount_address" rows="2" placeholder=" "></textarea>
+          <label for="mount_address">Adres</label>
+        </div>
+        <div class="row is-wide">
+          <textarea name="mount_notes" id="mount_notes" rows="2" placeholder=" "></textarea>
+          <label for="mount_notes">Açıklama</label>
+        </div>
+      </div>
     </section>
 
     <section class="step-pane" data-step="2">
@@ -1005,6 +1026,27 @@
             meta.textContent = '';
           });
       }
+      var mountBlock = document.getElementById('mount-block');
+      function clearMountFields() {
+        ['mount_contact_name', 'mount_phone', 'mount_address', 'mount_notes'].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        if (window.setCityDistrictValues) {
+          window.setCityDistrictValues('mount_city', '', '', false);
+        } else {
+          var city = document.getElementById('mount_city');
+          var district = document.getElementById('mount_district');
+          if (city) city.value = '';
+          if (district) district.value = '';
+        }
+      }
+      function syncMountBlock(kind) {
+        if (!mountBlock) return;
+        var show = kind === 'legal';
+        mountBlock.hidden = !show;
+        if (!show) clearMountFields();
+      }
       function selectParty(p) {
         partyId = String(p.id);
         document.getElementById('party_id').value = partyId;
@@ -1015,6 +1057,7 @@
         pager.hidden = true;
         meta.hidden = true;
         tools.hidden = true;
+        syncMountBlock(p.kind);
         syncContinue();
       }
       document.getElementById('clear-party').addEventListener('click', function () {
@@ -1024,6 +1067,7 @@
         list.hidden = false;
         meta.hidden = false;
         tools.hidden = false;
+        syncMountBlock('');
         syncContinue();
         loadParties(partyPage, document.getElementById('party-search').value.trim());
       });

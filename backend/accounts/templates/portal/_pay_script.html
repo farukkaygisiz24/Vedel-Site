@@ -146,7 +146,7 @@
     var transferPayMeta = document.getElementById('transfer-pay-meta');
     var transferSender = document.getElementById('id_transfer_sender');
     var payTimer = 0;
-    var remaining = payForm ? parseFloat(payForm.getAttribute('data-remaining')) || 0 : 0;
+    var remaining = payForm ? parseMoney(payForm.getAttribute('data-remaining')) : 0;
 
     function syncPayMethod() {
       if (!payForm) return;

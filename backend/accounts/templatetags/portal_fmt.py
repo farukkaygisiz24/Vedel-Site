@@ -43,6 +43,16 @@ def tr_money(value):
 
 
 @register.filter
+def plain_money(value):
+    """Dot decimal for data-* / JS (never localize)."""
+    n = _decimal(value)
+    if n is None:
+        return '0.00'
+    n = n.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+    return f'{n:.2f}'
+
+
+@register.filter
 def tr_qty(value):
     n = _decimal(value)
     if n is None:

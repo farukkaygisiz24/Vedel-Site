@@ -10,6 +10,7 @@ from stock.models import Product, StockMovement
 from stock.services import apply_movement
 
 from .models import Party, Payment, PaymentAllocation, Sale, SaleLine
+from .tr_locations import is_known_city, is_known_district
 
 TWOPLACES = Decimal('0.01')
 
@@ -187,6 +188,50 @@ def format_tr_phone(value: str, *, required: bool) -> str:
     return f'{digits[0]} ({digits[1:4]}) {digits[4:7]} {digits[7:9]} {digits[9:11]}'
 
 
+def _optional_city_district(city: str, district: str) -> tuple[str, str]:
+    city = tr_upper(city)
+    district = tr_upper(district)
+    if city and not is_known_city(city):
+        raise ValueError('İl geçersiz.')
+    if district and not city:
+        raise ValueError('İlçe için il seçin.')
+    if city and district and not is_known_district(city, district):
+        raise ValueError('İlçe geçersiz.')
+    return city, district
+
+
+def mount_fields_from_party(party: Party) -> dict:
+    name = f'{party.first_name} {party.last_name}'.strip()
+    if not name and party.kind == Party.KIND_LEGAL:
+        name = (party.company_name or '').strip()
+    return {
+        'mount_contact_name': tr_upper(name),
+        'mount_phone': party.phone or '',
+        'mount_city': tr_upper(party.city or ''),
+        'mount_district': tr_upper(party.district or ''),
+        'mount_address': tr_upper(party.address or ''),
+        'mount_notes': '',
+    }
+
+
+def mount_fields_from_post(post) -> dict:
+    city, district = _optional_city_district(post.get('mount_city', ''), post.get('mount_district', ''))
+    return {
+        'mount_contact_name': tr_upper(post.get('mount_contact_name', '')),
+        'mount_phone': format_tr_phone(post.get('mount_phone', ''), required=False),
+        'mount_city': city,
+        'mount_district': district,
+        'mount_address': tr_upper(post.get('mount_address', '')),
+        'mount_notes': str(post.get('mount_notes', '') or '').strip(),
+    }
+
+
+def resolve_sale_mount(*, party: Party, post) -> dict:
+    if party.kind == Party.KIND_LEGAL:
+        return mount_fields_from_post(post)
+    return mount_fields_from_party(party)
+
+
 def apply_party_fields(party: Party, post) -> Party:
     kind = str(post.get('kind', party.kind)).strip()
     if kind not in {Party.KIND_REAL, Party.KIND_LEGAL}:
@@ -221,6 +266,15 @@ def apply_party_fields(party: Party, post) -> Party:
         tax_no = only_digits(post.get('tax_no', ''))
         if len(tax_no) not in (10, 11):
             raise ValueError('Vergi kimlik no 10 veya 11 haneli olmalıdır.')
+        clash = (
+            Party.objects.filter(kind=Party.KIND_LEGAL, tax_no=tax_no)
+            .exclude(pk=party.pk or None)
+            .first()
+        )
+        if clash:
+            raise ValueError(
+                f'Bu vergi no ile kayıtlı müşteri var: {clash.display_name} ({clash.number}).'
+            )
         party.tax_no = tax_no
         party.national_id = ''
     else:
@@ -331,6 +385,7 @@ def create_sale(*, user, post) -> Sale:
     vat_total = money(sum((item['vat'] for item in parsed_lines), Decimal('0')))
     grand_total = money(sum((item['total'] for item in parsed_lines), Decimal('0')))
 
+    mount = resolve_sale_mount(party=party, post=post)
     sale = Sale.objects.create(
         number=next_sale_number(sale_date),
         date=sale_date,
@@ -340,6 +395,12 @@ def create_sale(*, user, post) -> Sale:
         invoice_status=invoice_status,
         invoice_no=tr_upper(post.get('invoice_no', '')),
         notes=str(post.get('notes', '')).strip(),
+        mount_contact_name=mount['mount_contact_name'],
+        mount_phone=mount['mount_phone'],
+        mount_city=mount['mount_city'],
+        mount_district=mount['mount_district'],
+        mount_address=mount['mount_address'],
+        mount_notes=mount['mount_notes'],
         subtotal=subtotal,
         vat_total=vat_total,
         grand_total=grand_total,

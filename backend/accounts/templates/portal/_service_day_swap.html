@@ -7,17 +7,8 @@
     try { payload = JSON.parse(node.textContent); } catch (err) { return; }
     var days = (payload && payload.days) || {};
     var todayIso = payload.today || '';
-    var aside = document.querySelector('[data-service-browse]');
-    var grid = document.querySelector('.day-cal.is-browse .date-grid');
-    if (!aside || !grid) return;
-    var titleEl = aside.querySelector('[data-day-title]');
-    var countEl = aside.querySelector('[data-day-count]');
-    var listEl = aside.querySelector('[data-day-list]');
-    var hintEl = document.querySelector('[data-cal-chosen]');
-    var dateInput = document.getElementById('service_date');
-    var hours = document.querySelector('[data-day-hours]');
 
-    function markHours(info) {
+    function markHours(info, hours) {
       if (!hours) return;
       var taken = {};
       (info.jobs || []).forEach(function (item) {
@@ -30,8 +21,17 @@
     }
 
     function paint(iso) {
+      var aside = document.querySelector('[data-service-browse]');
+      var grid = document.querySelector('.day-cal.is-browse .date-grid');
+      if (!aside || !grid) return false;
       var info = days[iso];
       if (!info) return false;
+      var titleEl = aside.querySelector('[data-day-title]');
+      var countEl = aside.querySelector('[data-day-count]');
+      var listEl = aside.querySelector('[data-day-list]');
+      var hintEl = document.querySelector('[data-cal-chosen]');
+      var dateInput = document.getElementById('service_date');
+      var hours = document.querySelector('[data-day-hours]');
       grid.querySelectorAll('a[data-day]').forEach(function (cell) {
         var on = cell.getAttribute('data-day') === iso;
         cell.classList.toggle('is-on', on);
@@ -77,7 +77,7 @@
           });
         }
       }
-      markHours(info);
+      markHours(info, hours);
       var assignIso = iso >= todayIso ? iso : todayIso;
       var assignInfo = days[assignIso] || info;
       document.querySelectorAll('[data-assign-date]').forEach(function (input) {
@@ -89,11 +89,11 @@
       return true;
     }
 
+    var dateInput = document.getElementById('service_date');
     var start = dateInput && dateInput.value ? dateInput.value : '';
-    if (start && days[start]) markHours(days[start]);
+    if (start && days[start]) markHours(days[start], document.querySelector('[data-day-hours]'));
 
     window.portalSwapDay = function (href, iso) {
-      if (!aside.isConnected || !grid.isConnected) return false;
       var key = iso;
       if (!key) {
         try { key = new URL(href, location.href).searchParams.get('day') || todayIso; }

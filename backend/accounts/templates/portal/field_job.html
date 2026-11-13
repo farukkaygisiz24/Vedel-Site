@@ -28,6 +28,7 @@
       </div>
     </dl>
   </section>
+  {% include 'portal/_sale_mount_facts.html' with sale=job.sale %}
 
   <section class="fis-block">
     <p class="field-label">Satılan cihazlar</p>
@@ -164,6 +165,7 @@
       {% endif %}
     </dl>
   </section>
+  {% include 'portal/_sale_mount_facts.html' with sale=job.sale %}
 
   <form method="post" action="{{ job.get_field_url }}" enctype="multipart/form-data" autocomplete="off" id="field-job-form"{% if sold_groups %} data-mount-handover{% endif %}>
     {% csrf_token %}

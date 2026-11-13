@@ -1,0 +1,38 @@
+{% load portal_fmt %}
+{% if sale and sale.has_mount %}
+<section class="fis-block" data-mount-facts>
+  <p class="field-label">Montaj yeri</p>
+  <dl class="fis-facts">
+    {% if sale.mount_contact_name %}
+    <div>
+      <dt>Ad soyad</dt>
+      <dd>{{ sale.mount_contact_name }}</dd>
+    </div>
+    {% endif %}
+    {% if sale.mount_phone %}
+    <div>
+      <dt>Telefon</dt>
+      <dd>{{ sale.mount_phone|tel_link }}</dd>
+    </div>
+    {% endif %}
+    {% if sale.mount_city or sale.mount_district %}
+    <div>
+      <dt>İl</dt>
+      <dd>{% if sale.mount_district and sale.mount_city %}{{ sale.mount_district }} / {{ sale.mount_city }}{% elif sale.mount_city %}{{ sale.mount_city }}{% else %}{{ sale.mount_district }}{% endif %}</dd>
+    </div>
+    {% endif %}
+    {% if sale.mount_address %}
+    <div class="is-wide">
+      <dt>Adres</dt>
+      <dd>{{ sale.mount_address }}</dd>
+    </div>
+    {% endif %}
+    {% if sale.mount_notes %}
+    <div class="is-wide">
+      <dt>Açıklama</dt>
+      <dd>{{ sale.mount_notes }}</dd>
+    </div>
+    {% endif %}
+  </dl>
+</section>
+{% endif %}

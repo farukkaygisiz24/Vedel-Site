@@ -76,6 +76,7 @@
         </div>
       </dl>
     </section>
+    {% include 'portal/_sale_mount_facts.html' with sale=sale %}
 
     <section class="fis-block">
       <p class="field-label">Kalemler</p>
@@ -294,7 +295,7 @@
         <h2>Ödeme ekle</h2>
         <p class="step-copy">Tutar kalanı aşamaz. Genel ve kalan aşağıda durur.</p>
       </div>
-      <form method="post" id="pay-form" novalidate data-remaining="{{ sale.remaining }}" data-grand="{{ sale.grand_total }}" data-paid="{{ sale.paid_total }}">
+      <form method="post" id="pay-form" novalidate data-remaining="{{ sale.remaining|plain_money }}" data-grand="{{ sale.grand_total|plain_money }}" data-paid="{{ sale.paid_total|plain_money }}">
         {% csrf_token %}
         <input type="hidden" name="action" value="payment" />
         <div class="modal-seg">
@@ -580,7 +581,7 @@
       var transferPayMeta = document.getElementById('transfer-pay-meta');
       var transferSender = document.getElementById('id_transfer_sender');
       var payTimer = 0;
-      var remaining = payForm ? parseFloat(payForm.getAttribute('data-remaining')) || 0 : 0;
+      var remaining = payForm ? parseMoney(payForm.getAttribute('data-remaining')) : 0;
 
       function syncPayMethod() {
         if (!payForm) return;

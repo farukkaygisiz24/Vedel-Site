@@ -65,6 +65,14 @@
                   <span class="device-room-text"><a href="{{ pack.job.get_absolute_url }}">{{ pack.job.number }}</a></span>
                 {% endif %}
               </div>
+              {% if readonly and pack.job.sale and pack.job.sale.has_mount %}
+              <div class="hint" data-mount-place>
+                {% if pack.job.sale.mount_place_summary %}{{ pack.job.sale.mount_place_summary }}{% endif %}
+                {% if pack.job.sale.mount_contact_name %}{% if pack.job.sale.mount_place_summary %} · {% endif %}{{ pack.job.sale.mount_contact_name }}{% endif %}
+                {% if pack.job.sale.mount_phone %} · {{ pack.job.sale.mount_phone }}{% endif %}
+                {% if pack.job.sale.mount_notes %} · {{ pack.job.sale.mount_notes }}{% endif %}
+              </div>
+              {% endif %}
             </th>
           </tr>
           <tr>

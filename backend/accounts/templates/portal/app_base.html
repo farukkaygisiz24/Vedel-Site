@@ -115,9 +115,16 @@
         transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
       }
 
-      .side-nav.has-stock .side-stage { width: 200%; }
+      .side-nav.has-drill.panes-2 .side-stage { width: 200%; }
 
-      .side-nav.is-stock .side-stage { transform: translateX(-50%); }
+      .side-nav.has-drill.panes-3 .side-stage { width: 300%; }
+
+      .side-nav.has-drill.panes-2.is-stock .side-stage,
+      .side-nav.has-drill.panes-2.is-sales .side-stage { transform: translateX(-50%); }
+
+      .side-nav.has-drill.panes-3.is-stock .side-stage { transform: translateX(-33.333%); }
+
+      .side-nav.has-drill.panes-3.is-sales .side-stage { transform: translateX(-66.666%); }
 
       .side-pane {
         display: flex;
@@ -130,9 +137,14 @@
         padding: 22px 22px 24px;
       }
 
-      .side-nav.has-stock .side-pane {
+      .side-nav.has-drill.panes-2 .side-pane {
         flex-basis: 50%;
         width: 50%;
+      }
+
+      .side-nav.has-drill.panes-3 .side-pane {
+        flex-basis: 33.333%;
+        width: 33.333%;
       }
 
       .side-kicker {
@@ -605,6 +617,9 @@
       }
 
       .wizard .field-label { margin-top: 22px; }
+      .wizard #klima-wrap { margin-top: 16px; }
+      .wizard #klima-wrap[hidden] { margin-top: 0; }
+      .wizard #serial-track-seg + .hint { margin-top: 8px; }
 
       .wizard-head + .field-label { margin-top: 0; }
 
@@ -978,6 +993,111 @@
         .city-district {
           grid-template-columns: 1fr;
         }
+      }
+
+      .mount-block {
+        margin-top: 18px;
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 10px;
+        align-content: start;
+      }
+
+      .mount-block > .field-label,
+      .mount-block > .step-copy,
+      .mount-block > .city-district,
+      .mount-block > .row.is-wide {
+        grid-column: 1 / -1;
+      }
+
+      .mount-block .step-copy {
+        margin-bottom: 2px;
+      }
+
+      .mount-block > .row {
+        background: #fff;
+        border: 1px solid rgba(29, 29, 31, 0.28);
+        border-radius: 8px;
+        min-width: 0;
+      }
+
+      .mount-block > .row + .row {
+        border-top: 1px solid rgba(29, 29, 31, 0.28);
+      }
+
+      .mount-block > .city-district {
+        margin-top: 0;
+      }
+
+      @media (max-width: 680px) {
+        .mount-block {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .mount-block .city-district .row {
+        min-width: 0;
+        background: #fff;
+        border: 1px solid rgba(29, 29, 31, 0.28);
+        border-radius: 8px;
+      }
+
+      .mount-block .city-district .pick-chip {
+        display: block;
+        width: 100%;
+      }
+
+      .mount-block .city-district .pick-chip .date-trigger {
+        position: relative;
+        height: 56px;
+        padding: 16px 36px 16px 14px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        box-shadow: none;
+        width: 100%;
+        text-align: left;
+      }
+
+      .mount-block .row:focus-within,
+      .mount-block .city-district .row:focus-within {
+        border-color: var(--accent);
+      }
+
+      .mount-block .row textarea {
+        width: 100%;
+        min-height: 72px;
+        border: 0;
+        background: transparent;
+        padding: 24px 14px 8px;
+        font-size: 17px;
+        letter-spacing: -0.022em;
+        color: var(--label);
+        outline: none;
+        font-family: inherit;
+        resize: vertical;
+      }
+
+      .mount-block .row textarea + label {
+        top: 8px;
+        transform: none;
+        font-size: 11px;
+        color: #aeaeb2;
+      }
+
+      .mount-block .row textarea:focus + label {
+        color: var(--accent);
+      }
+
+      .mount-block .row textarea:placeholder-shown + label {
+        top: 18px;
+        font-size: 17px;
+        color: #c7c7cc;
+      }
+
+      .mount-block .row textarea:focus {
+        background: rgba(220, 38, 38, 0.05);
       }
 
       .modal-body .city-district .row {
@@ -1959,6 +2079,109 @@
 
       .wait-card form,
       .wait-card .btn { flex: 0 0 auto; }
+
+      .mount-act-list { margin-bottom: 28px; }
+
+      .mount-act-card {
+        --fis-pad: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .mount-act-card .fis-card-head {
+        margin-bottom: 14px;
+      }
+
+      .mount-act-card .fis-card-head > div {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+
+      .mount-act-card .fis-card-head .hint {
+        margin: 4px 0 0;
+      }
+
+      .mount-act-card .fis-name {
+        margin-top: 2px;
+        font-size: 17px;
+        font-weight: 590;
+        letter-spacing: -0.02em;
+      }
+
+      .mount-act-rows {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        min-width: 0;
+      }
+
+      .mount-act-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(200px, 0.85fr);
+        gap: 10px 14px;
+        align-items: center;
+        padding: 10px 0;
+        box-shadow: inset 0 0.5px 0 var(--hairline);
+        min-width: 0;
+      }
+
+      .mount-act-row:first-child {
+        padding-top: 0;
+        box-shadow: none;
+      }
+
+      .mount-act-device {
+        min-width: 0;
+      }
+
+      .mount-act-device b {
+        display: block;
+        font-size: 14px;
+        font-weight: 510;
+        letter-spacing: -0.016em;
+      }
+
+      .mount-act-device small {
+        display: block;
+        margin-top: 3px;
+        color: var(--secondary);
+        font-size: 12px;
+      }
+
+      .mount-act-fields {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .mount-act-foot {
+        display: flex;
+        justify-content: flex-end;
+        align-items: flex-end;
+        flex-wrap: wrap;
+        gap: 14px 16px;
+        margin-top: 16px;
+        padding-top: 14px;
+        box-shadow: inset 0 0.5px 0 var(--hairline);
+      }
+
+      .mount-act-care {
+        min-width: 0;
+        flex: 0 1 auto;
+      }
+
+      .mount-act-care .field-label {
+        margin: 0 0 8px;
+      }
+
+      .mount-act-foot .btn {
+        flex: 0 0 auto;
+        min-width: var(--action-w);
+      }
 
       .month-jobs {
         display: flex;
@@ -3981,6 +4204,71 @@
         border-color: var(--accent);
       }
 
+      .modal-body > .field-label {
+        margin-top: 18px;
+      }
+
+      .modal-body > .field-label:first-child {
+        margin-top: 0;
+      }
+
+      .modal-body > .group + .field-label,
+      .modal-body > .hint + .field-label,
+      .modal-body > .seg + .field-label,
+      .modal-body > .pay-grid + .field-label,
+      .modal-body > #klima-wrap + .field-label {
+        margin-top: 18px;
+      }
+
+      .modal-body > .seg {
+        margin: 0;
+      }
+
+      .modal-body > .hint {
+        margin: 8px 0 0;
+        line-height: 1.4;
+      }
+
+      .modal-body > .pay-grid {
+        margin-top: 0;
+      }
+
+      .modal-body > #klima-wrap {
+        margin-top: 16px;
+      }
+
+      .modal-body > #klima-wrap[hidden] {
+        margin-top: 0;
+      }
+
+      .modal-body > #klima-wrap > .field-label {
+        margin-top: 0;
+      }
+
+      .modal-body > #klima-wrap > .seg {
+        margin: 0 0 10px;
+      }
+
+      .modal-body > #klima-wrap > #outdoor-wrap {
+        margin-top: 12px;
+      }
+
+      .modal-body > #klima-wrap > #outdoor-wrap > .field-label {
+        margin-top: 0;
+      }
+
+      #product-edit-modal .modal-card {
+        width: min(100%, 560px);
+      }
+
+      #product-edit-modal .modal-body {
+        padding: 18px 22px 16px;
+      }
+
+      #product-edit-modal .pay-grid {
+        gap: 12px;
+      }
+
       #party-modal .modal-body > .group,
       #party-modal .fold-body .group {
         display: grid;
@@ -5084,7 +5372,11 @@
             }
           };
 
-          wrap._setCityDistrict(cityVal.value, districtVal.value, !cityVal.value);
+          wrap._setCityDistrict(
+            cityVal.value,
+            districtVal.value,
+            !cityVal.value && !wrap.hasAttribute('data-no-default')
+          );
         }
 
         function initCityDistrictPicks(scope) {
@@ -5225,12 +5517,25 @@
           var root = scope || document;
           var wrap = root.querySelector('#klima-wrap');
           var kindEl = root.querySelector('#p_device_kind');
+          var serialSeg = root.querySelector('#serial-track-seg');
           var familySeg = root.querySelector('#device-family-seg');
           var roleSeg = root.querySelector('#multi-role-seg');
           var outdoorWrap = root.querySelector('#outdoor-wrap');
           var outdoorEl = root.querySelector('#p_outdoor_name');
-          if (!wrap || !kindEl || kindEl._klimaBound) return;
-          kindEl._klimaBound = true;
+          if (!serialSeg || serialSeg._serialBound) return;
+          serialSeg._serialBound = true;
+          var klimaState = {
+            isKlima: !!(wrap && (wrap.getAttribute('data-is-klima') === '1' || !wrap.hidden)),
+          };
+          function tracksValue() {
+            var on = serialSeg.querySelector('input[name=tracks_serial]:checked');
+            return on ? on.value === '1' : false;
+          }
+          function setTracks(on) {
+            serialSeg.querySelectorAll('input[name=tracks_serial]').forEach(function (el) {
+              el.checked = (el.value === '1') === !!on;
+            });
+          }
           function familyValue() {
             var on = familySeg && familySeg.querySelector('input[name=device_family]:checked');
             return on ? on.value : '';
@@ -5240,9 +5545,16 @@
             return on ? on.value : 'indoor';
           }
           function apply() {
-            if (wrap.hidden) {
+            var tracks = tracksValue();
+            if (wrap) wrap.hidden = !(klimaState.isKlima && tracks);
+            if (!kindEl) return;
+            if (!wrap || wrap.hidden) {
               kindEl.value = '';
               if (outdoorEl) outdoorEl.required = false;
+              if (!klimaState.isKlima || !tracks) {
+                if (roleSeg) roleSeg.hidden = true;
+                if (outdoorWrap) outdoorWrap.hidden = true;
+              }
               return;
             }
             var family = familyValue();
@@ -5266,6 +5578,9 @@
               kindEl.value = '';
             }
           }
+          serialSeg.querySelectorAll('input[name=tracks_serial]').forEach(function (el) {
+            el.addEventListener('change', apply);
+          });
           if (familySeg) {
             familySeg.querySelectorAll('input[name=device_family]').forEach(function (el) {
               el.addEventListener('change', apply);
@@ -5276,8 +5591,14 @@
               el.addEventListener('change', apply);
             });
           }
-          window.syncKlimaFields = function (isKlima) {
-            wrap.hidden = !isKlima;
+          window.syncKlimaFields = function (isKlima, forceTracks) {
+            klimaState.isKlima = !!isKlima;
+            if (wrap) wrap.setAttribute('data-is-klima', isKlima ? '1' : '0');
+            if (typeof forceTracks === 'boolean') {
+              setTracks(forceTracks);
+            } else if (isKlima && !serialSeg.querySelector('input[name=tracks_serial]:checked')) {
+              setTracks(true);
+            }
             if (!isKlima) {
               familySeg && familySeg.querySelectorAll('input[name=device_family]').forEach(function (el) { el.checked = false; });
               if (outdoorEl) outdoorEl.value = '';
@@ -5392,6 +5713,9 @@
         var busy = false;
         var pendingPop = false;
         var shownKey = location.pathname + location.search;
+        var filterAbort = null;
+        var monthAbort = null;
+        var filterTimers = new WeakMap();
 
         function pathOf(href) {
           try {
@@ -5408,6 +5732,14 @@
           } catch (err) {
             return href;
           }
+        }
+
+        function isSalesPath(path) {
+          return path.indexOf('/sales/') === 0 && path.indexOf('/sales/customers/') !== 0;
+        }
+
+        function isMountPath(path) {
+          return path.indexOf('/sales/mount-activation') === 0;
         }
 
         function onlyTabQueryChanged(href) {
@@ -5436,13 +5768,22 @@
           return true;
         }
 
+        function setDrillPane(mode) {
+          nav.classList.toggle('is-stock', mode === 'stock');
+          nav.classList.toggle('is-sales', mode === 'sales');
+          if (mode === 'stock') nav.setAttribute('aria-label', 'Depo');
+          else if (mode === 'sales') nav.setAttribute('aria-label', 'Satış');
+          else nav.setAttribute('aria-label', 'Ana menü');
+        }
+
         function markActive(href) {
           var next;
           try { next = new URL(href, location.href); } catch (err) { return; }
           var path = next.pathname;
           var cat = next.searchParams.get('category') || '';
-          nav.classList.toggle('is-stock', path.indexOf('/stock/') === 0);
-          nav.setAttribute('aria-label', path.indexOf('/stock/') === 0 ? 'Depo' : 'Ana menü');
+          if (path.indexOf('/stock/') === 0) setDrillPane('stock');
+          else if (isSalesPath(path)) setDrillPane('sales');
+          else setDrillPane('');
           nav.querySelectorAll('a.side-link').forEach(function (link) {
             var url;
             try { url = new URL(link.href, location.href); } catch (err) { return; }
@@ -5451,20 +5792,24 @@
               on = path === '/stock/' && !cat;
             } else if (url.pathname.indexOf('/stock/') === 0 && url.searchParams.get('category')) {
               on = path.indexOf('/stock/') === 0 && cat === url.searchParams.get('category');
+            } else if (link.hasAttribute('data-sales-all')) {
+              on = isSalesPath(path) && !isMountPath(path);
+            } else if (isMountPath(url.pathname)) {
+              on = isMountPath(path);
+            } else if (link.hasAttribute('data-sales-open')) {
+              on = isSalesPath(path);
+            } else if (link.hasAttribute('data-stock-open')) {
+              on = path.indexOf('/stock/') === 0;
             } else if (url.pathname === '/field/' || url.pathname.indexOf('/field/') === 0) {
               on = path.indexOf('/field/') === 0;
             } else if (url.pathname.indexOf('/sales/customers/') === 0) {
               on = path.indexOf('/sales/customers/') === 0;
-            } else if (url.pathname === '/sales/' || url.pathname.indexOf('/sales/') === 0) {
-              on = path.indexOf('/sales/') === 0 && path.indexOf('/sales/customers/') !== 0;
             } else if (url.pathname === '/service/' || url.pathname.indexOf('/service/') === 0) {
               on = path.indexOf('/service/') === 0;
             } else if (url.pathname === '/crew/' || url.pathname.indexOf('/crew/') === 0) {
               on = path.indexOf('/crew/') === 0;
             } else if (url.pathname === '/users/' || url.pathname.indexOf('/users/') === 0) {
               on = path.indexOf('/users/') === 0;
-            } else if (link.hasAttribute('data-stock-open')) {
-              on = path.indexOf('/stock/') === 0;
             } else {
               on = url.pathname === path;
             }
@@ -5477,8 +5822,18 @@
           if (nextNav) {
             var currentStock = nav.querySelector('[data-pane="stock"]');
             var nextStock = nextNav.querySelector('[data-pane="stock"]');
-            if (currentStock && nextStock) currentStock.innerHTML = nextStock.innerHTML;
-            else nav.innerHTML = nextNav.innerHTML;
+            var currentSales = nav.querySelector('[data-pane="sales"]');
+            var nextSales = nextNav.querySelector('[data-pane="sales"]');
+            var synced = false;
+            if (currentStock && nextStock) {
+              currentStock.innerHTML = nextStock.innerHTML;
+              synced = true;
+            }
+            if (currentSales && nextSales) {
+              currentSales.innerHTML = nextSales.innerHTML;
+              synced = true;
+            }
+            if (!synced) nav.innerHTML = nextNav.innerHTML;
           }
           markActive(href || location.href);
         }
@@ -5502,6 +5857,42 @@
             else neu.textContent = old.textContent;
             old.parentNode.replaceChild(neu, old);
           });
+        }
+
+        function captureSearchFocus() {
+          var el = document.activeElement;
+          if (!el || el.tagName !== 'INPUT' || el.type !== 'search' || el.name !== 'q') return null;
+          return {
+            value: el.value,
+            start: el.selectionStart,
+            end: el.selectionEnd,
+          };
+        }
+
+        function restoreSearchFocus(snap) {
+          if (!snap) return;
+          var el = workspace.querySelector('input[type="search"][name="q"]');
+          if (!el) return;
+          try {
+            el.focus();
+            var len = el.value.length;
+            var start = snap.start == null ? len : Math.min(snap.start, len);
+            var end = snap.end == null ? len : Math.min(snap.end, len);
+            el.setSelectionRange(start, end);
+          } catch (err) {}
+        }
+
+        function filterUrlFromForm(form) {
+          var action = form.getAttribute('action') || location.pathname;
+          var url;
+          try { url = new URL(action, location.href); } catch (err) { return location.href; }
+          url.search = '';
+          var data = new FormData(form);
+          data.forEach(function (value, key) {
+            if (!String(value || '').trim()) return;
+            url.searchParams.append(key, value);
+          });
+          return url.href;
         }
 
         function playArrive() {
@@ -5528,10 +5919,11 @@
           });
         }
 
-        function swap(html, title, url, push) {
+        function applyWorkspace(html, title, url, histMode, focusSnap) {
           document.title = title;
           shownKey = urlKey(url);
-          if (push) history.pushState({ portal: true }, title, url);
+          if (histMode === 'push') history.pushState({ portal: true }, title, url);
+          else if (histMode === 'replace') history.replaceState({ portal: true }, title, url);
           window.portalSwapDay = null;
           workspace.innerHTML = html;
           runScripts(workspace);
@@ -5539,17 +5931,62 @@
           initCityDistrictPicks(workspace);
           initPortalPicks(workspace);
           initOutdoorPicks(workspace);
-          return playArrive();
+          restoreSearchFocus(focusSnap);
         }
 
-        function openPage(url, push) {
-          if (busy) return Promise.resolve();
+        function openPage(url, push, opts) {
+          opts = opts || {};
+          var quiet = !!opts.quiet;
+          var replaceHist = !!opts.replace;
+          var focusSearch = !!opts.focusSearch;
+          if (!quiet) {
+            if (busy) return Promise.resolve();
+            if (urlKey(url) === shownKey) return Promise.resolve();
+            if (filterAbort) {
+              try { filterAbort.abort(); } catch (err) {}
+              filterAbort = null;
+            }
+            busy = true;
+            var started = Date.now();
+            if (!reduceMotion()) workspace.classList.add('is-leaving');
+            return fetch(url, {
+              credentials: 'same-origin',
+              headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+            })
+              .then(function (response) {
+                if (!response.ok) throw new Error('nav');
+                return response.text();
+              })
+              .then(function (text) {
+                var doc = new DOMParser().parseFromString(text, 'text/html');
+                var next = doc.querySelector('.workspace');
+                if (!next) throw new Error('nav');
+                var leaveWait = reduceMotion() ? 0 : Math.max(0, 320 - (Date.now() - started));
+                return wait(leaveWait).then(function () {
+                  applyWorkspace(next.innerHTML, doc.title, url, push ? 'push' : '', null);
+                  return playArrive().then(function () {
+                    syncNav(doc, url);
+                    bootToasts(doc);
+                  });
+                });
+              })
+              .catch(function () {
+                busy = false;
+                workspace.classList.remove('is-leaving', 'is-arrive');
+                location.href = url;
+              });
+          }
+
           if (urlKey(url) === shownKey) return Promise.resolve();
-          busy = true;
-          var started = Date.now();
-          if (!reduceMotion()) workspace.classList.add('is-leaving');
+          if (filterAbort) {
+            try { filterAbort.abort(); } catch (err) {}
+          }
+          filterAbort = new AbortController();
+          var signal = filterAbort.signal;
+          var focusSnap = focusSearch ? captureSearchFocus() : null;
           return fetch(url, {
             credentials: 'same-origin',
+            signal: signal,
             headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
           })
             .then(function (response) {
@@ -5557,43 +5994,141 @@
               return response.text();
             })
             .then(function (text) {
+              if (signal.aborted) return;
               var doc = new DOMParser().parseFromString(text, 'text/html');
               var next = doc.querySelector('.workspace');
               if (!next) throw new Error('nav');
-              var leaveWait = reduceMotion() ? 0 : Math.max(0, 320 - (Date.now() - started));
-              return wait(leaveWait).then(function () {
-                return swap(next.innerHTML, doc.title, url, push).then(function () {
-                  syncNav(doc, url);
-                  bootToasts(doc);
-                });
-              });
+              var hist = replaceHist ? 'replace' : (push ? 'push' : '');
+              applyWorkspace(next.innerHTML, doc.title, url, hist, focusSnap);
+              syncNav(doc, url);
+              bootToasts(doc);
             })
-            .catch(function () {
-              busy = false;
-              workspace.classList.remove('is-leaving', 'is-arrive');
+            .catch(function (err) {
+              if (err && err.name === 'AbortError') return;
               location.href = url;
             });
         }
 
+        function rebindDaySwap(doc) {
+          var nextPanel = doc.getElementById('service-day-panel');
+          var curPanel = document.getElementById('service-day-panel');
+          if (nextPanel && curPanel) {
+            curPanel.replaceWith(document.importNode(nextPanel, true));
+          } else if (nextPanel && !curPanel) {
+            workspace.appendChild(document.importNode(nextPanel, true));
+          }
+          workspace.querySelectorAll('[data-day-swap-script]').forEach(function (node) {
+            node.remove();
+          });
+          var swapScript = null;
+          doc.querySelectorAll('script').forEach(function (node) {
+            var type = String(node.getAttribute('type') || '').toLowerCase();
+            if (type && type !== 'text/javascript' && type !== 'application/javascript' && type !== 'module') return;
+            var body = node.textContent || '';
+            if (body.indexOf('portalSwapDay') !== -1) swapScript = body;
+          });
+          if (!swapScript) return;
+          var neu = document.createElement('script');
+          neu.setAttribute('data-day-swap-script', '');
+          neu.textContent = swapScript;
+          workspace.appendChild(neu);
+        }
+
+        function swapServiceBrowse(url, push) {
+          if (monthAbort) {
+            try { monthAbort.abort(); } catch (err) {}
+          }
+          monthAbort = new AbortController();
+          var signal = monthAbort.signal;
+          window.portalSwapDay = null;
+          return fetch(url, {
+            credentials: 'same-origin',
+            signal: signal,
+            headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' },
+          })
+            .then(function (response) {
+              if (!response.ok) throw new Error('nav');
+              return response.text();
+            })
+            .then(function (text) {
+              if (signal.aborted) return;
+              var doc = new DOMParser().parseFromString(text, 'text/html');
+              var nextRow = doc.querySelector('.day-cal-row');
+              var curRow = workspace.querySelector('.day-cal-row');
+              if (!nextRow || !curRow) throw new Error('nav');
+              curRow.replaceWith(document.importNode(nextRow, true));
+              var nextWeek = doc.querySelector('.week-board');
+              var curWeek = workspace.querySelector('.week-board');
+              if (nextWeek && curWeek) curWeek.replaceWith(document.importNode(nextWeek, true));
+              rebindDaySwap(doc);
+              document.title = doc.title || document.title;
+              shownKey = urlKey(url);
+              if (push) history.pushState({ portal: true }, document.title, url);
+              else if (urlKey(url) !== urlKey(location.href)) {
+                history.replaceState({ portal: true }, document.title, url);
+              }
+              syncNav(doc, url);
+            })
+            .catch(function (err) {
+              if (err && err.name === 'AbortError') return;
+              openPage(url, push, { quiet: true, replace: !push, focusSearch: false });
+            });
+        }
+
+        function isServiceBrowsePath(path) {
+          return path === '/service/' || path === '/service';
+        }
+
+        function serviceBrowseQueryOnly(href) {
+          try {
+            var next = new URL(href, location.href);
+            return isServiceBrowsePath(next.pathname) && !!workspace.querySelector('.day-cal-row');
+          } catch (err) {
+            return false;
+          }
+        }
+
+        function trySwapServiceDay(href, iso) {
+          if (window.portalSwapDay && window.portalSwapDay(href, iso || '')) {
+            shownKey = urlKey(href);
+            return true;
+          }
+          return false;
+        }
+
+        function monthQueryDiffers(href) {
+          try {
+            var next = new URL(href, location.href);
+            var prev = new URL(shownKey, location.origin);
+            if (next.pathname !== prev.pathname) return false;
+            if (!isServiceBrowsePath(next.pathname)) return false;
+            return (next.searchParams.get('month') || '') !== (prev.searchParams.get('month') || '');
+          } catch (err) {
+            return false;
+          }
+        }
+
         nav.addEventListener('click', function (event) {
-          if (event.target.closest('[data-stock-back]')) {
+          if (event.target.closest('[data-stock-back], [data-sales-back]')) {
             event.preventDefault();
-            nav.classList.remove('is-stock');
-            nav.setAttribute('aria-label', 'Ana menü');
+            setDrillPane('');
             return;
           }
           var link = event.target.closest('a.side-link');
           if (!link || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           if (pathOf(link.href).indexOf('/field/') === 0) return;
           event.preventDefault();
-          if (link.hasAttribute('data-stock-open') || pathOf(link.href).indexOf('/stock/') === 0) {
-            nav.classList.add('is-stock');
-            nav.setAttribute('aria-label', 'Depo');
+          var path = pathOf(link.href);
+          if (link.hasAttribute('data-stock-open') || path.indexOf('/stock/') === 0) {
+            setDrillPane('stock');
+          } else if (link.hasAttribute('data-sales-open') || isSalesPath(path)) {
+            setDrillPane('sales');
           } else {
-            nav.classList.remove('is-stock');
-            nav.setAttribute('aria-label', 'Ana menü');
+            setDrillPane('');
           }
-          if (!link.hasAttribute('data-stock-open') && window.portalCloseNav) window.portalCloseNav();
+          if (!link.hasAttribute('data-stock-open') && !link.hasAttribute('data-sales-open') && window.portalCloseNav) {
+            window.portalCloseNav();
+          }
           openPage(link.href, true);
         });
 
@@ -5607,9 +6142,21 @@
           if (url.origin !== location.origin) return;
           if (url.pathname.indexOf('/cikis') !== -1) return;
           if (url.pathname.indexOf('/field/') === 0) return;
-          if (link.hasAttribute('data-day-swap') && window.portalSwapDay && window.portalSwapDay(url.href, link.getAttribute('data-day'))) {
+          if (link.hasAttribute('data-cal-month-swap')) {
             event.preventDefault();
-            shownKey = urlKey(url.href);
+            swapServiceBrowse(url.href, true);
+            return;
+          }
+          if (link.hasAttribute('data-day-swap') || (link.hasAttribute('data-day') && link.closest('.day-cal.is-browse'))) {
+            event.preventDefault();
+            if (trySwapServiceDay(url.href, link.getAttribute('data-day'))) return;
+            swapServiceBrowse(url.href, true);
+            return;
+          }
+          if (serviceBrowseQueryOnly(url.href) && (url.searchParams.has('day') || url.searchParams.has('month'))) {
+            event.preventDefault();
+            if (!monthQueryDiffers(url.href) && trySwapServiceDay(url.href, url.searchParams.get('day') || '')) return;
+            swapServiceBrowse(url.href, true);
             return;
           }
           if (onlyTabQueryChanged(url.href)) {
@@ -5621,6 +6168,30 @@
           openPage(url.href, true);
         });
 
+        document.addEventListener('submit', function (event) {
+          var form = event.target;
+          if (!form || !form.matches || !form.matches('[data-sale-filters]')) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          var href = filterUrlFromForm(form);
+          var quiet = pathOf(href) === location.pathname;
+          openPage(href, true, { quiet: quiet, replace: false, focusSearch: false });
+        }, true);
+
+        document.addEventListener('input', function (event) {
+          var input = event.target;
+          if (!input || input.tagName !== 'INPUT') return;
+          if (input.type !== 'search' || input.name !== 'q') return;
+          var form = input.closest('[data-sale-filters]');
+          if (!form) return;
+          var prev = filterTimers.get(form);
+          if (prev) window.clearTimeout(prev);
+          filterTimers.set(form, window.setTimeout(function () {
+            var href = filterUrlFromForm(form);
+            openPage(href, false, { quiet: true, replace: true, focusSearch: true });
+          }, 320));
+        });
+
         window.addEventListener('popstate', function () {
           if (window.portalCloseNav) window.portalCloseNav();
           if (busy) {
@@ -5629,21 +6200,21 @@
           }
           var here;
           try { here = new URL(location.href); } catch (err) { here = null; }
-          if (
-            here &&
-            here.pathname === '/service/' &&
-            document.querySelector('[data-service-browse]') &&
-            window.portalSwapDay &&
-            window.portalSwapDay(location.href, here.searchParams.get('day') || '')
-          ) {
-            shownKey = urlKey(location.href);
+          if (here && serviceBrowseQueryOnly(here.href)) {
+            if (monthQueryDiffers(here.href)) {
+              swapServiceBrowse(location.href, false);
+              return;
+            }
+            if (trySwapServiceDay(location.href, here.searchParams.get('day') || '')) return;
+            swapServiceBrowse(location.href, false);
             return;
           }
           if (here && onlyTabQueryChanged(here.href)) {
             applyFisTab(here.href, false);
             return;
           }
-          openPage(location.href, false);
+          var quietPop = here && pathOf(here.href) === pathOf(shownKey);
+          openPage(location.href, false, { quiet: quietPop, replace: false, focusSearch: false });
         });
       })();
     </script>

@@ -1,6 +1,6 @@
 <nav
-  class="side-nav{% if can_stock %} has-stock{% endif %}{% if can_stock and '/stock/' in request.path %} is-stock{% endif %}"
-  aria-label="{% if '/stock/' in request.path %}Depo{% else %}Ana menü{% endif %}"
+  class="side-nav{% if can_stock or can_sales %} has-drill{% endif %}{% if can_stock and can_sales %} panes-3{% elif can_stock or can_sales %} panes-2{% endif %}{% if can_stock %} has-stock{% endif %}{% if can_sales %} has-sales{% endif %}{% if can_stock and '/stock/' in request.path %} is-stock{% elif can_sales and '/sales/' in request.path and '/sales/customers/' not in request.path %} is-sales{% endif %}"
+  aria-label="{% if '/stock/' in request.path %}Depo{% elif '/sales/' in request.path and '/sales/customers/' not in request.path %}Satış{% else %}Ana menü{% endif %}"
 >
   <div class="side-stage">
     <div class="side-pane" data-pane="main">
@@ -41,6 +41,7 @@
       <a
         class="side-link{% if '/sales/' in request.path and '/sales/customers/' not in request.path %} is-active{% endif %}"
         href="{% url 'portal-sales' %}"
+        data-sales-open
       >
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M20.2 13.2 12.8 5.8A2.2 2.2 0 0 0 11.2 5H6.2C5.5 5 5 5.5 5 6.2v5c0 .6.2 1.1.6 1.6l7.4 7.4a2.2 2.2 0 0 0 3.1 0l4.1-4.1a2.2 2.2 0 0 0 0-3.1Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
@@ -131,6 +132,35 @@
         {{ item.name }}
       </a>
       {% endfor %}
+    </div>
+    {% endif %}
+    {% if can_sales %}
+    <div class="side-pane" data-pane="sales">
+      <button class="side-link" type="button" data-sales-back>
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M14.2 5.8 8 12l6.2 6.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Menü
+      </button>
+      <p class="side-kicker">Satış</p>
+      <a
+        class="side-link{% if request.resolver_match.url_name == 'portal-sales' or request.resolver_match.url_name == 'portal-sales-archive' %} is-active{% endif %}"
+        href="{% url 'portal-sales' %}"
+        data-sales-all
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M20.2 13.2 12.8 5.8A2.2 2.2 0 0 0 11.2 5H6.2C5.5 5 5 5.5 5 6.2v5c0 .6.2 1.1.6 1.6l7.4 7.4a2.2 2.2 0 0 0 3.1 0l4.1-4.1a2.2 2.2 0 0 0 0-3.1Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="8.3" cy="8.4" r="1.15" stroke="currentColor" stroke-width="1.7"/>
+        </svg>
+        Satış listesi
+      </a>
+      <p class="side-kicker">Kategoriler</p>
+      <a
+        class="side-link side-sub{% if request.resolver_match.url_name == 'portal-sales-mount-activation' %} is-active{% endif %}"
+        href="{% url 'portal-sales-mount-activation' %}"
+      >
+        Montaj aktivasyonu
+      </a>
     </div>
     {% endif %}
   </div>

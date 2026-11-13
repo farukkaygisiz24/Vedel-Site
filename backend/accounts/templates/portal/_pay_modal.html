@@ -7,7 +7,7 @@
       <h2>{{ pay_title|default:'Ödeme ekle' }}</h2>
       <p class="step-copy">{{ pay_copy }}</p>
     </div>
-    <form method="post" id="pay-form" novalidate data-remaining="{{ pay_remaining }}" data-grand="{{ pay_grand }}" data-paid="{{ pay_paid }}">
+    <form method="post" id="pay-form" novalidate data-remaining="{{ pay_remaining|plain_money }}" data-grand="{{ pay_grand|plain_money }}" data-paid="{{ pay_paid|plain_money }}">
       {% csrf_token %}
       <input type="hidden" name="action" value="payment" />
       <div class="modal-seg">

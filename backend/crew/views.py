@@ -9,6 +9,7 @@ from django.views.decorators.http import require_http_methods
 
 from accounts.http import role_required
 from accounts.models import Customer
+from accounts.search import q_search
 from accounts.toasts import queue_toast
 from accounts.weather import get_weather
 
@@ -76,17 +77,18 @@ def _page_nav(paginator, page_obj, filters):
 def _member_q(query: str):
     q = Q()
     for token in query.split():
-        q &= (
-            Q(number__icontains=token)
-            | Q(first_name__icontains=token)
-            | Q(last_name__icontains=token)
-            | Q(phone__icontains=token)
-            | Q(phone2__icontains=token)
-            | Q(title__icontains=token)
-            | Q(national_id__icontains=token)
-            | Q(address__icontains=token)
-            | Q(city__icontains=token)
-            | Q(district__icontains=token)
+        q &= q_search(
+            token,
+            'number',
+            'first_name',
+            'last_name',
+            'phone',
+            'phone2',
+            'title',
+            'national_id',
+            'address',
+            'city',
+            'district',
         )
     return q
 

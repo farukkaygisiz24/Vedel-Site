@@ -13,6 +13,7 @@ from django.views.decorators.http import require_http_methods
 from accounts.http import can_access_category, role_required, stock_scope
 from accounts.models import Customer
 from accounts.portal import _wants_json
+from accounts.search import q_search
 from accounts.toasts import queue_toast
 from accounts.weather import get_weather
 from sales.models import Party
@@ -107,10 +108,34 @@ def product_search_json(request: HttpRequest) -> JsonResponse:
     cat = Category.objects.filter(pk=int(cat_raw)).first() if cat_raw.isdigit() else None
     if cat and not can_access_category(request.user, cat):
         cat = None
-    # Split/Multi filtreleri yalnız klima kategorilerinde; Merkez Depo gibi
-    # aksesuar stokları cihaz tipinden bağımsız listelenir.
-    apply_family = bool(family) and (cat is None or cat.is_klima)
-    if apply_family:
+    merkez = Category.objects.filter(slug=DEFAULT_CATEGORY_SLUG).first()
+    if merkez and not can_access_category(request.user, merkez):
+        merkez = None
+
+    if cat and cat.is_klima:
+        # Klima markası + Split/Multi cihazlar; Merkez Depo her markada global.
+        if family == Product.KIND_SPLIT:
+            brand_q = (
+                Q(category=cat)
+                & (Q(device_kind=Product.KIND_SPLIT) | Q(outdoor_name__gt=''))
+                & ~Q(device_kind__in=[Product.KIND_MULTI_INDOOR, Product.KIND_MULTI_OUTDOOR])
+            )
+        elif family == 'multi':
+            brand_q = (
+                Q(category=cat)
+                & (
+                    Q(device_kind__in=[Product.KIND_MULTI_INDOOR, Product.KIND_MULTI_OUTDOOR])
+                    | Q(is_device=True, outdoor_name='', device_kind='')
+                )
+                & ~Q(device_kind=Product.KIND_SPLIT)
+            )
+        else:
+            brand_q = Q(category=cat)
+        if merkez:
+            qs = qs.filter(brand_q | Q(category=merkez))
+        else:
+            qs = qs.filter(brand_q)
+    else:
         if family == Product.KIND_SPLIT:
             qs = qs.filter(Q(device_kind=Product.KIND_SPLIT) | Q(outdoor_name__gt='')).exclude(
                 device_kind__in=[Product.KIND_MULTI_INDOOR, Product.KIND_MULTI_OUTDOOR]
@@ -120,11 +145,11 @@ def product_search_json(request: HttpRequest) -> JsonResponse:
                 Q(device_kind__in=[Product.KIND_MULTI_INDOOR, Product.KIND_MULTI_OUTDOOR])
                 | Q(is_device=True, outdoor_name='', device_kind='')
             ).exclude(device_kind=Product.KIND_SPLIT)
-    if cat:
-        qs = qs.filter(category=cat)
+        if cat:
+            qs = qs.filter(category=cat)
     tokens = [token for token in query.split() if token]
     for token in tokens:
-        qs = qs.filter(Q(name__icontains=token) | Q(sku__icontains=token) | Q(brand__icontains=token))
+        qs = qs.filter(q_search(token, 'name', 'sku', 'brand'))
     paginator = Paginator(qs.order_by('name'), PRODUCT_PAGE_SIZE)
     page_obj = paginator.get_page(page)
     prefix = None
@@ -311,7 +336,7 @@ def _stock_list_context(request: HttpRequest, error='', stock_modal=''):
         qs = qs.filter(category__in=scope)
     tokens = [token for token in query.split() if token]
     for token in tokens:
-        qs = qs.filter(Q(name__icontains=token) | Q(sku__icontains=token) | Q(brand__icontains=token))
+        qs = qs.filter(q_search(token, 'name', 'sku', 'brand'))
     if category_slug == 'other':
         qs = qs.filter(category__isnull=True)
     elif category_slug:
@@ -564,6 +589,11 @@ def product_new(request: HttpRequest) -> HttpResponse:
             form_alert_on=bool(posted and str(posted.get('alert_on', '')).strip() in ('1', 'on', 'true')),
             form_device_kind=str(posted.get('device_kind', '')).strip() if posted else '',
             form_outdoor_name=tr_upper(posted.get('outdoor_name', '')) if posted else '',
+            form_tracks_serial=(
+                str(posted.get('tracks_serial', '')).strip() in ('1', 'on', 'true', 'yes')
+                if posted
+                else bool(category.is_klima)
+            ),
             category_is_klima=bool(category.is_klima),
             form_note=posted.get('note', '') if posted else '',
             category_id=category.pk,

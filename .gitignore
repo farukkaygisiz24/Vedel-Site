@@ -53,3 +53,7 @@ __pycache__/
 
 # local test credentials
 backend/.dev-superuser
+
+# local production data pulls
+data-exports/
+/media/

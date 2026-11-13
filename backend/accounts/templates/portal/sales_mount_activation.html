@@ -1,0 +1,99 @@
+{% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
+
+{% block title %}Montaj aktivasyon | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Eksik montaj</h1>
+      <p class="lead">Montaj tarihi satış günü olarak kilitli. Seri no ve bakım aralığını girip aktif edin.</p>
+    </div>
+    <div class="toolbar-actions">
+      <a class="btn is-ghost" href="{% url 'portal-sales' %}">Satış listesi</a>
+    </div>
+  </div>
+
+  {% if error %}<p class="flash is-err" role="alert">{{ error }}</p>{% endif %}
+
+  {% if not days %}
+  <p class="empty">Aktive edilecek satış kalmadı.</p>
+  {% else %}
+  {% for day in days %}
+  <p class="field-label">{{ day.date|date:'d.m.Y' }} · {{ day.sales|length }} satış</p>
+  <div class="wait-list mount-act-list">
+    {% for item in day.sales %}
+    {% with sale=item.sale %}
+    <form method="post" class="fis-card mount-act-card" autocomplete="off">
+      {% csrf_token %}
+      <input type="hidden" name="sale_id" value="{{ sale.pk }}" />
+
+      <div class="fis-card-head">
+        <div>
+          <p class="field-label">{{ sale.number }}</p>
+          <div class="fis-name">{{ sale.party.display_name }}</div>
+          <p class="hint">Montaj {{ sale.date|date:'d.m.Y' }} · kilitli</p>
+        </div>
+        <a class="btn is-ghost" href="{{ sale.get_absolute_url }}">Fiş</a>
+      </div>
+
+      <div class="mount-act-rows">
+        {% for row in item.rows %}
+        <div class="mount-act-row">
+          <div class="mount-act-device">
+            <b>{{ row.label }}</b>
+            {% if row.outdoor_name and row.kind == 'split' %}
+            <small>Dış · {{ row.outdoor_name }}</small>
+            {% endif %}
+          </div>
+          <div class="mount-act-fields">
+            {% if row.needs_indoor_serial %}
+            <input
+              class="device-serial"
+              type="text"
+              name="{{ row.serial_name }}"
+              placeholder="İç seri no"
+              aria-label="İç seri no"
+              autocomplete="off"
+              data-upper
+              required
+            />
+            {% endif %}
+            {% if row.needs_outdoor_serial %}
+            <input
+              class="device-serial"
+              type="text"
+              name="{{ row.outdoor_name_key }}"
+              placeholder="Dış seri no"
+              aria-label="Dış seri no"
+              autocomplete="off"
+              data-upper
+              required
+            />
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="fis-card-foot mount-act-foot">
+        <div class="mount-act-care">
+          <p class="field-label">Bakım aralığı</p>
+          <div class="seg is-mini" role="radiogroup" aria-label="Bakım aralığı">
+            {% for months, label in care_intervals %}
+            <label>
+              <input type="radio" name="interval_months" value="{{ months }}"{% if months == 12 %} checked{% endif %} />
+              <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button class="btn" type="submit">Aktif et</button>
+      </div>
+    </form>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+  {% endif %}
+{% endblock %}

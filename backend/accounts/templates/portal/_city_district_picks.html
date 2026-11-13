@@ -1,12 +1,12 @@
-{# Requires city_id, district_id. Optional: city_value, district_value, default_city. #}
-{% with city_val=city_value|default:'' district_val=district_value|default:'' def_city=default_city|default:tr_default_city %}
-<div class="city-district" data-city-district data-default-city="{{ def_city }}">
+{# Requires city_id, district_id. Optional: city_value, district_value, default_city, city_name, district_name, required (default true), no_default. #}
+{% with city_val=city_value|default:'' district_val=district_value|default:'' def_city=default_city|default:tr_default_city city_nm=city_name|default:'city' district_nm=district_name|default:'district' %}
+<div class="city-district" data-city-district data-default-city="{{ def_city }}"{% if no_default %} data-no-default{% endif %}>
   <div class="row">
     <div class="pick-chip" data-pick data-city-pick data-pick-empty="Eşleşen il yok." data-pick-blank="">
       <button type="button" class="date-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="{{ city_id }}-list">
         <span data-pick-label{% if not city_val %} class="is-empty"{% endif %}>{% if city_val %}{{ city_val }}{% endif %}</span>
       </button>
-      <input type="hidden" name="city" id="{{ city_id }}" value="{{ city_val }}" required />
+      <input type="hidden" name="{{ city_nm }}" id="{{ city_id }}" value="{{ city_val }}"{% if required != False and required != '0' %} required{% endif %} />
       <div class="date-pop" id="{{ city_id }}-list">
         <div class="pick-search">
           <span class="pick-search-icon" aria-hidden="true">
@@ -25,7 +25,7 @@
       <button type="button" class="date-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="{{ district_id }}-list">
         <span data-pick-label{% if not district_val %} class="is-empty"{% endif %}>{% if district_val %}{{ district_val }}{% endif %}</span>
       </button>
-      <input type="hidden" name="district" id="{{ district_id }}" value="{{ district_val }}" required />
+      <input type="hidden" name="{{ district_nm }}" id="{{ district_id }}" value="{{ district_val }}"{% if required != False and required != '0' %} required{% endif %} />
       <div class="date-pop" id="{{ district_id }}-list">
         <div class="pick-search">
           <span class="pick-search-icon" aria-hidden="true">

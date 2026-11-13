@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.http import QueryDict
 from django.test import TestCase
 from django.urls import reverse
 
@@ -9,8 +10,17 @@ from crew.models import CrewMember
 from service.models import Job, JobLine
 from service.services import adjust_closed_job, close_job
 
+from stock.models import Category, Product
+
 from .models import Party, Payment, PaymentAllocation, Sale
-from .services import add_job_payment, add_party_payment, add_payment, delete_payment, party_from_post
+from .services import (
+    add_job_payment,
+    add_party_payment,
+    add_payment,
+    create_sale,
+    delete_payment,
+    party_from_post,
+)
 
 
 class PartyPaymentTests(TestCase):
@@ -103,6 +113,18 @@ class PartyPaymentTests(TestCase):
         self.assertEqual(allocs[0].amount, Decimal('40.00'))
         self.assertEqual(allocs[1].job_id, self.job.pk)
         self.assertEqual(allocs[1].amount, Decimal('60.00'))
+
+    def test_party_pay_closes_kurus_remainder(self):
+        add_party_payment(party=self.party, user=self.lead, post=self._pay_post('119.80'))
+        self.assertEqual(self.sale.remaining + self.job.remaining, Decimal('0.20'))
+        self.client.force_login(self.lead)
+        page = self.client.get(self.party.get_absolute_url())
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'data-remaining="0.20"')
+        payment = add_party_payment(party=self.party, user=self.lead, post=self._pay_post('0,20'))
+        self.assertEqual(payment.amount, Decimal('0.20'))
+        self.assertEqual(self.sale.remaining, Decimal('0.00'))
+        self.assertEqual(self.job.remaining, Decimal('0.00'))
 
     def test_sale_slip_payment_still_works(self):
         payment = add_payment(sale=self.sale, user=self.lead, post=self._pay_post('25'))
@@ -254,3 +276,156 @@ class PartyCityDistrictRequiredTests(TestCase):
                 ),
                 self.lead,
             )
+
+    def test_legal_tax_no_rejects_duplicate(self):
+        party_from_post(
+            self._post(
+                kind=Party.KIND_LEGAL,
+                company_name='Alpas Ltd',
+                tax_no='0560087584',
+                first_name='Ali',
+                last_name='Veli',
+            ),
+            self.lead,
+        )
+        with self.assertRaisesMessage(ValueError, 'Bu vergi no ile kayıtlı müşteri var'):
+            party_from_post(
+                self._post(
+                    kind=Party.KIND_LEGAL,
+                    company_name='Alpas Tekrar',
+                    tax_no='0560087584',
+                    first_name='Ali',
+                    last_name='Veli',
+                ),
+                self.lead,
+            )
+
+
+class SaleMountFieldsTests(TestCase):
+    def setUp(self):
+        self.lead = Customer.objects.create_user(
+            username='sale-mount-lead',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE_LEAD,
+        )
+        self.legal = Party.objects.create(
+            kind=Party.KIND_LEGAL,
+            number='CUSTL8801',
+            company_name='Beztas Ltd',
+            first_name='Ali',
+            last_name='Yetkili',
+            tax_no='1234567890',
+            phone='05550001122',
+            address='Fatura mah',
+            city='BURSA',
+            district='OSMANGAZİ',
+            created_by=self.lead,
+        )
+        self.real = Party.objects.create(
+            kind=Party.KIND_REAL,
+            number='CUSTR8802',
+            first_name='Ayşe',
+            last_name='Yılmaz',
+            phone='05550003344',
+            address='Ev mah',
+            city='BURSA',
+            district='NİLÜFER',
+            created_by=self.lead,
+        )
+        category = Category.objects.create(
+            name='Klima Split Mount',
+            slug='klima-split-mount',
+            sku_prefix='KM',
+            is_klima=True,
+            created_by=self.lead,
+        )
+        self.product = Product.objects.create(
+            sku='KMSPL1',
+            brand='Daikin',
+            name='FTXM25',
+            category=category,
+            is_device=True,
+            device_kind=Product.KIND_SPLIT,
+            outdoor_name='RXM25',
+            stock_qty=Decimal('10.00'),
+            sale_price=Decimal('1000.00'),
+            created_by=self.lead,
+        )
+
+    def _sale_post(self, party, **extra):
+        q = QueryDict(mutable=True)
+        q.update(
+            {
+                'party_mode': 'existing',
+                'party_id': str(party.pk),
+                'date': date.today().isoformat(),
+                'vat_mode': Sale.VAT_NONE,
+                'invoice_status': Sale.INVOICE_NO,
+            }
+        )
+        q.setlist('product_id', [str(self.product.pk)])
+        q.setlist('qty', ['1'])
+        q.setlist('unit_price', ['1000'])
+        q.setlist('description', [''])
+        q.setlist('vat_rate', ['0'])
+        q.setlist('pay_method', [])
+        q.setlist('pay_amount', [])
+        for key, value in extra.items():
+            if isinstance(value, (list, tuple)):
+                q.setlist(key, list(value))
+            else:
+                q[key] = value
+        return q
+
+    def test_legal_sale_allows_empty_mount(self):
+        sale = create_sale(user=self.lead, post=self._sale_post(self.legal))
+        self.assertFalse(sale.has_mount)
+        self.assertEqual(sale.mount_address, '')
+        self.assertEqual(sale.mount_notes, '')
+
+    def test_legal_sale_stores_partial_mount_and_notes(self):
+        sale = create_sale(
+            user=self.lead,
+            post=self._sale_post(
+                self.legal,
+                mount_contact_name='şantiye ahmet',
+                mount_phone='05551112233',
+                mount_city='Bursa',
+                mount_district='Nilüfer',
+                mount_address='şantiye kapı 2',
+                mount_notes='Akşam gelin',
+            ),
+        )
+        self.assertTrue(sale.has_mount)
+        self.assertEqual(sale.mount_contact_name, 'ŞANTİYE AHMET')
+        self.assertEqual(sale.mount_phone, '0 (555) 111 22 33')
+        self.assertEqual(sale.mount_city, 'BURSA')
+        self.assertEqual(sale.mount_district, 'NİLÜFER')
+        self.assertEqual(sale.mount_address, 'ŞANTİYE KAPI 2')
+        self.assertEqual(sale.mount_notes, 'Akşam gelin')
+        self.assertIn('NİLÜFER / BURSA', sale.mount_place_summary)
+
+    def test_real_sale_copies_party_address(self):
+        sale = create_sale(user=self.lead, post=self._sale_post(self.real))
+        self.assertEqual(sale.mount_contact_name, 'AYŞE YILMAZ')
+        self.assertEqual(sale.mount_phone, self.real.phone)
+        self.assertEqual(sale.mount_city, 'BURSA')
+        self.assertEqual(sale.mount_district, 'NİLÜFER')
+        self.assertEqual(sale.mount_address, 'EV MAH')
+        self.assertEqual(sale.mount_notes, '')
+
+    def test_sales_form_shows_optional_mount_block(self):
+        self.client.force_login(self.lead)
+        page = self.client.get(reverse('portal-sales-new'))
+        body = page.content.decode()
+        self.assertIn('id="mount-block"', body)
+        self.assertIn('name="mount_contact_name"', body)
+        self.assertIn('name="mount_phone"', body)
+        self.assertIn('name="mount_address"', body)
+        self.assertIn('name="mount_notes"', body)
+        self.assertIn('name="mount_city"', body)
+        self.assertIn('name="mount_district"', body)
+        self.assertIn('data-no-default', body)
+        self.assertRegex(body, r'id="mount_city"(?![^>]*\srequired)')
+        self.assertRegex(body, r'id="mount_district"(?![^>]*\srequired)')

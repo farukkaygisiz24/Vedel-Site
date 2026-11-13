@@ -34,6 +34,7 @@ urlpatterns = [
     path('customers/', views.customer_list, name='portal-sales-customers'),
     path('customers/<int:pk>/', views.customer_detail_redirect),
     path('customers/<party_no:number>/', views.customer_edit, name='portal-sales-customers-edit'),
+    path('mount-activation/', views.mount_activation, name='portal-sales-mount-activation'),
     path('<int:pk>/', views.sale_detail_redirect),
     path('<sale_no:number>/', views.sale_detail, name='portal-sales-detail'),
 ]

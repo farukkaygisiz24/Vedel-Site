@@ -128,9 +128,12 @@ def add_months(when: date, months: int) -> date:
     return date(year, month, day)
 
 
+DEFAULT_CARE_INTERVAL = 12
+
+
 def parse_interval(raw) -> int:
     try:
-        months = int(str(raw or '').strip() or '6')
+        months = int(str(raw or '').strip() or str(DEFAULT_CARE_INTERVAL))
     except (TypeError, ValueError) as exc:
         raise ValueError('Bakım aralığı seçin.') from exc
     if months not in {3, 6, 9, 12}:
@@ -357,7 +360,7 @@ def _sold_device_name(unit: JobSoldUnit) -> str:
 
 def _sold_interval(unit: JobSoldUnit) -> int:
     try:
-        months = int(unit.interval_months or 6)
+        months = int(unit.interval_months or DEFAULT_CARE_INTERVAL)
     except (TypeError, ValueError):
         months = 6
     return months if months in {3, 6, 9, 12} else 6
@@ -408,9 +411,19 @@ def party_device_choices(party) -> list[dict]:
     return rows
 
 
-def device_from_sold_unit(*, party, unit: JobSoldUnit, user) -> Device:
+def _mount_place_from_job(job: Job | None) -> str:
+    sale = getattr(job, 'sale', None) if job is not None else None
+    if sale is None:
+        return ''
+    summary = (getattr(sale, 'mount_place_summary', None) or '').strip()
+    if not summary:
+        return ''
+    return tr_upper(summary)[:160]
+
+
+def device_from_sold_unit(*, party, unit: JobSoldUnit, user, job: Job | None = None) -> Device:
     name = _sold_device_name(unit)
-    place = tr_upper(unit.room or '')
+    place = _mount_place_from_job(job) or tr_upper(unit.room or '')
     found = Device.objects.filter(party=party, name=name, place=place).first()
     if found:
         return found
@@ -427,20 +440,20 @@ def device_from_sold_unit(*, party, unit: JobSoldUnit, user) -> Device:
 
 def _pack_interval(pack: JobSoldPack) -> int:
     try:
-        months = int(pack.interval_months or 6)
+        months = int(pack.interval_months or DEFAULT_CARE_INTERVAL)
     except (TypeError, ValueError):
         months = 6
     return months if months in {3, 6, 9, 12} else 6
 
 
-def device_from_sold_pack(*, party, pack: JobSoldPack, user, serviced_on=None) -> Device:
+def device_from_sold_pack(*, party, pack: JobSoldPack, user, serviced_on=None, job: Job | None = None) -> Device:
     name = tr_upper((pack.label or '').strip() or 'CİHAZ')
     serial = tr_upper(pack.outdoor_serial or '')
     if serial and serial not in name:
         name = f'{name} · {serial}'
     name = name[:160]
     indoor = pack.units.order_by('id').first()
-    place = tr_upper((indoor.room if indoor else '') or '')
+    place = _mount_place_from_job(job) or tr_upper((indoor.room if indoor else '') or '')
     interval = _pack_interval(pack)
     next_due = add_months(serviced_on, interval) if serviced_on else None
     found = Device.objects.filter(party=party, name=name, place=place).first()
@@ -471,6 +484,7 @@ def devices_from_sold_packs(*, job: Job, user) -> list[Device]:
                 pack=pack,
                 user=user,
                 serviced_on=job.date,
+                job=job,
             )
         )
     return created
@@ -491,7 +505,7 @@ def _resolve_device(*, party, post, user, current: Device | None = None) -> Devi
             unit = JobSoldUnit.objects.filter(pk=int(unit_id), job__party=party).first()
             if not unit:
                 raise ValueError('Cihaz bulunamadı.')
-            return device_from_sold_unit(party=party, unit=unit, user=user)
+            return device_from_sold_unit(party=party, unit=unit, user=user, job=unit.job)
         if not raw.isdigit():
             raise ValueError('Cihaz bulunamadı.')
         device = Device.objects.filter(pk=int(raw), party=party).first()
@@ -579,8 +593,6 @@ def _product_kind(product) -> str:
         Product.KIND_MULTI_OUTDOOR,
     }:
         return kind
-    if getattr(product, 'is_device', False):
-        return Product.KIND_SPLIT
     return ''
 
 
@@ -588,15 +600,16 @@ def sale_line_is_device(line: SaleLine, sale: Sale | None = None) -> bool:
     product = line.product
     if not product:
         return False
-    if _product_kind(product):
+    if _product_kind(product) or getattr(product, 'is_device', False):
         return True
-    sale = sale or getattr(line, 'sale', None)
-    if not sale or sale.work_type != Sale.WORK_DEVICE:
-        return False
     category = getattr(product, 'category', None)
     if category and category.slug == MOUNT_CATEGORY_SLUG:
         return False
-    return True
+    # Legacy klima kartları: bayrak yoksa cihaz satışında seri ister.
+    if category and getattr(category, 'is_klima', False):
+        sale = sale or getattr(line, 'sale', None)
+        return bool(sale and sale.work_type == Sale.WORK_DEVICE)
+    return False
 
 
 def _line_role(line: SaleLine, sale: Sale | None = None) -> str:
@@ -779,7 +792,7 @@ def unassigned_sold_units(job: Job) -> list[JobSoldUnit]:
 def party_sold_unit_groups(party) -> list[dict]:
     packs = list(
         JobSoldPack.objects.filter(job__party=party)
-        .select_related('job', 'job__party', 'outdoor_product')
+        .select_related('job', 'job__party', 'job__sale', 'outdoor_product')
         .prefetch_related('units', 'photos', 'materials__product')
         .order_by('job_id', 'sort', 'id')
     )
@@ -805,11 +818,11 @@ CARE_MONTHS = {3, 6, 9, 12}
 def _parse_unit_care(post, pk, prefix: str) -> dict:
     raw_interval = str(post.get(f'unit_{prefix}interval_{pk}', '')).strip()
     try:
-        interval = int(raw_interval or '6')
+        interval = int(raw_interval or str(DEFAULT_CARE_INTERVAL))
     except (TypeError, ValueError):
-        interval = 6
+        interval = DEFAULT_CARE_INTERVAL
     if interval not in CARE_MONTHS:
-        interval = 6
+        interval = DEFAULT_CARE_INTERVAL
     raw_last = str(post.get(f'unit_{prefix}last_{pk}', '')).strip()
     last = None
     if raw_last:
@@ -836,11 +849,11 @@ def _parse_unit_photo(upload):
 def _parse_pack_care(post, pk) -> dict:
     raw_interval = str(post.get(f'pack_interval_{pk}', '')).strip()
     try:
-        interval = int(raw_interval or '6')
+        interval = int(raw_interval or str(DEFAULT_CARE_INTERVAL))
     except (TypeError, ValueError):
-        interval = 6
+        interval = DEFAULT_CARE_INTERVAL
     if interval not in CARE_MONTHS:
-        interval = 6
+        interval = DEFAULT_CARE_INTERVAL
     raw_last = str(post.get(f'pack_last_{pk}', '')).strip()
     last = None
     if raw_last:
@@ -1418,6 +1431,170 @@ def schedule_sale_job(*, sale: Sale, when: date, user, clock: time | None = None
         raise ValueError('Bu satış numarası zaten bir işte kayıtlı.') from exc
     ensure_sold_units(job)
     return job
+
+
+def sale_mount_preview_rows(sale: Sale) -> list[dict]:
+    """Device rows for the temporary mount-activation panel (no job required)."""
+    rows: list[dict] = []
+    lines = list(sale.lines.select_related('product', 'product__outdoor', 'product__category'))
+    for line in lines:
+        role = _line_role(line, sale)
+        if not role:
+            continue
+        count = unit_count(line.qty)
+        brand, model, outdoor = _line_device_fields(line)
+        if role == Product.KIND_SPLIT:
+            for index in range(count):
+                key = f's:{line.pk}:{index}'
+                rows.append(
+                    {
+                        'source_key': key,
+                        'kind': 'split',
+                        'label': f'{brand} · {model}',
+                        'outdoor_name': outdoor,
+                        'needs_indoor_serial': True,
+                        'needs_outdoor_serial': bool(outdoor),
+                        'serial_name': f'serial_{key}',
+                        'outdoor_name_key': f'outdoor_{key}',
+                    }
+                )
+        elif role == Product.KIND_MULTI_OUTDOOR:
+            for index in range(count):
+                key = f'o:{line.pk}:{index}'
+                rows.append(
+                    {
+                        'source_key': key,
+                        'kind': 'multi_outdoor',
+                        'label': f'Dış ünite · {model}',
+                        'outdoor_name': model,
+                        'needs_indoor_serial': False,
+                        'needs_outdoor_serial': True,
+                        'serial_name': '',
+                        'outdoor_name_key': f'outdoor_{key}',
+                    }
+                )
+        else:
+            for index in range(count):
+                key = f'i:{line.pk}:{index}'
+                rows.append(
+                    {
+                        'source_key': key,
+                        'kind': 'multi_indoor',
+                        'label': f'İç ünite · {brand} · {model}',
+                        'outdoor_name': '',
+                        'needs_indoor_serial': True,
+                        'needs_outdoor_serial': False,
+                        'serial_name': f'serial_{key}',
+                        'outdoor_name_key': '',
+                    }
+                )
+    return rows
+
+
+def _auto_assign_multi_indoors(job: Job) -> None:
+    packs = list(
+        JobSoldPack.objects.filter(job=job, kind=JobSoldPack.KIND_MULTI).order_by('sort', 'id')
+    )
+    units = list(JobSoldUnit.objects.filter(job=job, pack__isnull=True).order_by('id'))
+    if not packs or not units:
+        return
+    for index, unit in enumerate(units):
+        pack = packs[index % len(packs)]
+        unit.pack = pack
+        unit.save(update_fields=['pack'])
+
+
+@transaction.atomic
+def activate_sale_mount(*, sale: Sale, user, post) -> Job:
+    """Temporary backfill: create/close mount job on sale.date with serials + care interval."""
+    existing = Job.objects.filter(sale=sale).first()
+    if existing and existing.status == Job.STATUS_CLOSED:
+        raise ValueError('Bu satış zaten aktif edilmiş.')
+
+    when = sale.date
+    if existing:
+        job = existing
+        job.date = when
+        job.party = sale.party
+        job.vat_mode = sale.vat_mode
+        job.updated_by = user
+        job.save(update_fields=['date', 'party', 'vat_mode', 'updated_by', 'updated_at'])
+        relabel_mount_job(job)
+    else:
+        job = Job(
+            number=sale.number,
+            date=when,
+            party=sale.party,
+            sale=sale,
+            vat_mode=sale.vat_mode,
+            status=Job.STATUS_PENDING,
+            notes=sale.notes,
+            created_by=user,
+            updated_by=user,
+        )
+        try:
+            job.save()
+        except IntegrityError as exc:
+            raise ValueError('Bu satış numarası zaten bir işte kayıtlı.') from exc
+
+    packs = ensure_sold_packs(job)
+    _auto_assign_multi_indoors(job)
+    packs = list(JobSoldPack.objects.filter(job=job).prefetch_related('units').order_by('sort', 'id'))
+    if not packs:
+        if JobSoldUnit.objects.filter(job=job).exists():
+            raise ValueError('Multi iç üniteler için satışta dış ünite kalemi de olmalı.')
+        raise ValueError('Bu satışta aktive edilecek cihaz kalemi yok.')
+
+    try:
+        interval = int(
+            str(post.get('interval_months', str(DEFAULT_CARE_INTERVAL))).strip()
+            or str(DEFAULT_CARE_INTERVAL)
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError('Bakım aralığı geçersiz.') from exc
+    if interval not in {3, 6, 9, 12}:
+        raise ValueError('Bakım aralığı 3, 6, 9 veya 12 ay olmalı.')
+
+    for pack in packs:
+        outdoor_key = f'outdoor_{pack.source_key}'
+        outdoor_serial = tr_upper(post.get(outdoor_key, ''))
+        if pack.outdoor_name and not outdoor_serial:
+            raise ValueError(f'Dış ünite seri no zorunlu ({pack.outdoor_name}).')
+        pack.outdoor_serial = outdoor_serial
+        pack.interval_months = interval
+        pack.last_serviced_on = when
+        pack.next_due = add_months(when, interval)
+        pack.save(
+            update_fields=[
+                'outdoor_serial',
+                'interval_months',
+                'last_serviced_on',
+                'next_due',
+            ]
+        )
+        units = list(pack.units.order_by('id'))
+        if not units and pack.kind == JobSoldPack.KIND_SPLIT:
+            raise ValueError('İç ünite bulunamadı.')
+        for unit in units:
+            if pack.kind == JobSoldPack.KIND_SPLIT:
+                serial = tr_upper(post.get(f'serial_{pack.source_key}', ''))
+            else:
+                serial = tr_upper(
+                    post.get(f'serial_i:{unit.sale_line_id}:{unit.line_index}', '')
+                )
+            if not serial:
+                raise ValueError(f'Seri no zorunlu ({unit.brand} · {unit.model}).')
+            unit.serial = serial
+            unit.save(update_fields=['serial'])
+
+    job.status = Job.STATUS_SUBMITTED
+    job.submitted_at = timezone.now()
+    job.submitted_by = user
+    job.updated_by = user
+    job.save(
+        update_fields=['status', 'submitted_at', 'submitted_by', 'updated_by', 'updated_at']
+    )
+    return close_job(job=job, user=user)
 
 
 @transaction.atomic

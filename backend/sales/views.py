@@ -13,6 +13,7 @@ from django.views.decorators.http import require_http_methods
 from accounts.http import role_required, stock_scope
 from accounts.models import Customer
 from accounts.portal import _wants_json
+from accounts.search import q_search
 from accounts.toasts import queue_toast
 from accounts.weather import get_weather
 from stock.models import Category, Product
@@ -21,8 +22,10 @@ from stock.services import StockError
 from service.models import Device, Job
 from service.services import (
     SERVICE_HOUR_LABELS,
+    activate_sale_mount,
     month_load_payload,
     party_sold_unit_groups,
+    sale_mount_preview_rows,
     sold_unit_groups,
     unassigned_sold_units,
 )
@@ -65,19 +68,16 @@ def _parse_iso_date(raw):
 
 
 def _sale_categories_for(user):
-    from stock.services import DEFAULT_CATEGORY_SLUG
-
-    qs = Category.objects.filter(Q(is_klima=True) | Q(slug=DEFAULT_CATEGORY_SLUG))
+    # Only klima brands (Euroform / MHI). Merkez Depo is global in product search.
+    qs = Category.objects.filter(is_klima=True).order_by('name')
     scope = stock_scope(user)
     if scope is not None:
         qs = qs.filter(pk__in=scope.values_list('pk', flat=True))
-    cats = list(qs)
-    cats.sort(key=lambda item: (0 if item.slug == DEFAULT_CATEGORY_SLUG else 1, item.name))
-    return cats
+    return list(qs)
 
 
 def _klima_categories_for(user):
-    return [item for item in _sale_categories_for(user) if item.is_klima]
+    return _sale_categories_for(user)
 
 
 def _archive_years(today=None):
@@ -166,13 +166,19 @@ def _sale_list_context(request: HttpRequest, *, archive=False):
     tokens = [token for token in query.split() if token]
     for token in tokens:
         qs = qs.filter(
-            Q(number__icontains=token)
-            | Q(invoice_no__icontains=token)
-            | Q(party__first_name__icontains=token)
-            | Q(party__last_name__icontains=token)
-            | Q(party__company_name__icontains=token)
-            | Q(lines__product__name__icontains=token)
-            | Q(lines__product__sku__icontains=token)
+            q_search(
+                token,
+                'number',
+                'invoice_no',
+                'party__first_name',
+                'party__last_name',
+                'party__company_name',
+                'party__number',
+                'party__phone',
+                'lines__product__name',
+                'lines__product__sku',
+                'lines__product__brand',
+            )
         )
     if tokens:
         qs = qs.distinct()
@@ -347,17 +353,22 @@ def _party_queryset(query: str):
     tokens = [token for token in query.split() if token]
     for token in tokens:
         qs = qs.filter(
-            Q(first_name__icontains=token)
-            | Q(last_name__icontains=token)
-            | Q(company_name__icontains=token)
-            | Q(phone__icontains=token)
-            | Q(phone2__icontains=token)
-            | Q(contact2_name__icontains=token)
-            | Q(email__icontains=token)
-            | Q(city__icontains=token)
-            | Q(tax_no__icontains=token)
-            | Q(national_id__icontains=token)
-            | Q(number__icontains=token)
+            q_search(
+                token,
+                'first_name',
+                'last_name',
+                'company_name',
+                'phone',
+                'phone2',
+                'contact2_name',
+                'email',
+                'city',
+                'district',
+                'address',
+                'tax_no',
+                'national_id',
+                'number',
+            )
         )
     return qs
 
@@ -990,5 +1001,56 @@ def customer_edit(request: HttpRequest, number: str) -> HttpResponse:
                     'transfer_sender': transfer_sender,
                 },
             ),
+        ),
+    )
+
+
+def _missing_mount_days():
+    linked = Job.objects.filter(sale_id__isnull=False).values_list('sale_id', flat=True)
+    sales = (
+        Sale.objects.filter(work_type=Sale.WORK_DEVICE)
+        .exclude(pk__in=linked)
+        .select_related('party')
+        .prefetch_related('lines__product', 'lines__product__outdoor', 'lines__product__category')
+        .order_by('date', 'id')
+    )
+    days = []
+    current = None
+    bucket = None
+    for sale in sales:
+        rows = sale_mount_preview_rows(sale)
+        if not rows:
+            continue
+        if current != sale.date:
+            current = sale.date
+            bucket = {'date': sale.date, 'sales': []}
+            days.append(bucket)
+        bucket['sales'].append({'sale': sale, 'rows': rows})
+    return days
+
+
+@role_required(Customer.ROLE_SALES, Customer.ROLE_SERVICE_LEAD)
+@require_http_methods(['GET', 'POST'])
+def mount_activation(request: HttpRequest) -> HttpResponse:
+    """Temporary backfill panel — remove after historical mounts are activated."""
+    error = ''
+    if request.method == 'POST':
+        sale_id = str(request.POST.get('sale_id', '')).strip()
+        try:
+            if not sale_id.isdigit():
+                raise ValueError('Satış seçin.')
+            sale = Sale.objects.select_related('party').get(pk=int(sale_id), work_type=Sale.WORK_DEVICE)
+            job = activate_sale_mount(sale=sale, user=request.user, post=request.POST)
+            push_toast(request, f'{sale.number} montajı aktif · {job.device.name if job.device_id else "cihaz"}')
+            return redirect('portal-sales-mount-activation')
+        except (ValueError, Sale.DoesNotExist) as exc:
+            error = str(exc)
+    return render(
+        request,
+        'portal/sales_mount_activation.html',
+        _ctx(
+            days=_missing_mount_days(),
+            care_intervals=[(3, '3 ay'), (6, '6 ay'), (9, '9 ay'), (12, '12 ay')],
+            error=error,
         ),
     )

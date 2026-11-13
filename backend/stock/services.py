@@ -268,8 +268,23 @@ def apply_movement(
     )
 
 
+def tracks_serial_from_post(post) -> bool:
+    raw = str(post.get('tracks_serial', '')).strip().lower()
+    if raw in {'1', 'on', 'true', 'yes'}:
+        return True
+    if raw in {'0', 'off', 'false', 'no'}:
+        return False
+    kind = str(post.get('device_kind', '')).strip()
+    return kind in {
+        Product.KIND_SPLIT,
+        Product.KIND_MULTI_INDOOR,
+        Product.KIND_MULTI_OUTDOOR,
+    }
+
+
 def apply_device_fields(product: Product, post, *, exclude_pk=None) -> Product:
     category = product.category
+    tracks = tracks_serial_from_post(post)
     kind = str(post.get('device_kind', '')).strip()
     if kind not in {
         Product.KIND_SPLIT,
@@ -278,20 +293,31 @@ def apply_device_fields(product: Product, post, *, exclude_pk=None) -> Product:
         Product.KIND_NONE,
     }:
         kind = Product.KIND_NONE
-    if category is None or not category.is_klima:
-        kind = Product.KIND_NONE
-    elif kind == Product.KIND_NONE:
-        raise ValueError('Split veya multi seçin.')
-    product.device_kind = kind
-    product.is_device = bool(kind)
+
     product.outdoor = None
-    if kind == Product.KIND_SPLIT:
-        name = tr_upper(post.get('outdoor_name', ''))
-        if not name:
-            raise ValueError('Split cihazda dış ünite model kodu zorunlu.')
-        product.outdoor_name = name
-    else:
+    if not tracks:
+        product.is_device = False
+        product.device_kind = Product.KIND_NONE
         product.outdoor_name = ''
+        return product
+
+    if category is not None and category.is_klima:
+        if kind == Product.KIND_NONE:
+            raise ValueError('Split veya multi seçin.')
+        product.device_kind = kind
+        product.is_device = True
+        if kind == Product.KIND_SPLIT:
+            name = tr_upper(post.get('outdoor_name', ''))
+            if not name:
+                raise ValueError('Split cihazda dış ünite model kodu zorunlu.')
+            product.outdoor_name = name
+        else:
+            product.outdoor_name = ''
+        return product
+
+    product.is_device = True
+    product.device_kind = Product.KIND_NONE
+    product.outdoor_name = ''
     return product
 
 

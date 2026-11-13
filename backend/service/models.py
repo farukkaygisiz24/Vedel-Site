@@ -29,7 +29,7 @@ class Device(models.Model):
     interval_months = models.PositiveSmallIntegerField(
         'Bakım aralığı',
         choices=INTERVAL_CHOICES,
-        default=6,
+        default=12,
     )
     last_serviced_on = models.DateField('Son bakım', null=True, blank=True)
     next_due = models.DateField('Sonraki bakım', null=True, blank=True)
@@ -240,7 +240,8 @@ class Job(models.Model):
 
     @property
     def remaining(self) -> Decimal:
-        return self.grand_total - self.paid_total
+        value = self.grand_total - self.paid_total
+        return value.quantize(Decimal('0.01'))
 
     @property
     def discount_amount(self) -> Decimal:
@@ -361,7 +362,7 @@ class JobSoldPack(models.Model):
     interval_months = models.PositiveSmallIntegerField(
         'Bakım aralığı',
         choices=CARE_INTERVALS,
-        default=6,
+        default=12,
     )
     last_serviced_on = models.DateField('Son bakım', null=True, blank=True)
     next_due = models.DateField('Sonraki bakım', null=True, blank=True)
@@ -473,7 +474,7 @@ class JobSoldUnit(models.Model):
     interval_months = models.PositiveSmallIntegerField(
         'Bakım aralığı',
         choices=CARE_INTERVALS,
-        default=6,
+        default=12,
     )
     last_serviced_on = models.DateField('Son bakım', null=True, blank=True)
     next_due = models.DateField('Sonraki bakım', null=True, blank=True)

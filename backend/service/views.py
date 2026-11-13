@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from accounts.http import crew_member_for, role_required
 from accounts.models import Customer
 from accounts.portal import _wants_json
+from accounts.search import q_search
 from accounts.toasts import queue_toast
 from accounts.weather import get_weather
 from crew.models import CrewMember
@@ -513,15 +514,17 @@ def client_list(request: HttpRequest) -> HttpResponse:
 def client_q(query: str):
     q = Q()
     for token in query.split():
-        q &= (
-            Q(first_name__icontains=token)
-            | Q(last_name__icontains=token)
-            | Q(company_name__icontains=token)
-            | Q(phone__icontains=token)
-            | Q(phone2__icontains=token)
-            | Q(number__icontains=token)
-            | Q(address__icontains=token)
-            | Q(city__icontains=token)
+        q &= q_search(
+            token,
+            'first_name',
+            'last_name',
+            'company_name',
+            'phone',
+            'phone2',
+            'number',
+            'address',
+            'city',
+            'district',
         )
     return q
 
@@ -529,14 +532,17 @@ def client_q(query: str):
 def models_q(query: str):
     q = Q()
     for token in query.split():
-        q &= (
-            Q(number__icontains=token)
-            | Q(party__first_name__icontains=token)
-            | Q(party__last_name__icontains=token)
-            | Q(party__company_name__icontains=token)
-            | Q(party__number__icontains=token)
-            | Q(device__name__icontains=token)
-            | Q(sale__number__icontains=token)
+        q &= q_search(
+            token,
+            'number',
+            'party__first_name',
+            'party__last_name',
+            'party__company_name',
+            'party__number',
+            'party__phone',
+            'device__name',
+            'device__place',
+            'sale__number',
         )
     return q
 
@@ -599,7 +605,7 @@ def _job_form_context(request: HttpRequest, job: Job | None = None, error=''):
         'initial_lines': lines,
         'notes': job.notes if job else '',
         'vat_mode': job.vat_mode if job else Job.VAT_NONE,
-        'device_interval': device.interval_months if device else 6,
+        'device_interval': device.interval_months if device else 12,
         'device_place': device.place if device else '',
         'device_mode': device_mode,
         'assignee_id': assignee_id,

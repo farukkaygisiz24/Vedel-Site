@@ -4,9 +4,9 @@
     <input type="hidden" name="{{ cal_date_name }}" id="service_date" value="{{ chosen_day|date:'Y-m-d' }}" />
     {% endif %}
     <div class="day-cal-head">
-      <a href="{{ cal_prev }}" aria-label="Önceki ay">‹</a>
+      <a href="{{ cal_prev }}" aria-label="Önceki ay" data-cal-month-swap>‹</a>
       <b>{{ cal_month_label }}</b>
-      <a href="{{ cal_next }}" aria-label="Sonraki ay">›</a>
+      <a href="{{ cal_next }}" aria-label="Sonraki ay" data-cal-month-swap>›</a>
     </div>
     <div class="date-dow">
       <span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span>
@@ -16,7 +16,7 @@
       <a
         href="{{ cell.href }}"
         data-day="{{ cell.iso }}"
-        {% if not cell.muted %}data-day-swap{% endif %}
+        data-day-swap
         class="{% if cell.muted %}is-muted {% endif %}{% if cell.today %}is-today {% endif %}{% if cell.on %}is-on {% endif %}{% if cell.busy %}is-busy {% endif %}{% if cell.full %}is-full{% endif %}"
         {% if cell.on %}aria-current="date"{% endif %}
       >

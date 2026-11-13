@@ -1,4 +1,17 @@
-<div id="klima-wrap"{% if not category_is_klima %} hidden{% endif %}>
+<p class="field-label">Seri no takibi</p>
+<div class="seg" id="serial-track-seg">
+  <label>
+    <input type="radio" name="tracks_serial" value="1"{% if form_tracks_serial %} checked{% endif %} />
+    <span>Gerekli</span>
+  </label>
+  <label>
+    <input type="radio" name="tracks_serial" value="0"{% if not form_tracks_serial %} checked{% endif %} />
+    <span>Gerekmez</span>
+  </label>
+</div>
+<p class="hint">Klima, hava perdesi gibi ünitelerde gerekli. Kumanda, KNX aparatı gibi parçalarda gerekmez.</p>
+
+<div id="klima-wrap" data-is-klima="{% if category_is_klima %}1{% else %}0{% endif %}"{% if not category_is_klima or not form_tracks_serial %} hidden{% endif %}>
   <p class="field-label">Cihaz tipi</p>
   <input type="hidden" name="device_kind" id="p_device_kind" value="{{ form_device_kind }}" />
   <div class="seg" id="device-family-seg">
