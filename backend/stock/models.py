@@ -16,6 +16,13 @@ class Category(models.Model):
     )
     brand = models.CharField('Marka', max_length=80, blank=True)
     is_klima = models.BooleanField('Klima', default=False)
+    is_copper_pipe = models.BooleanField('Bakır boru', default=False)
+    included_copper_meters = models.DecimalField(
+        'Split dahil bakır (mt)',
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal('0.00'),
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

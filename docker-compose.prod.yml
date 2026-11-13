@@ -14,6 +14,16 @@ services:
       retries: 12
     restart: unless-stopped
 
+  redis:
+    image: redis:7.4-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   backend:
     build: ./backend
     env_file:
@@ -25,6 +35,7 @@ services:
       DJANGO_CORS_ORIGINS: ${DJANGO_CORS_ORIGINS:-https://vedel.com.tr,https://www.vedel.com.tr}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://servis.vedel.com.tr,https://vedel.com.tr,https://www.vedel.com.tr}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - ./backend:/app
       - ./media:/app/media
@@ -32,6 +43,8 @@ services:
       - '127.0.0.1:8020:8000'
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

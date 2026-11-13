@@ -13,7 +13,7 @@ from accounts.portal import _wants_json
 from accounts.toasts import queue_toast
 from accounts.weather import get_weather
 from stock.models import Product
-from stock.services import MOUNT_CATEGORY_SLUG, SERVICE_CATEGORY_SLUG
+from stock.services import SERVICE_CATEGORY_SLUG, mount_material_filter
 from stock.views import _product_payload
 
 from .models import Job, JobSoldPack, JobSoldUnit
@@ -317,7 +317,7 @@ def field_products(request: HttpRequest) -> JsonResponse:
     mount = str(request.GET.get('mount', '')).strip() in ('1', 'true', 'on')
     service = str(request.GET.get('service', '')).strip() in ('1', 'true', 'on')
     if mount:
-        qs = qs.filter(category__slug=MOUNT_CATEGORY_SLUG)
+        qs = qs.filter(mount_material_filter())
     elif service:
         qs = qs.filter(category__is_klima=False).exclude(category__slug=SERVICE_CATEGORY_SLUG)
     scope = stock_scope(request.user)

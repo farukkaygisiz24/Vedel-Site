@@ -20,6 +20,7 @@
       </div>
     </div>
     {% if error and not pay_open and not invoice_open %}<p class="flash is-err">{{ error }}</p>{% endif %}
+    {% include 'portal/_copper_excess_banner.html' %}
 
     <section class="fis-letter">
       <div class="fis-letter-head">

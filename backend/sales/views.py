@@ -23,6 +23,7 @@ from service.models import Device, Job
 from service.services import (
     SERVICE_HOUR_LABELS,
     activate_sale_mount,
+    copper_mount_summary,
     month_load_payload,
     party_sold_unit_groups,
     sale_mount_preview_rows,
@@ -856,6 +857,7 @@ def _sale_detail(request: HttpRequest, number: str, *, archive_route: bool) -> H
             sold_groups=sold_groups,
             unassigned_units=unassigned_units,
             multi_packs=multi_packs,
+            copper_summary=copper_mount_summary(job) if job else None,
             allocations=allocations,
             **_pay_table_context(payments),
             invoice_choices=Sale.INVOICE_CHOICES,

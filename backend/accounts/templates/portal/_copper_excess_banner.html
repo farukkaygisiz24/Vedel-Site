@@ -1,0 +1,20 @@
+{% load portal_fmt %}
+{% if copper_summary and copper_summary.has_excess %}
+<p class="flash is-err" role="status" data-copper-excess="1">
+  Bakır: {{ copper_summary.used|tr_qty }} mt kullanıldı ·
+  {{ copper_summary.included|tr_qty }} mt dahil ·
+  {{ copper_summary.agreed|tr_qty }} mt satışta anlaşıldı ·
+  {{ copper_summary.excess|tr_qty }} mt aşım{% if copper_summary.excess_estimate %}
+  · tahmini {{ copper_summary.excess_estimate|tr_money }} ₺{% endif %}.
+  Elle tahsil edin.
+</p>
+{% elif copper_summary %}
+<p class="hint" data-copper-summary="1">
+  Bakır: {{ copper_summary.used|tr_qty }} mt kullanıldı ·
+  {{ copper_summary.included|tr_qty }} mt dahil ·
+  {{ copper_summary.agreed|tr_qty }} mt satışta anlaşıldı.
+</p>
+{% endif %}
+{% if copper_summary and copper_summary.non_meter %}
+<p class="hint" data-copper-unit-warn="1">Bazı bakır kalemlerinin birimi metre değil; hesap metre varsayar.</p>
+{% endif %}

@@ -52,13 +52,23 @@
       {% endif %}
       {% if can_service_lead %}
       <a
-        class="side-link{% if '/service/' in request.path %} is-active{% endif %}"
+        class="side-link{% if '/service/' in request.path and '/service/reminders/' not in request.path %} is-active{% endif %}"
         href="{% url 'portal-service' %}"
       >
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         Servis
+      </a>
+      <a
+        class="side-link{% if '/service/reminders/' in request.path %} is-active{% endif %}"
+        href="{% url 'portal-service-reminders' %}"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke="currentColor" stroke-width="1.7"/>
+          <path d="M3.5 9.5h17M8 3v4M16 3v4M9 14.5l2 2 4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Bakımlar
       </a>
       {% endif %}
       {% if can_stock %}

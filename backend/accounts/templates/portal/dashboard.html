@@ -1,8 +1,110 @@
 {% extends 'portal/app_base.html' %}
+{% load portal_fmt %}
 
 {% block title %}Ana sayfa | Vedel Servis{% endblock %}
 
 {% block workspace %}
-  <h1>Ana sayfa</h1>
-  <p class="lead">Hoş geldiniz, {{ user.username }}. Servis işlemlerinize buradan devam edebilirsiniz.</p>
+<div class="dash" data-live="dashboard">
+  <div class="toolbar">
+    <h1>Ana sayfa</h1>
+  </div>
+
+  {% if sales_revenue or service_revenue %}
+  <div class="dash-grid">
+    {% if sales_revenue %}
+    {% include 'portal/_dash_revenue.html' with title='Satış' rev=sales_revenue link_name='portal-sales' %}
+    {% endif %}
+    {% if service_revenue %}
+    {% include 'portal/_dash_revenue.html' with title='Servis' rev=service_revenue link_name='portal-service-jobs' %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="dash-grid">
+    {% if can_service_lead %}
+    <section class="dash-block">
+      <div class="dash-head">
+        <p class="field-label">Gidilmeyen işler</p>
+        <a class="btn is-ghost" href="{% url 'portal-service' %}">Servis</a>
+      </div>
+      <div class="party-stats is-2">
+        <div class="party-stat">
+          <span>Kaçırılan</span>
+          <b{% if missed_count %} class="is-over"{% endif %}>{{ missed_count }}</b>
+        </div>
+        <div class="party-stat">
+          <span>Bugün açık</span>
+          <b>{{ today_open_count }}</b>
+        </div>
+      </div>
+      <div class="wait-list">
+        {% for item in missed_jobs %}
+        <a class="wait-card" href="{{ item.get_absolute_url }}">
+          <div>
+            <b>{{ item.party.display_name }}</b>
+            <small>{{ item.date|date:'d.m.Y' }}{% if item.time %} · {{ item.time|time:'H:i' }}{% endif %} · {{ item.get_status_display }}{% if item.sale %} · {{ item.sale.number }}{% endif %}</small>
+          </div>
+        </a>
+        {% empty %}
+        <p class="hint">Kaçırılan iş yok.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="dash-block">
+      <div class="dash-head">
+        <p class="field-label">Bakımlar</p>
+        <a class="btn is-ghost" href="{% url 'portal-service-reminders' %}">Tümü</a>
+      </div>
+      <div class="party-stats is-2">
+        <div class="party-stat">
+          <span>Geciken</span>
+          <b{% if due_overdue_count %} class="is-over"{% endif %}>{{ due_overdue_count }}</b>
+        </div>
+        <div class="party-stat">
+          <span>14 gün içinde</span>
+          <b>{{ due_soon_count }}</b>
+        </div>
+      </div>
+      <div class="wait-list">
+        {% for item in due_devices %}
+        <div class="wait-card">
+          <div>
+            <b>{{ item.party.display_name }}</b>
+            <small>{{ item.name }} · {{ item.interval_months }} ay</small>
+          </div>
+          <span class="money{% if item.next_due < today %} is-over{% endif %}">{{ item.next_due|date:'d.m.Y' }}</span>
+        </div>
+        {% empty %}
+        <p class="hint">Yaklaşan bakım yok.</p>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    {% if can_sales %}
+    <section class="dash-block">
+      <div class="dash-head">
+        <p class="field-label">Kritik cihaz stoğu</p>
+        <a class="btn is-ghost" href="{% url 'portal-stock' %}?stock=out">Tümü{% if device_alert_count %} ({{ device_alert_count }}){% endif %}</a>
+      </div>
+      {% include 'portal/_dash_stock_list.html' with items=device_alerts empty='Kritik seviyede cihaz yok.' %}
+    </section>
+    {% endif %}
+
+    {% if can_service_lead %}
+    <section class="dash-block">
+      <div class="dash-head">
+        <p class="field-label">Bakır boru</p>
+        <a class="btn is-ghost" href="{% url 'portal-stock' %}?category=bakir-boru">Depo</a>
+      </div>
+      {% include 'portal/_dash_stock_list.html' with items=copper_items empty='Bakır boru ürünü yok.' %}
+      {% if mount_alerts %}
+      <p class="field-label">Montaj malzemesi · kritik{% if mount_alert_count > mount_alerts|length %} ({{ mount_alert_count }}){% endif %}</p>
+      {% include 'portal/_dash_stock_list.html' with items=mount_alerts empty='' %}
+      {% endif %}
+    </section>
+    {% endif %}
+  </div>
+</div>
 {% endblock %}

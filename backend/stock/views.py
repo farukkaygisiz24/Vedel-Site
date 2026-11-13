@@ -19,17 +19,19 @@ from accounts.weather import get_weather
 from sales.models import Party
 from stock.models import Category, Product, StockMovement
 from stock.services import (
+    LOW_STOCK,
     AUTO_SKU_RETRIES,
     StockError,
     apply_device_fields,
     apply_movement,
     DEFAULT_CATEGORY_SLUG,
-    MOUNT_CATEGORY_SLUG,
+    _parse_copper_flag,
     _parse_klima_flag,
     create_category,
     default_category,
     delete_category,
     mount_category,
+    mount_material_filter,
     update_category,
     is_auto_sku,
     next_sku,
@@ -45,10 +47,6 @@ QTY_FIELD = DecimalField(max_digits=12, decimal_places=2)
 MONEY_FIELD = DecimalField(max_digits=14, decimal_places=2)
 QTY_ZERO = Value(Decimal('0.00'), output_field=QTY_FIELD)
 MONEY_ZERO = Value(Decimal('0.00'), output_field=MONEY_FIELD)
-LOW_STOCK = Q(alert_on=True) & (
-    Q(alert_qty__isnull=True, stock_qty__lte=0)
-    | Q(alert_qty__isnull=False, stock_qty__lte=F('alert_qty'))
-)
 
 
 def _ctx(**extra):
@@ -99,7 +97,13 @@ def product_search_json(request: HttpRequest) -> JsonResponse:
         page = 1
     qs = Product.objects.filter(is_active=True).select_related('category')
     if str(request.GET.get('mount', '')).strip() in ('1', 'true', 'on'):
-        qs = qs.filter(category__slug=MOUNT_CATEGORY_SLUG, is_device=False)
+        qs = qs.filter(mount_material_filter(), is_device=False)
+    copper_only = str(request.GET.get('copper', '')).strip() in ('1', 'true', 'on')
+    if copper_only:
+        qs = qs.filter(category__is_copper_pipe=True, is_device=False)
+    elif str(request.GET.get('sale', '')).strip() in ('1', 'true', 'on'):
+        # Normal sale lines: copper goes through the "Anlaşma kalemi" panel only.
+        qs = qs.exclude(category__is_copper_pipe=True)
     family = str(request.GET.get('device_family', '')).strip()
     scope = stock_scope(request.user)
     if scope is not None:
@@ -112,6 +116,9 @@ def product_search_json(request: HttpRequest) -> JsonResponse:
     if merkez and not can_access_category(request.user, merkez):
         merkez = None
 
+    if copper_only:
+        cat = None
+        family = ''
     if cat and cat.is_klima:
         # Klima markası + Split/Multi cihazlar; Merkez Depo her markada global.
         if family == Product.KIND_SPLIT:
@@ -283,6 +290,8 @@ def _category_payload(item: Category, toast='') -> dict:
         'prefix': item.sku_prefix,
         'brand': item.brand,
         'is_klima': bool(item.is_klima),
+        'is_copper_pipe': bool(item.is_copper_pipe),
+        'included_copper_meters': str(item.included_copper_meters or Decimal('0.00')),
         'locked': item.products.exists(),
         'next_sku': next_sku(item.sku_prefix),
         'url': f'/stock/?category={item.slug}',
@@ -300,6 +309,8 @@ def _category_choices():
             'prefix': item.sku_prefix,
             'brand': item.brand,
             'is_klima': bool(item.is_klima),
+            'is_copper_pipe': bool(item.is_copper_pipe),
+            'included_copper_meters': str(item.included_copper_meters or Decimal('0.00')),
             'slug': item.slug,
             'locked': item.product_n > 0,
         }
@@ -435,6 +446,12 @@ def _stock_list_context(request: HttpRequest, error='', stock_modal=''):
                 'prefix': category.sku_prefix,
                 'brand': category.brand,
                 'is_klima': bool(category.is_klima),
+                'is_copper_pipe': bool(category.is_copper_pipe),
+                'included_copper_meters': (
+                    ''
+                    if not category.included_copper_meters
+                    else format(category.included_copper_meters.normalize(), 'f').rstrip('0').rstrip('.')
+                ),
                 'slug': category.slug,
                 'locked': category.products.exists(),
             }
@@ -479,6 +496,8 @@ def stock_home(request: HttpRequest) -> HttpResponse:
                         prefix=request.POST.get('sku_prefix', ''),
                         brand=request.POST.get('brand', ''),
                         is_klima=_parse_klima_flag(request.POST.get('is_klima')),
+                        is_copper_pipe=_parse_copper_flag(request.POST.get('is_copper_pipe')),
+                        included_copper_meters=request.POST.get('included_copper_meters', ''),
                     )
                     text = queue_toast(request, 'Kategori güncellendi.')
                 else:
@@ -487,6 +506,8 @@ def stock_home(request: HttpRequest) -> HttpResponse:
                         prefix=request.POST.get('sku_prefix', ''),
                         brand=request.POST.get('brand', ''),
                         is_klima=_parse_klima_flag(request.POST.get('is_klima')),
+                        is_copper_pipe=_parse_copper_flag(request.POST.get('is_copper_pipe')),
+                        included_copper_meters=request.POST.get('included_copper_meters', ''),
                         user=request.user,
                     )
                     text = queue_toast(request, 'Kategori eklendi.')

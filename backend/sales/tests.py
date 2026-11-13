@@ -429,3 +429,187 @@ class SaleMountFieldsTests(TestCase):
         self.assertIn('data-no-default', body)
         self.assertRegex(body, r'id="mount_city"(?![^>]*\srequired)')
         self.assertRegex(body, r'id="mount_district"(?![^>]*\srequired)')
+
+
+class CopperSaleLineTests(TestCase):
+    def setUp(self):
+        self.lead = Customer.objects.create_user(
+            username='copper-sale-lead',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE_LEAD,
+        )
+        self.party = Party.objects.create(
+            kind=Party.KIND_REAL,
+            number='CUSTCU001',
+            first_name='Ravil',
+            last_name='Gıda',
+            phone='05550004455',
+            address='Test',
+            city='BURSA',
+            district='NİLÜFER',
+            created_by=self.lead,
+        )
+        category = Category.objects.create(
+            name='Euroform Copper Sale',
+            slug='euroform-copper-sale',
+            sku_prefix='ECS',
+            is_klima=True,
+            included_copper_meters=Decimal('5.00'),
+            created_by=self.lead,
+        )
+        self.product = Product.objects.create(
+            sku='ECS-0001',
+            brand='Euroform',
+            name='Split',
+            category=category,
+            is_device=True,
+            device_kind=Product.KIND_SPLIT,
+            outdoor_name='Outdoor',
+            stock_qty=Decimal('5.00'),
+            sale_price=Decimal('1000.00'),
+            created_by=self.lead,
+        )
+        self.copper_cat = Category.objects.create(
+            name='Bakır Sale Cat',
+            slug='bakir-sale-cat',
+            sku_prefix='BSC',
+            is_copper_pipe=True,
+            created_by=self.lead,
+        )
+        self.pipe = Product.objects.create(
+            sku='BSC-0001',
+            brand='Anadolu',
+            name='1/4-1/2 Bakır Boru',
+            category=self.copper_cat,
+            unit='MT',
+            stock_qty=Decimal('100.00'),
+            sale_price=Decimal('50.00'),
+            vat_rate=Decimal('0.00'),
+            created_by=self.lead,
+        )
+
+    def _post(self, **extra):
+        q = QueryDict(mutable=True)
+        q.update(
+            {
+                'party_mode': 'existing',
+                'party_id': str(self.party.pk),
+                'date': date.today().isoformat(),
+                'vat_mode': Sale.VAT_NONE,
+                'invoice_status': Sale.INVOICE_NO,
+            }
+        )
+        q.setlist('product_id', [str(self.product.pk)])
+        q.setlist('qty', ['1'])
+        q.setlist('unit_price', ['1000'])
+        q.setlist('description', [''])
+        q.setlist('vat_rate', ['0'])
+        q.setlist('pay_method', [])
+        q.setlist('pay_amount', [])
+        for key, value in extra.items():
+            if isinstance(value, (list, tuple)):
+                q.setlist(key, list(value))
+            else:
+                q[key] = value
+        return q
+
+    def test_agreed_copper_line_adds_total_without_stock(self):
+        from stock.models import StockMovement
+        from sales.services import COPPER_LINE_DESCRIPTION, sale_agreed_copper_meters
+
+        before_device = self.product.stock_qty
+        before_pipe = self.pipe.stock_qty
+        sale = create_sale(
+            user=self.lead,
+            post=self._post(
+                copper_product_id=[str(self.pipe.pk)],
+                copper_qty=['18'],
+                copper_unit_price=['50'],
+                copper_vat_rate=['0'],
+            ),
+        )
+        self.product.refresh_from_db()
+        self.pipe.refresh_from_db()
+        self.assertEqual(self.product.stock_qty, before_device - Decimal('1.00'))
+        self.assertEqual(self.pipe.stock_qty, before_pipe)
+        copper = sale.lines.filter(description=COPPER_LINE_DESCRIPTION).get()
+        self.assertEqual(copper.product_id, self.pipe.pk)
+        self.assertEqual(copper.qty, Decimal('18.00'))
+        self.assertEqual(copper.unit_price, Decimal('50.00'))
+        self.assertEqual(copper.line_total, Decimal('900.00'))
+        self.assertEqual(sale.grand_total, Decimal('1900.00'))
+        self.assertEqual(sale_agreed_copper_meters(sale), Decimal('18.00'))
+        self.assertFalse(StockMovement.objects.filter(sale_line=copper).exists())
+
+    def test_sales_form_shows_copper_panel(self):
+        self.client.force_login(self.lead)
+        page = self.client.get(reverse('portal-sales-new'))
+        self.assertContains(page, 'sale-copper-panel')
+        self.assertContains(page, 'add-copper-line')
+        self.assertContains(page, 'Anlaşma kalemi')
+        self.assertContains(page, 'copper-line-tpl')
+
+    def test_copper_product_rejected_on_normal_line(self):
+        post = self._post()
+        post.setlist('product_id', [str(self.product.pk), str(self.pipe.pk)])
+        post.setlist('qty', ['1', '10'])
+        post.setlist('unit_price', ['1000', '50'])
+        post.setlist('description', ['', ''])
+        post.setlist('vat_rate', ['0', '0'])
+        before = self.pipe.stock_qty
+        with self.assertRaisesMessage(ValueError, 'Anlaşma kalemi'):
+            create_sale(user=self.lead, post=post)
+        self.pipe.refresh_from_db()
+        self.assertEqual(self.pipe.stock_qty, before)
+
+    def test_copper_line_flag_not_description(self):
+        from sales.services import sale_agreed_copper_meters
+
+        post = self._post(
+            copper_product_id=[str(self.pipe.pk)],
+            copper_qty=['2.500'],
+            copper_unit_price=['50'],
+            copper_vat_rate=['0'],
+        )
+        # A typed 'Bakır boru' description on the device line must not count as copper.
+        post.setlist('description', ['Bakır boru'])
+        sale = create_sale(user=self.lead, post=post)
+        copper = sale.lines.get(is_copper=True)
+        self.assertEqual(copper.qty, Decimal('2.50'))
+        self.assertEqual(sale.lines.filter(is_copper=False).count(), 1)
+        self.assertEqual(sale_agreed_copper_meters(sale), Decimal('2.50'))
+
+    def test_copper_panel_rejects_non_copper_product(self):
+        with self.assertRaisesMessage(ValueError, 'yalnız bakır boru'):
+            create_sale(
+                user=self.lead,
+                post=self._post(
+                    copper_product_id=[str(self.product.pk)],
+                    copper_qty=['3'],
+                    copper_unit_price=['50'],
+                ),
+            )
+        with self.assertRaisesMessage(ValueError, 'birlikte girilmeli'):
+            create_sale(
+                user=self.lead,
+                post=self._post(copper_product_id=[str(self.pipe.pk)], copper_qty=['3']),
+            )
+
+    def test_copper_keeps_zero_vat(self):
+        post = self._post(
+            vat_mode=Sale.VAT_PLUS,
+            copper_product_id=[str(self.pipe.pk)],
+            copper_qty=['10'],
+            copper_unit_price=['50'],
+        )
+        sale = create_sale(user=self.lead, post=post)
+        self.assertEqual(sale.lines.get(is_copper=True).vat_rate, Decimal('0.00'))
+
+    def test_sale_search_hides_copper_from_normal_lines(self):
+        self.client.force_login(self.lead)
+        headers = {'HTTP_ACCEPT': 'application/json'}
+        normal = self.client.get(reverse('portal-stock'), {'q': 'Bakır', 'sale': '1'}, **headers)
+        self.assertNotIn('BSC-0001', {item['sku'] for item in normal.json()['results']})
+        copper = self.client.get(reverse('portal-stock'), {'q': 'Bakır', 'copper': '1'}, **headers)
+        self.assertIn('BSC-0001', {item['sku'] for item in copper.json()['results']})

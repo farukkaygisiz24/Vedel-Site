@@ -1,0 +1,14 @@
+{% load portal_fmt %}
+<div class="wait-list">
+  {% for item in items %}
+  <a class="wait-card" href="{{ item.get_absolute_url }}">
+    <div>
+      <b>{{ item.display_name }}</b>
+      <small>{{ item.sku }}{% if item.alert_on and item.alert_qty is not None %} · eşik {{ item.alert_qty|tr_qty }}{% endif %}</small>
+    </div>
+    <span class="money{% if item.stock_qty <= 0 or item.is_low %} is-over{% endif %}">{{ item.stock_qty|tr_qty }} {{ item.unit|default:'' }}</span>
+  </a>
+  {% empty %}
+  {% if empty %}<p class="hint">{{ empty }}</p>{% endif %}
+  {% endfor %}
+</div>

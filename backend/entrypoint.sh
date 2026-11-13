@@ -5,18 +5,19 @@ mkdir -p media
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
 
+# ASGI (uvicorn) serves both HTTP and the /ws/portal/ live-update socket.
 if [ "${DJANGO_DEBUG:-0}" = "1" ]; then
-  # Threads: a browser's idle preconnect would otherwise block the single sync worker.
-  exec gunicorn vedelb2c.wsgi:application \
-    --bind 0.0.0.0:8000 \
-    --workers 1 \
-    --threads 8 \
+  exec uvicorn vedelb2c.asgi:application \
+    --host 0.0.0.0 \
+    --port 8000 \
     --reload \
-    --timeout 60
+    --timeout-keep-alive 5
 fi
 
-exec gunicorn vedelb2c.wsgi:application \
-  --bind 0.0.0.0:8000 \
-  --workers "${GUNICORN_WORKERS:-2}" \
-  --threads "${GUNICORN_THREADS:-4}" \
-  --timeout 60
+exec uvicorn vedelb2c.asgi:application \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --workers "${UVICORN_WORKERS:-${GUNICORN_WORKERS:-2}}" \
+  --proxy-headers \
+  --forwarded-allow-ips '*' \
+  --timeout-keep-alive 5

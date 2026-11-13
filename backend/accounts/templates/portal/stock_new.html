@@ -137,6 +137,21 @@
               <i></i>
             </span>
           </label>
+          <div class="row" id="c-copper-meters-wrap" hidden style="margin-top:16px">
+            <input id="c_included_copper" name="included_copper_meters" placeholder=" " inputmode="decimal" autocomplete="off" />
+            <label for="c_included_copper">Split dahil bakır (mt)</label>
+          </div>
+          <p class="hint" id="c-copper-meters-hint" hidden>Boş veya 0 = dahil yok. Yalnız split cihazlar için.</p>
+          <label class="switch" for="c_is_copper" style="margin-top:16px" id="c-copper-switch-wrap">
+            <span>
+              <b>Bakır boru kategorisi</b>
+              <small class="hint">Montaj malzemesinde bakır metre bu kategoriden sayılır.</small>
+            </span>
+            <span class="toggle">
+              <input type="checkbox" name="is_copper_pipe" id="c_is_copper" value="1" />
+              <i></i>
+            </span>
+          </label>
           <p class="hint">Önek 2–6 harf. MHI, ERF, STK. Marka boş bırakılabilir.</p>
         </div>
         <p class="modal-alert" id="category-error" hidden role="alert"></p>
@@ -289,10 +304,30 @@
       });
       setCat(catEl.value, false);
       var err = document.getElementById('category-error');
+      var cKlima = document.getElementById('c_is_klima');
+      var cCopper = document.getElementById('c_is_copper');
+      var cMeters = document.getElementById('c_included_copper');
+      var cMetersWrap = document.getElementById('c-copper-meters-wrap');
+      var cMetersHint = document.getElementById('c-copper-meters-hint');
+      var cCopperWrap = document.getElementById('c-copper-switch-wrap');
+      function syncNewCatFlags() {
+        var klimaOn = !!(cKlima && cKlima.checked);
+        if (klimaOn && cCopper) cCopper.checked = false;
+        if (cMetersWrap) cMetersWrap.hidden = !klimaOn;
+        if (cMetersHint) cMetersHint.hidden = !klimaOn;
+        if (cCopperWrap) cCopperWrap.hidden = klimaOn;
+        if (!klimaOn && cMeters) cMeters.value = '';
+      }
+      if (cKlima) cKlima.addEventListener('change', syncNewCatFlags);
+      if (cCopper) cCopper.addEventListener('change', function () {
+        if (cCopper.checked && cKlima) cKlima.checked = false;
+        syncNewCatFlags();
+      });
       function revealCatModal() {
         catForm.reset();
         err.hidden = true;
         err.textContent = '';
+        syncNewCatFlags();
         catModal.hidden = false;
         requestAnimationFrame(function () {
           requestAnimationFrame(function () { catModal.classList.add('is-on'); });

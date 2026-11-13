@@ -25,6 +25,7 @@
       </div>
     </div>
     {% if error and not pay_open %}<p class="flash is-err">{{ error }}</p>{% endif %}
+    {% if not can_service_field or can_service_lead %}{% include 'portal/_copper_excess_banner.html' %}{% endif %}
 
     <section class="fis-letter">
       <div class="fis-letter-head">

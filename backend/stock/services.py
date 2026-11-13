@@ -2,6 +2,7 @@ import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.db import transaction
+from django.db.models import F, Q
 
 from .models import Category, Product, StockMovement
 
@@ -12,6 +13,16 @@ DEFAULT_SKU_PREFIX = 'STK'
 MOUNT_CATEGORY_NAME = 'Klima Montaj Malzemesi'
 MOUNT_CATEGORY_SLUG = 'klima-montaj-malzemesi'
 MOUNT_SKU_PREFIX = 'KMM'
+COPPER_CATEGORY_NAME = 'Bakır Boru'
+COPPER_CATEGORY_SLUG = 'bakir-boru'
+COPPER_SKU_PREFIX = 'BAK'
+MAX_INCLUDED_COPPER_METERS = Decimal('1000.00')
+
+# Products at/below their critical threshold ("Kritik eşik", only when "Hatırlat" is on).
+LOW_STOCK = Q(alert_on=True) & (
+    Q(alert_qty__isnull=True, stock_qty__lte=0)
+    | Q(alert_qty__isnull=False, stock_qty__lte=F('alert_qty'))
+)
 SERVICE_LABOR_SKU = 'KS-0004'
 SERVICE_CATEGORY_SLUG = 'klima-servis'
 AUTO_SKU_RETRIES = 5
@@ -154,19 +165,100 @@ def _parse_klima_flag(raw) -> bool:
     return str(raw or '').strip() in ('1', 'on', 'true', 'yes')
 
 
-def create_category(*, name: str, prefix: str, user, brand: str = '', is_klima: bool = False) -> Category:
+def _parse_copper_flag(raw) -> bool:
+    return str(raw or '').strip() in ('1', 'on', 'true', 'yes')
+
+
+def parse_included_copper_meters(raw) -> Decimal:
+    text = str(raw or '').strip()
+    if not text:
+        return Decimal('0.00')
+    value = parse_decimal(text, 'Split dahil bakır (mt)')
+    if value < 0:
+        raise ValueError('Split dahil bakır metre negatif olamaz.')
+    if value > MAX_INCLUDED_COPPER_METERS:
+        raise ValueError('Split dahil bakır metre en fazla 1000 olabilir.')
+    return value
+
+
+def mount_material_filter():
+    from django.db.models import Q
+
+    return Q(category__slug=MOUNT_CATEGORY_SLUG) | Q(category__is_copper_pipe=True)
+
+
+def copper_category(user=None) -> Category:
+    item = Category.objects.filter(slug=COPPER_CATEGORY_SLUG).first()
+    if item:
+        return item
+    item = Category.objects.filter(name=COPPER_CATEGORY_NAME).first()
+    if item:
+        changed = []
+        if item.slug != COPPER_CATEGORY_SLUG and not Category.objects.filter(slug=COPPER_CATEGORY_SLUG).exists():
+            item.slug = COPPER_CATEGORY_SLUG
+            changed.append('slug')
+        if not item.is_copper_pipe:
+            item.is_copper_pipe = True
+            changed.append('is_copper_pipe')
+        if changed:
+            item.save(update_fields=changed)
+        return item
+    item = Category.objects.filter(sku_prefix=COPPER_SKU_PREFIX).first()
+    if item:
+        if not item.is_copper_pipe:
+            item.is_copper_pipe = True
+            item.save(update_fields=['is_copper_pipe'])
+        return item
+    if user is not None:
+        return create_category(
+            name=COPPER_CATEGORY_NAME,
+            prefix=COPPER_SKU_PREFIX,
+            user=user,
+            is_copper_pipe=True,
+        )
+    raise ValueError('Bakır Boru deposu yok.')
+
+
+def create_category(
+    *,
+    name: str,
+    prefix: str,
+    user,
+    brand: str = '',
+    is_klima: bool = False,
+    is_copper_pipe: bool = False,
+    included_copper_meters=None,
+) -> Category:
     name = pretty_label(name)
     if not name:
         raise ValueError('Kategori adı zorunlu.')
     sku_prefix = normalize_prefix(prefix)
+    is_klima = bool(is_klima)
+    is_copper_pipe = bool(is_copper_pipe)
+    if is_klima and is_copper_pipe:
+        raise ValueError('Klima ve bakır boru aynı kategoride olamaz.')
     if is_klima and sku_prefix == MOUNT_SKU_PREFIX:
         raise ValueError('Montaj kategorisi klima olamaz.')
+    if is_klima and sku_prefix == COPPER_SKU_PREFIX:
+        raise ValueError('Bakır boru kategorisi klima olamaz.')
+    if is_copper_pipe and sku_prefix == MOUNT_SKU_PREFIX:
+        raise ValueError('Montaj kategorisi bakır boru olarak işaretlenemez.')
+    if included_copper_meters is None:
+        meters = Decimal('0.00')
+    elif isinstance(included_copper_meters, Decimal):
+        meters = included_copper_meters
+    else:
+        meters = parse_included_copper_meters(included_copper_meters)
+    if not is_klima:
+        meters = Decimal('0.00')
     return Category.objects.create(
         name=name,
         slug=next_category_slug(name),
         sku_prefix=sku_prefix,
         brand=pretty_label(brand),
-        is_klima=bool(is_klima),
+        is_klima=is_klima,
+        is_copper_pipe=is_copper_pipe,
+        included_copper_meters=meters,
         created_by=user,
     )
 
@@ -175,6 +267,7 @@ PROTECTED_CATEGORY_SLUGS = frozenset(
     {
         DEFAULT_CATEGORY_SLUG,
         MOUNT_CATEGORY_SLUG,
+        COPPER_CATEGORY_SLUG,
         SERVICE_CATEGORY_SLUG,
     }
 )
@@ -189,20 +282,52 @@ def delete_category(*, item: Category) -> None:
     item.delete()
 
 
-def update_category(*, item: Category, name: str, prefix: str, brand: str = '', is_klima: bool = False) -> Category:
+def update_category(
+    *,
+    item: Category,
+    name: str,
+    prefix: str,
+    brand: str = '',
+    is_klima: bool = False,
+    is_copper_pipe: bool = False,
+    included_copper_meters=None,
+) -> Category:
     name = pretty_label(name)
     if not name:
         raise ValueError('Kategori adı zorunlu.')
     new_prefix = normalize_prefix(prefix)
     if new_prefix != item.sku_prefix and item.products.exists():
         raise ValueError('Bu kategoride ürün varken önek değişmez.')
+    is_klima = bool(is_klima)
+    is_copper_pipe = bool(is_copper_pipe)
+    if item.slug == COPPER_CATEGORY_SLUG:
+        # The protected copper depot always stays copper.
+        is_copper_pipe = True
+    if is_klima and is_copper_pipe:
+        raise ValueError('Klima ve bakır boru aynı kategoride olamaz.')
     if is_klima and (new_prefix == MOUNT_SKU_PREFIX or item.slug == MOUNT_CATEGORY_SLUG):
         raise ValueError('Montaj kategorisi klima olamaz.')
+    if is_klima and (new_prefix == COPPER_SKU_PREFIX or item.slug == COPPER_CATEGORY_SLUG or item.is_copper_pipe):
+        raise ValueError('Bakır boru kategorisi klima olamaz.')
+    if is_copper_pipe and (new_prefix == MOUNT_SKU_PREFIX or item.slug == MOUNT_CATEGORY_SLUG):
+        raise ValueError('Montaj kategorisi bakır boru olarak işaretlenemez.')
+    if included_copper_meters is None:
+        meters = item.included_copper_meters or Decimal('0.00')
+    elif isinstance(included_copper_meters, Decimal):
+        meters = included_copper_meters
+    else:
+        meters = parse_included_copper_meters(included_copper_meters)
+    if not is_klima:
+        meters = Decimal('0.00')
     item.name = name
     item.sku_prefix = new_prefix
     item.brand = pretty_label(brand)
-    item.is_klima = bool(is_klima)
-    item.save(update_fields=['name', 'sku_prefix', 'brand', 'is_klima'])
+    item.is_klima = is_klima
+    item.is_copper_pipe = is_copper_pipe
+    item.included_copper_meters = meters
+    item.save(
+        update_fields=['name', 'sku_prefix', 'brand', 'is_klima', 'is_copper_pipe', 'included_copper_meters']
+    )
     return item
 
 

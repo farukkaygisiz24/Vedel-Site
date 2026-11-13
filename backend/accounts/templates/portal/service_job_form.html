@@ -30,6 +30,7 @@
     </div>
   </div>
   <p class="flash is-err" id="job-error"{% if not error %} hidden{% endif %} role="alert">{{ error }}</p>
+  {% if not tech_mode %}{% include 'portal/_copper_excess_banner.html' %}{% endif %}
 
   <form class="wizard{% if office_close %} is-slip{% endif %}" method="post" action="{% if job %}{{ job.get_absolute_url }}{% else %}{% url 'portal-service-job-new' %}{% endif %}" id="job-form" autocomplete="off" enctype="multipart/form-data">
     {% csrf_token %}

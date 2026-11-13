@@ -13,19 +13,41 @@ from .models import Party, Payment, PaymentAllocation, Sale, SaleLine
 from .tr_locations import is_known_city, is_known_district
 
 TWOPLACES = Decimal('0.01')
+COPPER_LINE_DESCRIPTION = 'Bakır boru'
 
 
 def money(value: Decimal) -> Decimal:
     return value.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
 
 
-def parse_decimal(raw, field: str) -> Decimal:
+def is_copper_sale_line(line: SaleLine | None) -> bool:
+    if line is None:
+        return False
+    return bool(getattr(line, 'is_copper', False))
+
+
+def sale_agreed_copper_meters(sale: Sale | None) -> Decimal:
+    if sale is None:
+        return Decimal('0.00')
+    total = Decimal('0.00')
+    for line in sale.lines.all():
+        if is_copper_sale_line(line):
+            total += line.qty or Decimal('0.00')
+    return money(total)
+
+
+def parse_decimal(raw, field: str, *, thousands: bool = True) -> Decimal:
+    """Parse a Turkish-typed number.
+
+    thousands=False is for measured quantities (metre, adet): a lone dot is a
+    decimal point there, so '2.500' means 2.5 — same as the browser's parseFloat.
+    """
     text = str(raw or '').strip().replace('\xa0', '').replace(' ', '')
     if not text:
         raise ValueError(f'{field} boş olamaz.')
     if ',' in text:
         text = text.replace('.', '').replace(',', '.')
-    else:
+    elif thousands:
         parts = text.split('.')
         if len(parts) > 1 and all(len(part) == 3 for part in parts[1:]):
             text = ''.join(parts)
@@ -357,6 +379,8 @@ def create_sale(*, user, post) -> Sale:
         if price < 0:
             raise ValueError('Birim fiyat negatif olamaz.')
         product = Product.objects.select_for_update().get(pk=product_id, is_active=True)
+        if product.category_id and product.category.is_copper_pipe:
+            raise ValueError('Bakır boruyu Anlaşma kalemi bölümünden ekleyin.')
         vat_rate = (
             parse_decimal(vat_rates[index], 'KDV')
             if index < len(vat_rates) and str(vat_rates[index]).strip()
@@ -372,6 +396,53 @@ def create_sale(*, user, post) -> Sale:
                 'unit_price': price,
                 'vat_rate': vat_rate,
                 'description': descriptions[index].strip() if index < len(descriptions) else '',
+                'net': net,
+                'vat': vat,
+                'total': total,
+            }
+        )
+
+    copper_product_ids = post.getlist('copper_product_id')
+    copper_qtys = post.getlist('copper_qty')
+    copper_prices = post.getlist('copper_unit_price')
+    copper_vats = post.getlist('copper_vat_rate')
+    copper_count = max(len(copper_product_ids), len(copper_qtys), len(copper_prices), len(copper_vats))
+    for index in range(copper_count):
+        product_id = str(copper_product_ids[index] if index < len(copper_product_ids) else '').strip()
+        qty_raw = str(copper_qtys[index] if index < len(copper_qtys) else '').strip()
+        price_raw = str(copper_prices[index] if index < len(copper_prices) else '').strip()
+        if not product_id and not qty_raw and not price_raw:
+            continue
+        if not product_id:
+            raise ValueError('Bakır boru kaleminde ürün seçin.')
+        if not qty_raw or not price_raw:
+            raise ValueError('Bakır boru için metre ve birim fiyat birlikte girilmeli.')
+        copper_qty = parse_decimal(qty_raw, 'Bakır boru metre', thousands=False)
+        copper_price = parse_decimal(price_raw, 'Bakır boru birim fiyat')
+        if copper_qty <= 0:
+            raise ValueError('Bakır boru metre sıfırdan büyük olmalı.')
+        if copper_price < 0:
+            raise ValueError('Bakır boru birim fiyat negatif olamaz.')
+        copper_product = Product.objects.select_related('category').get(pk=product_id, is_active=True)
+        category = getattr(copper_product, 'category', None)
+        if not category or not category.is_copper_pipe:
+            raise ValueError('Bakır boru kaleminde yalnız bakır boru ürünü seçilir.')
+        vat_raw = str(copper_vats[index] if index < len(copper_vats) else '').strip()
+        copper_vat = parse_decimal(vat_raw, 'Bakır boru KDV') if vat_raw else (
+            copper_product.vat_rate if copper_product.vat_rate is not None else Decimal('20.00')
+        )
+        if vat_mode == Sale.VAT_NONE:
+            copper_vat = Decimal('0.00')
+        net, vat, total = line_amounts(copper_qty, copper_price, copper_vat, vat_mode)
+        parsed_lines.append(
+            {
+                'product': copper_product,
+                'qty': copper_qty,
+                'unit_price': copper_price,
+                'vat_rate': copper_vat,
+                'description': COPPER_LINE_DESCRIPTION,
+                'skip_stock': True,
+                'is_copper': True,
                 'net': net,
                 'vat': vat,
                 'total': total,
@@ -413,6 +484,7 @@ def create_sale(*, user, post) -> Sale:
             sale=sale,
             product=item['product'],
             description=item['description'],
+            is_copper=item.get('is_copper', False),
             qty=item['qty'],
             unit_price=item['unit_price'],
             vat_rate=item['vat_rate'],
@@ -420,7 +492,7 @@ def create_sale(*, user, post) -> Sale:
             line_vat=item['vat'],
             line_total=item['total'],
         )
-        if item['product']:
+        if item['product'] and not item.get('skip_stock'):
             apply_movement(
                 product=item['product'],
                 qty=-item['qty'],

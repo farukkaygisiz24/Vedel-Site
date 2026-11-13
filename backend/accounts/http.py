@@ -83,13 +83,25 @@ def field_required(view):
     return wrapped
 
 
+def field_stock_categories(user):
+    """Categories a field tech may use. Copper pipe follows mount access."""
+    from django.db.models import Q
+    from stock.models import Category
+    from stock.services import MOUNT_CATEGORY_SLUG
+
+    own = user.stock_categories.all()
+    if own.filter(slug=MOUNT_CATEGORY_SLUG).exists():
+        return Category.objects.filter(Q(portal_users=user) | Q(is_copper_pipe=True)).distinct()
+    return own
+
+
 def stock_scope(user):
     from stock.models import Category
 
     if not user or not getattr(user, 'is_authenticated', False):
         return Category.objects.none()
     if getattr(user, 'can_service_field', False) and not getattr(user, 'can_service_lead', False):
-        return user.stock_categories.all()
+        return field_stock_categories(user)
     if getattr(user, 'can_stock', False):
         return None
     return Category.objects.none()
@@ -131,8 +143,17 @@ class DisableBrowserCacheMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
+    """Portal HTML/JSON is live data: never let the browser or bfcache reuse it."""
+
+    LIVE_TYPES = ('text/html', 'application/json')
+
     def __call__(self, request):
         response = self.get_response(request)
+        if response.has_header('Cache-Control'):
+            return response
+        content_type = response.get('Content-Type', '')
+        if not content_type.startswith(self.LIVE_TYPES):
+            return response
         response['Cache-Control'] = 'no-store, max-age=0'
         response['Pragma'] = 'no-cache'
         return response

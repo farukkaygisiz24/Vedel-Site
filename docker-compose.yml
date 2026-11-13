@@ -16,6 +16,16 @@ services:
       - '5432:5432'
     restart: unless-stopped
 
+  redis:
+    image: redis:7.4-alpine
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   backend:
     build: ./backend
     environment:
@@ -26,6 +36,7 @@ services:
       DJANGO_CORS_ORIGINS: ${DJANGO_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - ./backend:/app
     command: ['sh', 'entrypoint.sh']
@@ -33,6 +44,8 @@ services:
       - '8000:8000'
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
