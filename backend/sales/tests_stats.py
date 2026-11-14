@@ -70,14 +70,18 @@ class YearSummaryTests(TestCase):
         self.assertEqual(summary.multi_systems, 1)
         self.assertEqual(summary.systems, 4)
         self.assertEqual(summary.revenue, Decimal('8800.00'))
-        self.assertEqual([item.qty for item in summary.top], [3, 2, 1])
-        self.assertEqual(summary.top[0].name, 'Mitsubishi · SRK20')
+        self.assertEqual(
+            [(item.name, item.qty) for item in summary.top],
+            [('Mitsubishi · SRK25', 2), ('Mitsubishi · SCM60', 1), ('Mitsubishi · Eski kart', 1)],
+        )
+        self.assertNotIn('Mitsubishi · SRK20', [item.name for item in summary.top])
         self.assertNotIn('Bakır boru', [item.name for item in summary.top])
 
     def test_legacy_line_next_to_multi_outdoor_is_an_indoor(self):
         self.sale('SAL20260904', date(2026, 6, 1), (self.outdoor, 1, 3000), (self.legacy, 2, 500))
         summary = year_summary(2026)
         self.assertEqual((summary.split_systems, summary.multi_systems), (0, 1))
+        self.assertEqual([item.name for item in summary.top], ['Mitsubishi · SCM60'])
 
     def test_sales_page_shows_summary(self):
         today = date.today()
