@@ -50,6 +50,7 @@ def year_summary(year: int) -> YearSummary:
     """A system is one split or one multi outdoor unit; multi indoors belong to their outdoor.
 
     Legacy klima lines without a device kind count as splits unless the sale has a multi outdoor.
+    The top list ranks systems only, so multi indoors stay out of it.
     """
     from service.services import _product_kind, sale_line_is_device
     from stock.models import Product
@@ -80,6 +81,8 @@ def year_summary(year: int) -> YearSummary:
                 summary.split_systems += qty
             elif kind == Product.KIND_MULTI_OUTDOOR:
                 summary.multi_systems += qty
+            else:
+                continue
             item = top.get(line.product_id)
             if item is None:
                 item = top[line.product_id] = TopProduct(line.product.display_name, 0, ZERO)
