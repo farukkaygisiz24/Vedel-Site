@@ -46,17 +46,18 @@ shift
 # shellcheck disable=SC2086
 MODELS="$*"
 cd "$REMOTE_DIR"
+# </dev/null: exec -T would otherwise eat the rest of this heredoc from stdin.
 docker compose exec -T backend python manage.py dumpdata \
   --indent 2 \
   $MODELS \
-  > /tmp/vedel-biz.json
+  > /tmp/vedel-biz.json </dev/null
 # media: compose mounts ./media → /app/media
 if [ -d media ]; then
   tar -C . -czf /tmp/media-biz.tgz media || tar -C . --ignore-failed-read -czf /tmp/media-biz.tgz media
 elif [ -d backend/media ]; then
   tar -C backend -czf /tmp/media-biz.tgz media
 else
-  docker compose exec -T backend sh -c 'cd /app && tar -czf /tmp/media-biz.tgz media'
+  docker compose exec -T backend sh -c 'cd /app && tar -czf /tmp/media-biz.tgz media' </dev/null
   docker compose cp backend:/tmp/media-biz.tgz /tmp/media-biz.tgz
 fi
 test -f /tmp/media-biz.tgz

@@ -210,6 +210,23 @@ class Job(models.Model):
         return ''
 
     @property
+    def kind_class(self) -> str:
+        return 'is-mount' if self.is_mount else 'is-service'
+
+    @property
+    def area_label(self) -> str:
+        sale = getattr(self, 'sale', None)
+        sources = []
+        if sale is not None:
+            sources.append((sale.mount_district, sale.mount_city))
+        sources.append((self.party.district, self.party.city))
+        for district, city in sources:
+            parts = [p for p in ((district or '').strip(), (city or '').strip()) if p]
+            if parts:
+                return ' / '.join(parts)
+        return ''
+
+    @property
     def device_summary(self) -> str:
         if self.is_mount:
             packs = list(self.sold_packs.all())
@@ -281,6 +298,7 @@ class JobLine(models.Model):
     line_net = models.DecimalField(max_digits=12, decimal_places=2)
     line_vat = models.DecimalField(max_digits=12, decimal_places=2)
     line_total = models.DecimalField(max_digits=12, decimal_places=2)
+    field_added = models.BooleanField('Sahadan eklendi', default=False)
 
     class Meta:
         verbose_name = 'İş kalemi'

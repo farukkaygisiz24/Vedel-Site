@@ -5,6 +5,7 @@
 {% block content %}
   <h1>Ayarlar</h1>
   <p class="lead">Hesap bilgilerinizi bu panelden güncelleyebilirsiniz.</p>
+  {% include 'portal/_app_install_card.html' %}
   <form class="panel" method="post" action="{% url 'portal-settings' %}" autocomplete="off">
     {% csrf_token %}
     {% if error %}<p class="flash is-err">{{ error }}</p>{% endif %}

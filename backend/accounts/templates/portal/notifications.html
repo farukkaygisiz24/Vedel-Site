@@ -1,0 +1,54 @@
+{% extends 'portal/app_base.html' %}
+
+{% block title %}Bildirimler | Vedel Servis{% endblock %}
+
+{% block workspace %}
+  <div class="toolbar">
+    <div>
+      <h1>Bildirimler</h1>
+      <p class="lead">{% if unread %}{{ unread }} okunmamış bildirim.{% else %}Hepsi okundu.{% endif %} Son 90 gün saklanır.</p>
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn is-ghost" type="button" data-notif-read-all{% if not unread %} disabled{% endif %}>Tümünü okundu yap</button>
+    </div>
+  </div>
+
+  <form class="sale-filters" method="get" data-sale-filters>
+    <div class="sale-filters-bar is-one">
+      <div class="sale-filter">
+        <span class="sale-filter-kicker">Göster</span>
+        <div class="sale-filter-opts">
+          <label>
+            <input type="radio" name="show" value=""{% if show != 'unread' %} checked{% endif %} />
+            <span>Tümü</span>
+          </label>
+          <label>
+            <input type="radio" name="show" value="unread"{% if show == 'unread' %} checked{% endif %} />
+            <span>Okunmamış</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  {% include 'portal/_notification_list.html' %}
+  {% include 'portal/_pager.html' %}
+  <script>
+    (function () {
+      var form = document.querySelector('[data-sale-filters]');
+      if (!form) return;
+      form.addEventListener('submit', function () {
+        form.querySelectorAll('input').forEach(function (el) {
+          if (el.disabled) return;
+          if (!String(el.value || '').trim()) el.disabled = true;
+        });
+      });
+      form.querySelectorAll('.sale-filter input').forEach(function (el) {
+        el.addEventListener('change', function () {
+          if (typeof form.requestSubmit === 'function') form.requestSubmit();
+          else form.submit();
+        });
+      });
+    })();
+  </script>
+{% endblock %}

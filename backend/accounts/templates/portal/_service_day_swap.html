@@ -52,20 +52,32 @@
         } else {
           info.jobs.forEach(function (item) {
             var row = document.createElement('a');
-            row.className = 'day-job';
+            row.className = 'day-job' + (item.kind_class ? ' ' + item.kind_class : '');
             row.href = item.url;
             var body = document.createElement('div');
             var name = document.createElement('b');
             name.textContent = item.party || 'Müşteri';
             body.appendChild(name);
+            var meta = document.createElement('small');
+            if (item.kind) {
+              var tag = document.createElement('span');
+              tag.className = 'kind-tag ' + (item.kind_class || '');
+              tag.textContent = item.kind;
+              meta.appendChild(tag);
+            }
             var bits = [];
-            if (item.kind) bits.push(item.kind);
             if (item.number) bits.push(item.number);
             if (item.assignee) bits.push(item.assignee);
-            if (bits.length) {
-              var meta = document.createElement('small');
-              meta.textContent = bits.join(' · ');
-              body.appendChild(meta);
+            meta.appendChild(document.createTextNode(bits.join(' · ')));
+            body.appendChild(meta);
+            var subBits = [];
+            if (item.device) subBits.push(item.device);
+            if (item.area) subBits.push(item.area);
+            if (subBits.length) {
+              var sub = document.createElement('small');
+              sub.className = 'day-job-sub';
+              sub.textContent = subBits.join(' · ');
+              body.appendChild(sub);
             }
             if (item.time) {
               var clock = document.createElement('time');

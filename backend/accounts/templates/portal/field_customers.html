@@ -1,0 +1,33 @@
+{% extends 'portal/field_base.html' %}
+
+{% block title %}Müşteriler | Vedel Servis{% endblock %}
+
+{% block content %}
+  <div class="fh-head">
+    <span class="fh-date">Cihaz ve montaj arşivi</span>
+    <h1>Müşteriler</h1>
+  </div>
+  <form class="field-mount-search fc-search" method="get" action="{% url 'portal-field-customers' %}" role="search" data-customer-search>
+    <input type="search" name="q" value="{{ query }}" placeholder="Seri no, isim veya telefon" autocomplete="off" autocapitalize="characters" enterkeyhint="search" aria-label="Müşteri ara" required />
+    <button class="btn" type="submit">Ara</button>
+  </form>
+  {% if query %}
+    {% include 'portal/_field_customer_list.html' %}
+  {% else %}
+    <p class="fh-empty">Cihazın seri numarasını, müşterinin adını ya da telefonunu yazıp Ara'ya basın.</p>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var form = document.querySelector('[data-customer-search]');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      var input = form.querySelector('input[name=q]');
+      input.value = input.value.trim();
+      input.blur();
+    });
+  })();
+</script>
+{% endblock %}

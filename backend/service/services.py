@@ -258,13 +258,17 @@ def _parse_job_lines(post, vat_mode: str) -> list[dict]:
     return parsed
 
 
-def _reject_klima_parts(parsed_lines: list[dict]) -> None:
+def _check_field_service_lines(parsed_lines: list[dict]) -> None:
     for item in parsed_lines:
-        if item['kind'] != JobLine.KIND_PART:
-            continue
         product = item.get('product')
         category = getattr(product, 'category', None) if product else None
-        if product is None or product.is_device or (category is not None and category.is_klima):
+        slug = category.slug if category is not None else ''
+        if item['kind'] == JobLine.KIND_LABOR:
+            if product is None or slug != SERVICE_CATEGORY_SLUG:
+                raise ValueError('Servis işi bulunamadı.')
+            continue
+        is_material = slug == MOUNT_CATEGORY_SLUG or bool(category and category.is_copper_pipe)
+        if product is None or product.is_device or not is_material:
             raise ValueError('Servis malzemesi bulunamadı.')
 
 
@@ -288,13 +292,15 @@ def _create_job_line(job: Job, item: dict) -> JobLine:
         line_net=item['net'],
         line_vat=item['vat'],
         line_total=item['total'],
+        field_added=item.get('field_added', False),
     )
 
 
 def _replace_field_service_parts(job: Job, parsed_lines: list[dict]) -> None:
-    parts = [item for item in parsed_lines if item['kind'] == JobLine.KIND_PART]
-    job.lines.filter(kind=JobLine.KIND_PART).delete()
-    for item in parts:
+    job.lines.filter(Q(kind=JobLine.KIND_PART) | Q(kind=JobLine.KIND_LABOR, field_added=True)).delete()
+    for item in parsed_lines:
+        if item['kind'] == JobLine.KIND_LABOR:
+            item['field_added'] = True
         _create_job_line(job, item)
     _recompute_job_totals(job)
 
@@ -318,10 +324,12 @@ def _seed_service_labor(job: Job, work_id) -> None:
     )
     if not product:
         raise ValueError('İş kartı bulunamadı.')
-    existing = job.lines.filter(kind=JobLine.KIND_LABOR, product=product).first()
+    existing = job.lines.filter(kind=JobLine.KIND_LABOR, product=product, field_added=False).first()
     if existing:
         return
-    job.lines.filter(kind=JobLine.KIND_LABOR, product__category__slug=SERVICE_CATEGORY_SLUG).delete()
+    job.lines.filter(
+        kind=JobLine.KIND_LABOR, product__category__slug=SERVICE_CATEGORY_SLUG, field_added=False
+    ).delete()
     qty = Decimal('1.00')
     price = product.sale_price or Decimal('0.00')
     vat_rate = Decimal('0.00') if job.vat_mode == Job.VAT_NONE else product.vat_rate
@@ -2087,7 +2095,7 @@ def save_field_job(*, user, job: Job, post, files=None) -> Job:
             parsed = [] if posted_lines else None
         if parsed is not None:
             if posted_lines:
-                _reject_klima_parts(parsed)
+                _check_field_service_lines(parsed)
                 _replace_field_service_parts(job, parsed)
             else:
                 _replace_lines(job, parsed)

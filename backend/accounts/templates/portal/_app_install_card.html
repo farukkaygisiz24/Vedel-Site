@@ -1,0 +1,70 @@
+<section class="app-card" data-app-card>
+  <h2>Uygulama ve bildirimler</h2>
+  <p>Yeni iş atandığında, montaj günü değiştiğinde ve akşam ertesi günün özeti için telefonunuza bildirim gelir.</p>
+  <div class="fj-actions">
+    <button class="fj-act is-primary" type="button" data-push-toggle hidden>Bildirimleri aç</button>
+  </div>
+  <span data-push-state></span>
+  <div data-install-ios hidden>
+    <p><b>iPhone:</b> Bildirimler için önce uygulamayı ana ekrana ekleyin.</p>
+    <ol>
+      <li>Safari'de alttaki <b>Paylaş</b> düğmesine dokunun.</li>
+      <li><b>Ana Ekrana Ekle</b>'yi seçin, "Web uygulaması olarak aç" açık kalsın.</li>
+      <li>Ana ekrandaki <b>Vedel</b> simgesinden açıp bu sayfaya dönün, <b>Bildirimleri aç</b>'a dokunun.</li>
+    </ol>
+  </div>
+  <div data-install-android hidden>
+    <p><b>Android:</b> Chrome menüsünden (⋮) <b>Uygulamayı yükle</b> ya da <b>Ana ekrana ekle</b>'yi seçin.</p>
+    <button class="fj-act" type="button" data-install-prompt hidden>Uygulamayı yükle</button>
+  </div>
+</section>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var card = document.querySelector('[data-app-card]');
+    if (!card || !window.portalNotify) return;
+    var push = window.portalNotify.push;
+    var btn = card.querySelector('[data-push-toggle]');
+    var stateEl = card.querySelector('[data-push-state]');
+    var html = document.documentElement;
+    var standalone = html.classList.contains('is-standalone');
+    var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var android = /Android/i.test(navigator.userAgent);
+    if (!standalone && ios) card.querySelector('[data-install-ios]').hidden = false;
+    if (!standalone && android) card.querySelector('[data-install-android]').hidden = false;
+    var LABELS = {
+      on: 'Bildirimler açık. Bu cihaza bildirim gelecek.',
+      off: '',
+      denied: 'Bildirim izni kapalı. Telefon ayarlarından Vedel için bildirimlere izin verin.',
+      unsupported: ios && !standalone ? 'Önce ana ekrana ekleyin.' : 'Bu tarayıcı bildirimleri desteklemiyor.',
+      nokey: 'Sunucuda bildirim anahtarı tanımlı değil.',
+    };
+    function paint(state) {
+      stateEl.textContent = LABELS[state] || '';
+      btn.hidden = state === 'unsupported' || state === 'denied' || state === 'nokey';
+      btn.disabled = false;
+      btn.textContent = state === 'on' ? 'Bildirimleri kapat' : 'Bildirimleri aç';
+      btn.classList.toggle('is-primary', state !== 'on');
+      btn.setAttribute('data-on', state === 'on' ? '1' : '');
+    }
+    push.state().then(paint);
+    btn.addEventListener('click', function () {
+      btn.disabled = true;
+      (btn.getAttribute('data-on') ? push.disable() : push.enable()).then(paint);
+    });
+    var deferred = null;
+    var installBtn = card.querySelector('[data-install-prompt]');
+    window.addEventListener('beforeinstallprompt', function (event) {
+      event.preventDefault();
+      deferred = event;
+      if (installBtn) installBtn.hidden = false;
+    });
+    if (installBtn) {
+      installBtn.addEventListener('click', function () {
+        if (!deferred) return;
+        deferred.prompt();
+        deferred = null;
+        installBtn.hidden = true;
+      });
+    }
+  });
+</script>

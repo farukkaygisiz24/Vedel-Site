@@ -13,3 +13,4 @@ channels-redis==4.2.1
 redis==5.2.1  # pinned: newer redis-py times out channels-redis blocking reads
 uvicorn[standard]==0.34.0
 daphne==4.1.2  # needed only by channels.testing
+pywebpush==2.5.0

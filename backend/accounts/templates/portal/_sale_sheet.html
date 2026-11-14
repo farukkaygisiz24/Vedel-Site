@@ -8,6 +8,8 @@
 </nav>
 {% endif %}
 
+{% include 'portal/_sale_summary.html' %}
+
 <form class="sale-filters" method="get" data-sale-filters>
   {% if archive and year %}<input type="hidden" name="year" value="{{ year }}" />{% endif %}
   {% if party_id %}<input type="hidden" name="party" value="{{ party_id }}" />{% endif %}

@@ -1,0 +1,142 @@
+{% extends 'portal/field_base.html' %}
+
+{% block title %}{{ party.display_name }} | Vedel Servis{% endblock %}
+
+{% block top %}
+  <a class="app-back" href="{% url 'portal-field-customers' %}" aria-label="Listeye dön">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M15 5.8 8 12l7 6.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
+  <img src="{% url 'portal-logo' %}" alt="Vedel Klima" />
+{% endblock %}
+
+{% block content %}
+  {% with phone=sale.mount_phone|default:party.phone %}
+  <section class="fj-card fj-hero">
+    <div class="fj-top">
+      <span class="fj-kind is-mount">Montaj</span>
+      <span class="fj-when{% if not mount_job %} is-done{% endif %}">{% if mount_job %}{{ mount_job.date|date:'d.m.Y' }}{% else %}Montaj kaydı yok{% endif %}</span>
+    </div>
+    <div class="fj-main">
+      <span class="fj-hero-day">Satış {{ sale.date|date:'d.m.Y' }} · {{ sale.number }}</span>
+      <b class="fj-party">{{ party.display_name }}</b>
+      {% if card.devices %}<span class="fj-device">{{ card.devices }}</span>{% endif %}
+    </div>
+    {% if phone or card.place %}
+    <div class="fj-actions">
+      {% if phone %}
+      <a class="fj-act" href="tel:{{ phone }}">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+        Ara
+      </a>
+      {% endif %}
+      {% if card.place %}
+      <a class="fj-act" href="https://www.google.com/maps/dir/?api=1&destination={{ card.place|urlencode }}" data-directions="{{ card.place }}">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>
+        Yol tarifi
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+  {% endwith %}
+
+  <section class="fis-letter">
+    <span class="fis-kicker">Müşteri</span>
+    <div class="fis-name">{{ party.display_name }}</div>
+    <p>{{ party.get_kind_display }}</p>
+    <dl class="fis-facts">
+      {% include 'portal/_party_facts.html' with party=party %}
+    </dl>
+  </section>
+  {% include 'portal/_sale_mount_facts.html' with sale=sale %}
+
+  <section class="fis-block">
+    <p class="field-label">Montaj</p>
+    {% if mount_job %}
+    <dl class="fis-facts">
+      <div><dt>Tarih</dt><dd>{{ mount_job.date|date:'d.m.Y' }}{% if mount_job.time %} · {{ mount_job.time|time:'H:i' }}{% endif %}</dd></div>
+      <div><dt>Personel</dt><dd>{% if mount_job.assignee %}{{ mount_job.assignee.display_name }}{% elif mount_job.assign_all %}Tüm personel{% else %}—{% endif %}</dd></div>
+      <div><dt>Durum</dt><dd>{{ mount_job.get_status_display }}</dd></div>
+    </dl>
+    {% else %}
+    <p class="hint">Montaj kaydı yok. Bu satışın montajı sisteme işlenmemiş.</p>
+    {% endif %}
+  </section>
+
+  <section class="fis-block">
+    <p class="field-label">Cihazlar</p>
+    {% for group in groups %}
+    {% with pack=group.pack %}
+    <article class="device-card">
+      <p class="device-card-kicker">{{ pack.get_kind_display }} · {{ pack.brand }}</p>
+      <dl class="fis-facts fc-facts">
+        {% for unit in group.units %}
+        <div><dt>İç ünite{% if group.units|length > 1 %} {{ forloop.counter }}{% endif %}</dt><dd>{{ unit.model }}{% if unit.room %} · {{ unit.room }}{% endif %}</dd></div>
+        <div><dt>Seri no</dt><dd class="device-serial">{{ unit.serial|default:'—' }}</dd></div>
+        {% endfor %}
+        {% if pack.outdoor_name %}
+        <div><dt>Dış ünite</dt><dd>{{ pack.outdoor_name }}</dd></div>
+        <div><dt>Seri no</dt><dd class="device-serial">{{ pack.outdoor_serial|default:'—' }}</dd></div>
+        {% endif %}
+        <div><dt>Bakım</dt><dd>{{ pack.get_interval_months_display }}{% if pack.last_serviced_on %} · son {{ pack.last_serviced_on|date:'d.m.Y' }}{% endif %}{% if pack.next_due %} · sonraki {{ pack.next_due|date:'d.m.Y' }}{% endif %}</dd></div>
+      </dl>
+      {% if group.shots %}
+      <div class="device-card-shots fc-shots">
+        {% for src in group.shots %}
+        <div class="device-card-shot"><a href="{{ src }}" data-lightbox><img src="{{ src }}" alt="" loading="lazy" /></a></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </article>
+    {% endwith %}
+    {% empty %}
+      {% if device_lines %}
+      <dl class="fis-facts">
+        {% for line in device_lines %}
+        <div><dt>{{ line.qty|floatformat:'-2' }} adet</dt><dd>{{ line.product.display_name }}</dd></div>
+        {% endfor %}
+      </dl>
+      <p class="hint">Seri numarası ve cihaz görseli yok: montaj kaydı bulunmuyor.</p>
+      {% else %}
+      <p class="hint">Cihaz kalemi yok.</p>
+      {% endif %}
+    {% endfor %}
+  </section>
+
+  {% if job_shots %}
+  <section class="fis-block">
+    <p class="field-label">Montaj görselleri</p>
+    <div class="device-album">
+      {% for src in job_shots %}
+      <a href="{{ src }}" data-lightbox><img class="device-album-shot" src="{{ src }}" alt="" loading="lazy" /></a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="fis-block">
+    <p class="field-label">Servis geçmişi</p>
+    <div class="fh-list">
+      {% for row in history %}
+      {% with item=row.job %}
+      <div class="fj-row fc-history">
+        <span class="fj-date"><small>{{ item.date|date:'M' }}</small><b>{{ item.date|date:'j' }}</b></span>
+        <span class="fj-row-main">
+          {% if row.url %}<a href="{{ row.url }}"><b>{{ item.kind_label }} · {{ item.get_status_display }}</b></a>{% else %}<b>{{ item.kind_label }} · {{ item.get_status_display }}</b>{% endif %}
+          <small>{{ item.date|date:'d.m.Y' }}{% if item.assignee %} · {{ item.assignee.display_name }}{% endif %}</small>
+          {% if row.works %}<small>{{ row.works|join:', ' }}</small>{% endif %}
+          {% if item.notes %}<small class="fc-note">{{ item.notes }}</small>{% endif %}
+          {% if row.shots %}
+          <span class="device-album">
+            {% for src in row.shots %}<a href="{{ src }}" data-lightbox><img class="device-album-shot" src="{{ src }}" alt="" loading="lazy" /></a>{% endfor %}
+          </span>
+          {% endif %}
+        </span>
+      </div>
+      {% endwith %}
+      {% empty %}
+      <p class="fh-empty">Bu müşteri için iş kaydı yok.</p>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

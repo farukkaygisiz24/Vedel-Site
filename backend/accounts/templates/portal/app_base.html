@@ -4,6 +4,16 @@
     <meta charset="utf-8" />
     {% include 'portal/_viewport.html' %}
     <title>{% block title %}Panel | Vedel Servis{% endblock %}</title>
+    <script>
+      // Apply the saved narrow-sidebar choice before first paint (no wide→narrow flash).
+      // Tablets (≤1100px) start narrow unless the user chose otherwise.
+      try {
+        var railPref = localStorage.getItem('vedel.navRail');
+        if (railPref === '1' || (railPref === null && window.innerWidth <= 1100)) {
+          document.documentElement.classList.add('nav-rail');
+        }
+      } catch (err) {}
+    </script>
     <style>
       :root {
         color-scheme: light;
@@ -209,6 +219,60 @@
         color: var(--accent);
       }
 
+      .side-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+      .rail-toggle {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        margin: 10px 22px 16px auto;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--secondary);
+        cursor: pointer;
+        border-right: 0;
+      }
+      .rail-toggle:hover { background: rgba(0, 0, 0, 0.045); color: var(--label); }
+      .rail-toggle svg { width: 18px; height: 18px; transition: transform 0.2s ease; }
+
+      /* Narrow (icon) sidebar — desktop/tablet only; phones keep the drawer. */
+      @media (min-width: 861px) {
+        .rail-toggle { display: flex; }
+        .window { position: relative; transition: flex-basis 0.2s ease, width 0.2s ease; }
+        .window .body { border-right: 0.5px solid var(--hairline); }
+        html.nav-rail .window { flex-basis: 72px; width: 72px; }
+        html.nav-rail .brand { padding: 0; justify-content: center; }
+        html.nav-rail .brand img { width: 56px; height: 56px; margin: 0; }
+        html.nav-rail .rail-toggle { margin: 10px auto 16px; }
+        html.nav-rail .rail-toggle svg { transform: rotate(180deg); }
+        html.nav-rail .side-pane { padding: 18px 12px; }
+        html.nav-rail .side-link { justify-content: center; padding: 0; min-height: 44px; }
+        html.nav-rail .side-link svg { width: 20px; height: 20px; }
+        html.nav-rail .side-label,
+        html.nav-rail .side-kicker,
+        html.nav-rail .side-sub { display: none; }
+        /* Drill (Depo / Satış) in rail mode: sidebar opens wide over the page until a page is picked. */
+        html.nav-rail.nav-peek .window .body {
+          position: absolute;
+          top: 56px;
+          left: 0;
+          bottom: 0;
+          width: 260px;
+          z-index: 40;
+          background: var(--fill);
+          box-shadow: 0 0 0 0.5px var(--hairline), 12px 0 32px rgba(0, 0, 0, 0.12);
+        }
+        html.nav-rail.nav-peek .side-pane { padding: 22px 22px 24px; }
+        html.nav-rail.nav-peek .side-link { justify-content: flex-start; padding: 0 12px; min-height: 40px; }
+        html.nav-rail.nav-peek .side-label { display: inline; }
+        html.nav-rail.nav-peek .side-kicker { display: block; }
+        html.nav-rail.nav-peek .side-sub { display: flex; padding: 0 12px 0 40px; min-height: 32px; }
+      }
+
       {% include 'portal/_topbar_css.html' %}
 
       .workspace {
@@ -216,26 +280,19 @@
         min-width: 0;
         overflow: auto;
         padding: 40px var(--page-pad-x);
-        transform-origin: 20% 12%;
-        transition:
-          opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
-          transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+        /* Page change: dim briefly while the next page loads, brighten when it lands.
+           Never fades to 0 and never animates twice (that read as flicker). */
+        transition: opacity 0.18s ease-out;
       }
 
       .workspace.is-leaving {
-        opacity: 0;
-        transform: translateY(18px) scale(0.985);
+        opacity: 0.5;
         pointer-events: none;
-      }
-
-      .workspace.is-arrive {
-        opacity: 0;
-        transform: translateY(22px) scale(0.98);
-        transition: none;
+        transition-duration: 0.12s;
       }
 
       /* Loading skeleton (slow soft-nav only; never on quiet swaps) */
-      .workspace.is-skel { opacity: 1; transform: none; pointer-events: none; }
+      .workspace.is-skel { opacity: 1; pointer-events: none; transition: none; }
       .skel { display: flex; flex-direction: column; gap: 12px; }
       .skel-line,
       .skel-card {
@@ -2281,6 +2338,108 @@
         opacity: 0.55;
       }
 
+      .day-job.is-mount,
+      .day-job.is-service,
+      .day-job.is-submitted { box-shadow: 0 0 0 0.5px var(--hairline); }
+      .week-col .day-job { background: var(--field); border-radius: 10px; }
+      .wk-tag {
+        justify-self: start;
+        display: inline-flex;
+        align-items: center;
+        height: 20px;
+        padding: 0 8px;
+        border-radius: 980px;
+        font-size: 11px;
+        font-weight: 650;
+        background: rgba(0, 0, 0, 0.06);
+        color: var(--label);
+      }
+      .wk-tag.is-mount { background: rgba(31, 74, 68, 0.12); color: var(--vedel); }
+      .wk-tag.is-service { background: rgba(180, 83, 9, 0.12); color: #92400e; }
+      .wk-tag.is-sub { background: rgba(22, 163, 74, 0.12); color: #15803d; }
+      .wk-tag.is-closed { background: rgba(0, 0, 0, 0.06); color: var(--secondary); }
+      .day-job .day-job-sub {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .kind-tag {
+        display: inline-flex;
+        align-items: center;
+        height: 18px;
+        margin-right: 6px;
+        padding: 0 7px;
+        border-radius: 980px;
+        font-size: 11px;
+        font-weight: 590;
+        vertical-align: 1px;
+      }
+
+      .kind-tag.is-mount { background: rgba(31, 74, 68, 0.12); color: var(--vedel); }
+      .kind-tag.is-service { background: rgba(180, 83, 9, 0.12); color: #92400e; }
+
+      .status-tag {
+        display: inline-flex;
+        align-items: center;
+        height: 20px;
+        padding: 0 8px;
+        border-radius: 980px;
+        background: rgba(0, 0, 0, 0.05);
+        color: var(--secondary);
+        font-size: 12px;
+        font-weight: 590;
+        white-space: nowrap;
+      }
+
+      .status-tag.is-pending { background: rgba(31, 74, 68, 0.08); color: var(--vedel); }
+      .status-tag.is-open { background: rgba(37, 99, 235, 0.1); color: #1d4ed8; }
+      .status-tag.is-submitted { background: rgba(22, 163, 74, 0.12); color: #15803d; }
+      .status-tag.is-overdue { background: rgba(220, 38, 38, 0.1); color: var(--accent); }
+
+      .cell-sub {
+        display: block;
+        margin-top: 2px;
+        color: var(--secondary);
+        font-size: 12px;
+      }
+
+      .week-col.is-today {
+        margin: -6px;
+        padding: 6px;
+        border-radius: 10px;
+        background: rgba(220, 38, 38, 0.05);
+      }
+
+      .week-col.is-past .day-job { opacity: 0.7; }
+
+      .week-day-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .week-day-label em {
+        display: inline-grid;
+        place-items: center;
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 980px;
+        background: var(--vedel);
+        color: #fff;
+        font-size: 10px;
+        font-style: normal;
+        letter-spacing: 0;
+      }
+
+      .svc-stats a.party-stat {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .svc-stats a.party-stat:hover { background: rgba(0, 0, 0, 0.03); }
+
       .crew-list {
         margin-top: 8px;
       }
@@ -2560,6 +2719,7 @@
       }
 
       .sale-filter-opts.is-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .sale-filter-opts.is-five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 
       .sale-filter {
         display: flex;
@@ -2732,6 +2892,33 @@
         font-size: 12px;
       }
       .party-stats.is-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sale-summary { margin: 0 0 18px; }
+      .sale-summary .party-stats { margin-bottom: 0; }
+      .sale-top {
+        margin: 0;
+        padding: 4px 16px;
+        list-style: none;
+        counter-reset: sale-top;
+        background: var(--field);
+        border-radius: 0 0 4px 4px;
+        box-shadow: 0 0 0 0.5px var(--hairline);
+      }
+      .sale-top li {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: baseline;
+        gap: 16px;
+        padding: 8px 0;
+        font-size: 13.5px;
+        counter-increment: sale-top;
+      }
+      .sale-top li + li { box-shadow: inset 0 0.5px 0 var(--hairline); }
+      .sale-top-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 510; }
+      .sale-top-name::before { content: counter(sale-top) '. '; color: var(--secondary); font-variant-numeric: tabular-nums; }
+      .sale-top-qty { color: var(--secondary); font-variant-numeric: tabular-nums; }
+      .sale-top .money { font-variant-numeric: tabular-nums; font-weight: 590; }
+      .sale-summary .party-stats { border-radius: 4px 4px 0 0; }
+      .sale-summary .party-stats:last-child { border-radius: 4px; }
 
       /* Office home (dashboard) */
       .dash-grid {
@@ -4711,6 +4898,9 @@
         <div class="body">
           {% include 'portal/_sidenav.html' %}
         </div>
+        <button class="rail-toggle" type="button" data-rail-toggle aria-pressed="false" aria-label="Menüyü daralt" title="Menüyü daralt">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M14.5 6 8.5 12l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </aside>
       <div class="main-col">
         {% include 'portal/_topbar.html' %}
@@ -5868,8 +6058,10 @@
               on = path.indexOf('/field/') === 0;
             } else if (url.pathname.indexOf('/sales/customers/') === 0) {
               on = path.indexOf('/sales/customers/') === 0;
+            } else if (url.pathname.indexOf('/service/reminders/') === 0) {
+              on = path.indexOf('/service/reminders/') === 0;
             } else if (url.pathname === '/service/' || url.pathname.indexOf('/service/') === 0) {
-              on = path.indexOf('/service/') === 0;
+              on = path.indexOf('/service/') === 0 && path.indexOf('/service/reminders/') !== 0;
             } else if (url.pathname === '/crew/' || url.pathname.indexOf('/crew/') === 0) {
               on = path.indexOf('/crew/') === 0;
             } else if (url.pathname === '/users/' || url.pathname.indexOf('/users/') === 0) {
@@ -5889,15 +6081,17 @@
             var currentSales = nav.querySelector('[data-pane="sales"]');
             var nextSales = nextNav.querySelector('[data-pane="sales"]');
             var synced = false;
+            // Only touch the DOM when the markup really changed (avoids sidebar flashes).
+            var put = function (el, html) { if (el.innerHTML !== html) el.innerHTML = html; };
             if (currentStock && nextStock) {
-              currentStock.innerHTML = nextStock.innerHTML;
+              put(currentStock, nextStock.innerHTML);
               synced = true;
             }
             if (currentSales && nextSales) {
-              currentSales.innerHTML = nextSales.innerHTML;
+              put(currentSales, nextSales.innerHTML);
               synced = true;
             }
-            if (!synced) nav.innerHTML = nextNav.innerHTML;
+            if (!synced) put(nav, nextNav.innerHTML);
           }
           markActive(href || location.href);
         }
@@ -5960,27 +6154,14 @@
         }
 
         function playArrive() {
-          workspace.classList.add('is-arrive');
-          workspace.classList.remove('is-leaving');
-          return new Promise(function (resolve) {
-            var finish = function () {
-              workspace.classList.remove('is-arrive');
-              busy = false;
-              resolve();
-              if (pendingPop) {
-                pendingPop = false;
-                openPage(location.href, false);
-              }
-            };
-            if (reduceMotion()) {
-              finish();
-              return;
-            }
-            requestAnimationFrame(function () {
-              workspace.offsetWidth;
-              requestAnimationFrame(finish);
-            });
-          });
+          // New content is already in place under the dim; just brighten (CSS transition).
+          workspace.classList.remove('is-leaving', 'is-skel');
+          busy = false;
+          if (pendingPop) {
+            pendingPop = false;
+            openPage(location.href, false);
+          }
+          return Promise.resolve();
         }
 
         function applyWorkspace(html, title, url, histMode, focusSnap) {
@@ -5999,7 +6180,7 @@
           if (window.portalBellRefresh) window.portalBellRefresh();
         }
 
-        var SKEL_DELAY = 300;
+        var SKEL_DELAY = 450;
         function skeletonKind(url) {
           var path = pathOf(url);
           if (path === '/dashboard/') return 'dashboard';
@@ -6036,7 +6217,7 @@
               filterAbort = null;
             }
             busy = true;
-            var started = Date.now();
+            markActive(url);
             var skelShown = false;
             var skelTimer = window.setTimeout(function () {
               skelShown = true;
@@ -6063,20 +6244,17 @@
                 var next = doc.querySelector('.workspace');
                 if (!next) throw new Error('nav');
                 window.clearTimeout(skelTimer);
-                var leaveWait = (reduceMotion() || skelShown) ? 0 : Math.max(0, 320 - (Date.now() - started));
-                return wait(leaveWait).then(function () {
-                  clearSkel();
-                  applyWorkspace(next.innerHTML, doc.title, url, push ? 'push' : '', null);
-                  return playArrive().then(function () {
-                    syncNav(doc, url);
-                    bootToasts(doc);
-                  });
+                syncNav(doc, url);
+                applyWorkspace(next.innerHTML, doc.title, url, push ? 'push' : '', null);
+                workspace.scrollTop = 0;
+                return playArrive().then(function () {
+                  bootToasts(doc);
                 });
               })
               .catch(function () {
                 clearSkel();
                 busy = false;
-                workspace.classList.remove('is-leaving', 'is-arrive');
+                workspace.classList.remove('is-leaving');
                 location.href = url;
               });
           }
@@ -6300,6 +6478,53 @@
           }, 320));
         });
 
+        // ---- Narrow (icon) sidebar ----------------------------------------------------
+        (function railNav() {
+          var root = document.documentElement;
+          var btn = document.querySelector('[data-rail-toggle]');
+          var aside = document.getElementById('portal-nav');
+          if (!btn || !aside) return;
+          function titles() {
+            aside.querySelectorAll('.side-link').forEach(function (link) {
+              var label = link.querySelector('.side-label');
+              var text = (label ? label.textContent : link.textContent).trim();
+              if (text && !link.getAttribute('title')) link.setAttribute('title', text);
+            });
+          }
+          function paint() {
+            var on = root.classList.contains('nav-rail');
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            btn.setAttribute('aria-label', on ? 'Menüyü genişlet' : 'Menüyü daralt');
+            btn.setAttribute('title', on ? 'Menüyü genişlet' : 'Menüyü daralt');
+          }
+          btn.addEventListener('click', function () {
+            var on = !root.classList.contains('nav-rail');
+            root.classList.toggle('nav-rail', on);
+            root.classList.remove('nav-peek');
+            try { localStorage.setItem('vedel.navRail', on ? '1' : '0'); } catch (err) {}
+            paint();
+          });
+          // Drill panes open wide over the page while in rail mode; close once a page is chosen.
+          aside.addEventListener('click', function (event) {
+            if (!root.classList.contains('nav-rail')) return;
+            var el = event.target.closest('a, button');
+            if (!el || el === btn) return;
+            if (el.hasAttribute('data-stock-open') || el.hasAttribute('data-sales-open')) {
+              root.classList.add('nav-peek');
+            } else if (el.closest('[data-pane="stock"], [data-pane="sales"]')) {
+              if (el.hasAttribute('data-stock-back') || el.hasAttribute('data-sales-back') || el.tagName === 'A') {
+                root.classList.remove('nav-peek');
+              }
+            }
+          });
+          document.addEventListener('click', function (event) {
+            if (root.classList.contains('nav-peek') && !aside.contains(event.target)) root.classList.remove('nav-peek');
+          });
+          titles();
+          paint();
+          new MutationObserver(titles).observe(aside, { childList: true, subtree: true });
+        })();
+
         // ---- Live updates (websocket /ws/portal/) ------------------------------------
         // Another user's write → refresh the list on screen quietly, or toast if we can't.
         (function liveUpdates() {
@@ -6354,6 +6579,15 @@
           }
           function onEvent(msg) {
             if (!msg || msg.type !== 'live' || !msg.kind) return;
+            if (msg.kind === 'field') return;
+            if (msg.kind === 'notification') {
+              if (window.portalBellRefresh) window.portalBellRefresh(true);
+              if (msg.text && window.portalToast) window.portalToast(msg.text, false, 'Bildirim');
+              if (location.pathname === '/notifications/' && !userBusy()) {
+                openPage(location.pathname + location.search, false, { quiet: true, force: true });
+              }
+              return;
+            }
             if (msg.actor != null && String(msg.actor) === me) return;
             dirty[msg.kind] = true;
             if (msg.text && toastText.indexOf(msg.text) === -1) toastText.push(msg.text);
@@ -6395,6 +6629,15 @@
         });
         window.portalRefresh = function () {
           return openPage(location.pathname + location.search, false, { quiet: true, force: true });
+        };
+        window.portalOpen = function (href) {
+          var url = new URL(href, location.href);
+          if (url.origin !== location.origin || url.pathname.indexOf('/field/') === 0) {
+            location.href = url.href;
+            return;
+          }
+          setDrillPane(isSalesPath(url.pathname) ? 'sales' : (url.pathname.indexOf('/stock/') === 0 ? 'stock' : ''));
+          openPage(url.href, true);
         };
 
         window.addEventListener('popstate', function () {

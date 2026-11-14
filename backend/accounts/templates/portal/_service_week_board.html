@@ -2,21 +2,25 @@
 <div class="week-board">
   <div class="day-jobs-head">
     <b>{{ week_label }}</b>
+    {% if week_open is not None %}<small>{{ week_open }} açık iş</small>{% endif %}
   </div>
   <div class="week-board-grid">
     {% for group in week_rows %}
-    <div class="week-col">
-      <p class="week-day-label{% if group.today %} is-today{% endif %}{% if group.past %} is-past{% endif %}">{{ group.dow }} {{ group.date.day }}</p>
+    <div class="week-col{% if group.today %} is-today{% endif %}{% if group.past %} is-past{% endif %}">
+      <p class="week-day-label{% if group.today %} is-today{% endif %}{% if group.past %} is-past{% endif %}">
+        {{ group.dow }} {{ group.date.day }}
+        {% if group.open_count and not group.past %}<em>{{ group.open_count }}</em>{% endif %}
+      </p>
       {% for item in group.jobs %}
-      <a class="day-job{% if item.status == 'closed' %} is-done{% elif item.status == 'submitted' %} is-submitted{% endif %}" href="{% if field_board %}{{ item.get_field_url }}{% else %}{{ item.get_absolute_url }}{% endif %}">
-        {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
+      <a class="day-job {{ item.kind_class }}{% if item.status == 'closed' %} is-done{% elif item.status == 'submitted' %} is-submitted{% endif %}" href="{% if field_board %}{{ item.get_field_url }}{% else %}{{ item.get_absolute_url }}{% endif %}">
+        <span class="wk-tag {% if item.status == 'closed' %}is-closed{% elif item.status == 'submitted' %}is-sub{% else %}{{ item.kind_class }}{% endif %}">{% if item.status == 'closed' %}Gidildi{% elif item.status == 'submitted' %}Teslim{% else %}{{ item.kind_label }}{% endif %}</span>
         <div>
           <b>{{ item.party.display_name }}</b>
           <small>
-            {{ item.kind_label }}
-            · {% if item.status == 'closed' %}Gidildi{% elif item.status == 'submitted' %}Teslim{% else %}{{ item.display_number }}{% endif %}
+            {% if item.time %}{{ item.time|time:'H:i' }} · {% endif %}{{ item.display_number }}
             {% if item.assignee_label %} · {{ item.assignee_label }}{% endif %}
           </small>
+          {% if item.area_label %}<small class="day-job-sub">{{ item.area_label }}</small>{% endif %}
         </div>
       </a>
       {% empty %}

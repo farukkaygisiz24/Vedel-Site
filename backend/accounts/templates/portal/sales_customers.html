@@ -7,7 +7,6 @@
   <div class="toolbar">
     <div>
       <h1>Müşteriler</h1>
-      <p class="lead">Güncel bakiyeler. İş ve tahsil seçilen döneme aittir.</p>
     </div>
     <div class="toolbar-actions">
       <a class="btn is-ghost" href="{% url 'portal-sales' %}">Satış listesi</a>
@@ -18,20 +17,24 @@
 
   <div class="party-stats">
     <div class="party-stat">
-      <span>Kalan borç</span>
+      <span>Açık bakiye</span>
       <b class="money{% if remain_total > 0 %} is-over{% endif %}">{{ remain_total|tr_money }} ₺</b>
+      <small>Tüm zamanlar</small>
     </div>
     <div class="party-stat">
-      <span>İş</span>
+      <span>İş hacmi</span>
       <b class="money">{{ work_total|tr_money }} ₺</b>
+      <small>{{ period_label }}</small>
     </div>
     <div class="party-stat">
-      <span>Tahsil</span>
+      <span>Tahsilat</span>
       <b class="money">{{ paid_total|tr_money }} ₺</b>
+      <small>{{ period_label }}</small>
     </div>
     <div class="party-stat">
-      <span>Borçlu</span>
+      <span>Borçlu müşteri</span>
       <b>{{ due_count }}</b>
+      <small>Açık bakiyesi olan</small>
     </div>
   </div>
 
@@ -88,9 +91,9 @@
           <th>Tür</th>
           <th>Telefon</th>
           <th>Fiş</th>
-          <th>İş</th>
-          <th>Tahsil</th>
-          <th>Kalan</th>
+          <th>İş hacmi</th>
+          <th>Tahsilat</th>
+          <th>Açık bakiye</th>
         </tr>
       </thead>
       <tbody>

@@ -1,0 +1,23 @@
+<div class="fh-list" data-customer-list>
+  {% for card in cards %}
+  <a class="fj-card" href="{{ card.url }}" data-customer-card>
+    <span class="fj-top">
+      <span class="fj-when{% if not card.mount_on %} is-done{% endif %}">{% if card.mount_on %}Montaj {{ card.mount_on|date:'d.m.Y' }}{% else %}Montaj kaydı yok{% endif %}</span>
+      <span class="fj-no">{{ card.sale.number }}</span>
+    </span>
+    <span class="fj-main">
+      <b class="fj-party">{{ card.party.display_name }}</b>
+      {% if card.devices %}<span class="fj-device">{{ card.devices }}</span>{% endif %}
+      {% if card.place %}<span class="fj-place">{{ card.place }}</span>{% endif %}
+    </span>
+  </a>
+  {% empty %}
+  <p class="fh-empty">“{{ query }}” için kayıt yok.</p>
+  {% endfor %}
+  {% if prev_href or next_href %}
+  <div class="fj-actions">
+    {% if prev_href %}<a class="fj-act" href="{{ prev_href }}">Önceki</a>{% endif %}
+    {% if next_href %}<a class="fj-act" href="{{ next_href }}">Sonraki</a>{% endif %}
+  </div>
+  {% endif %}
+</div>

@@ -3,8 +3,10 @@
 {% block title %}İşler | Vedel Servis{% endblock %}
 
 {% block content %}
-  <h1>İşler</h1>
-  <p class="lead">{% if member %}{{ member.display_name }}. Size atanan açık işler.{% else %}Personel kartınız bağlı değil.{% endif %}</p>
+  <div class="fh-head">
+    <span class="fh-date">{{ today_label }}</span>
+    <h1>{% if member %}Merhaba {{ member.first_name }}{% else %}İşler{% endif %}</h1>
+  </div>
 
   {% if not member %}
   <p class="day-jobs-empty">Saha işleri personel kartına bağlı hesaba düşer.{% if can_crew %} Kendinize iş atamak için bu hesabı bir personel kartına bağlayın.{% else %} Ofis bu hesabı bir personel kartına bağlamalı.{% endif %}</p>
@@ -12,63 +14,70 @@
   <p class="day-jobs-empty"><a href="{% url 'portal-crew' %}">Personel listesi</a></p>
   {% endif %}
   {% else %}
-  <section class="day-jobs">
-    <div class="day-jobs-head">
-      <b>Bugün</b>
-      <small>{{ today|date:'d.m.Y' }}</small>
-    </div>
-    <div class="day-jobs-list">
-      {% for item in today_jobs %}
-      <a class="day-job" href="{{ item.get_field_url }}">
-        {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
-        <div>
-          <b>{{ item.party.display_name }}</b>
-          <small>{{ item.number }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
+  <p class="fh-kick">Bugün</p>
+  <div class="fh-list">
+    {% for card in today_cards %}
+    <article class="fj-card">
+      <a class="fj-main" href="{{ card.job.get_field_url }}">
+        <div class="fj-top">
+          {% if card.job.time %}<time class="fj-time">{{ card.job.time|time:'H:i' }}</time>{% endif %}
+          <span class="fj-kind {{ card.kind_class }}">{{ card.kind }}</span>
+          <span class="fj-no">{{ card.job.display_number }}</span>
         </div>
+        <b class="fj-party">{{ card.job.party.display_name }}</b>
+        {% if card.device %}<span class="fj-device">{{ card.device }}</span>{% endif %}
+        {% if card.place %}<span class="fj-place">{{ card.place }}</span>{% endif %}
       </a>
-      {% empty %}
-      <p class="day-jobs-empty">Bugün açık iş yok.</p>
-      {% endfor %}
-    </div>
-  </section>
+      <div class="fj-actions">
+        {% if card.phone %}
+        <a class="fj-act" href="tel:{{ card.phone }}">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          Ara
+        </a>
+        {% endif %}
+        {% if card.maps_url %}
+        <a class="fj-act" href="{{ card.maps_url }}" data-directions="{{ card.place }}">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="9" r="2.5" stroke="currentColor" stroke-width="1.7"/></svg>
+          Yol tarifi
+        </a>
+        {% endif %}
+        <a class="fj-act is-primary" href="{{ card.job.get_field_url }}">İşi aç</a>
+      </div>
+    </article>
+    {% empty %}
+    <p class="fh-empty">Bugün açık iş yok.</p>
+    {% endfor %}
+  </div>
 
-  <section class="day-jobs">
-    <div class="day-jobs-head">
-      <b>Yarın</b>
-      <small>{{ tomorrow|date:'d.m.Y' }}</small>
-    </div>
-    <div class="day-jobs-list">
-      {% for item in tomorrow_jobs %}
-      <a class="day-job" href="{{ item.get_field_url }}">
-        {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
-        <div>
-          <b>{{ item.party.display_name }}</b>
-          <small>{{ item.number }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
-        </div>
-      </a>
-      {% empty %}
-      <p class="day-jobs-empty">Yarın açık iş yok.</p>
-      {% endfor %}
-    </div>
-  </section>
+  <p class="fh-kick">Yaklaşan</p>
+  <div class="fh-list">
+    {% for card in upcoming %}
+    <a class="fj-row" href="{{ card.job.get_field_url }}">
+      <span class="fj-date"><small>{{ card.dow }}</small><b>{{ card.job.date|date:'j' }}</b></span>
+      <span class="fj-row-main">
+        <b>{{ card.job.party.display_name }} · {{ card.kind }}</b>
+        <small>{% if card.device %}{{ card.device }}{% endif %}{% if card.device and card.job.time %} · {% endif %}{% if card.job.time %}{{ card.job.time|time:'H:i' }}{% endif %}</small>
+      </span>
+      <span class="fj-when">{{ card.when }}</span>
+    </a>
+    {% empty %}
+    <p class="fh-empty">Önümüzdeki 2 haftada açık iş yok.</p>
+    {% endfor %}
+  </div>
 
-  <section class="day-jobs">
-    <div class="day-jobs-head">
-      <b>Son tamamlanan</b>
-    </div>
-    <div class="day-jobs-list">
-      {% for item in recent_done %}
-      <a class="day-job" href="{{ item.get_field_url }}">
-        <time datetime="{{ item.date|date:'Y-m-d' }}">{{ item.date|date:'d.m' }}</time>
-        <div>
-          <b>{{ item.party.display_name }}</b>
-          <small>{{ item.number }}{% if item.party.address %} · {{ item.party.address }}{% endif %}</small>
-        </div>
-      </a>
-      {% empty %}
-      <p class="day-jobs-empty">Tamamlanan iş yok.</p>
-      {% endfor %}
-    </div>
-  </section>
+  {% if recent_done %}
+  <p class="fh-kick">Son tamamlanan</p>
+  <div class="fh-list">
+    {% for item in recent_done %}
+    <a class="fj-row is-done" href="{{ item.get_field_url }}">
+      <span class="fj-date"><small>{{ item.date|date:'M' }}</small><b>{{ item.date|date:'j' }}</b></span>
+      <span class="fj-row-main">
+        <b>{{ item.party.display_name }}</b>
+        <small>{{ item.display_number }} · {{ item.get_status_display }}</small>
+      </span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% endif %}
 {% endblock %}

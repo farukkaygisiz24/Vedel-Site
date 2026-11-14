@@ -191,19 +191,26 @@ def _week_pack(today: date, jobs_qs=None) -> dict:
     for item in week_qs:
         week_by_day.setdefault(item.date, []).append(item)
     week_rows = []
+    week_open = 0
     for offset in range(7):
         day_key = week_from + timedelta(days=offset)
+        day_jobs = week_by_day.get(day_key, [])
+        open_count = sum(1 for item in day_jobs if item.status == Job.STATUS_OPEN)
+        if day_key >= today:
+            week_open += open_count
         week_rows.append({
             'date': day_key,
             'dow': TR_DOW[offset],
             'label': _fmt_day_label(day_key),
             'today': day_key == today,
             'past': day_key < today,
-            'jobs': week_by_day.get(day_key, []),
+            'jobs': day_jobs,
+            'open_count': open_count,
         })
     return {
         'week_rows': week_rows,
         'week_label': _fmt_week_label(week_from, week_to),
+        'week_open': week_open,
     }
 
 
@@ -226,6 +233,7 @@ def _month_browse(*, view: date, chosen: date, today: date, jobs_qs=None) -> dic
         jobs = (
             source.filter(date=chosen, status=Job.STATUS_OPEN)
             .select_related('party', 'device', 'assignee', 'created_by', 'sale')
+            .prefetch_related('sold_packs')
             .order_by('time', 'id')
         )
         empty_copy = 'Bugün onaylanmış iş yok.' if chosen == today else 'Bu güne onaylanmış iş yok.'
@@ -240,7 +248,8 @@ def _month_browse(*, view: date, chosen: date, today: date, jobs_qs=None) -> dic
             date__lte=month_end,
             status=Job.STATUS_OPEN,
         )
-        .select_related('party', 'assignee', 'sale')
+        .select_related('party', 'assignee', 'sale', 'device')
+        .prefetch_related('sold_packs')
         .order_by('date', 'time', 'id')
     )
     open_by_day = {}
@@ -313,7 +322,10 @@ def _browse_job(item: Job) -> dict:
         'party': item.party.display_name,
         'number': item.display_number,
         'kind': item.kind_label,
+        'kind_class': item.kind_class,
         'assignee': item.assignee_label,
+        'area': item.area_label,
+        'device': '' if item.device_summary == '—' else item.device_summary,
     }
 
 
@@ -352,6 +364,7 @@ def _job_lines_payload(job: Job, *, prices: bool = True) -> list[dict]:
             'description': line.description,
             'qty': str(line.qty),
             'vat_rate': str(line.vat_rate),
+            'field_added': line.field_added,
         }
         if prices:
             row['unit_price'] = str(line.unit_price)
@@ -406,6 +419,13 @@ def schedule(request: HttpRequest) -> HttpResponse:
             .select_related(*related)
             .order_by('-submitted_at', 'date', 'time', 'id')
         )
+    waiting = list(waiting)
+    missed = list(missed)
+    submitted = list(submitted)
+    today_open = visible.filter(date=today, status=Job.STATUS_OPEN).count()
+    next7_open = visible.filter(
+        date__gte=today, date__lte=today + timedelta(days=6), status=Job.STATUS_OPEN
+    ).count()
     return render(
         request,
         'portal/service_schedule.html',
@@ -413,6 +433,8 @@ def schedule(request: HttpRequest) -> HttpResponse:
             waiting=waiting,
             missed=missed,
             submitted=submitted,
+            today_open=today_open,
+            next7_open=next7_open,
             tech_mode=tech_mode,
             **_week_pack(today, visible),
             **_month_browse(view=view, chosen=chosen, today=today, jobs_qs=visible),
@@ -581,7 +603,9 @@ def _job_form_context(request: HttpRequest, job: Job | None = None, error=''):
     work_name = ''
     if job:
         work_line = (
-            job.lines.filter(kind=JobLine.KIND_LABOR, product__category__slug=SERVICE_CATEGORY_SLUG)
+            job.lines.filter(
+                kind=JobLine.KIND_LABOR, product__category__slug=SERVICE_CATEGORY_SLUG, field_added=False
+            )
             .select_related('product')
             .first()
         )

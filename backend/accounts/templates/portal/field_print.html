@@ -36,7 +36,29 @@
     {% endif %}
   </article>
   <div class="btn-row">
-    <a class="btn is-ghost" href="{% url 'portal-field-print' job.number %}?format=zpl" download="{{ number }}.zpl">ZPL indir</a>
-    <a class="btn" href="{% url 'portal-field-print' job.number %}?format=cpcl" download="{{ number }}.cpcl">CPCL indir</a>
+    <a class="btn is-ghost" href="{% url 'portal-field-print' job.number %}?format=zpl" download="{{ number }}.zpl" data-share-file>ZPL indir</a>
+    <a class="btn" href="{% url 'portal-field-print' job.number %}?format=cpcl" download="{{ number }}.cpcl" data-share-file>CPCL indir</a>
   </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var standalone = document.documentElement.classList.contains('is-standalone');
+    if (!standalone || !navigator.canShare) return;
+    document.querySelectorAll('[data-share-file]').forEach(function (link) {
+      link.addEventListener('click', function (event) {
+        event.preventDefault();
+        fetch(link.href, { credentials: 'same-origin' })
+          .then(function (res) { return res.blob(); })
+          .then(function (blob) {
+            var file = new File([blob], link.getAttribute('download') || 'fis.txt', { type: 'text/plain' });
+            if (navigator.canShare({ files: [file] })) return navigator.share({ files: [file] });
+            location.href = link.href;
+          })
+          .catch(function () {});
+      });
+    });
+  })();
+</script>
 {% endblock %}

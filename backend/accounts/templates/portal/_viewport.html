@@ -6,9 +6,17 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Vedel" />
 <meta name="application-name" content="Vedel" />
+{% if user.is_authenticated %}<meta name="csrf-token" content="{{ csrf_token }}" />{% endif %}
 <link rel="manifest" href="{% url 'portal-manifest' %}" />
-<link rel="icon" href="{% url 'portal-favicon' %}" type="image/png" />
-<link rel="apple-touch-icon" href="{% url 'portal-favicon' %}" />
+<link rel="icon" href="{% url 'portal-favicon' %}" type="image/png" sizes="32x32" />
+<link rel="apple-touch-icon" href="{% url 'portal-icon' 'apple-touch-icon' %}" sizes="180x180" />
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('{% url 'portal-service-worker' %}', { scope: '/' }).catch(function () {});
+    });
+  }
+</script>
 {% include 'portal/_ios_zoom.html' %}
 <style>
   html.vedel-device-preview,
@@ -150,6 +158,8 @@
       if (url.pathname === location.pathname && url.search === location.search) return;
       event.preventDefault();
       location.href = url.href;
-    }, true);
+      // Bubble phase on purpose: portal soft-nav handles (and preventDefaults) its links first,
+      // so this only catches links nothing else took — no soft-nav + hard-reload double flash.
+    }, false);
   })();
 </script>

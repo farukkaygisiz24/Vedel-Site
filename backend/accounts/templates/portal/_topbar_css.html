@@ -61,6 +61,19 @@
       }
 
       .search input::placeholder { color: #c7c7cc; }
+      .search { position: relative; }
+      .search:focus-within { box-shadow: 0 0 0 0.5px var(--hairline), 0 0 0 3px rgba(31, 77, 69, 0.12); }
+      .search-pop {
+        left: 0;
+        right: auto;
+        width: min(440px, calc(100vw - 24px));
+        max-height: min(480px, 70vh);
+        overflow: auto;
+        overscroll-behavior: contain;
+      }
+      .search-pop .bell-title:not(:first-child) { margin-top: 10px; }
+      .profile-pop.search-pop .bell-item b { font-weight: 590; color: var(--label); }
+      .profile-pop a.bell-item.is-active { background: rgba(0, 0, 0, 0.05); }
 
       .profile { position: relative; flex: 0 0 auto; }
 
@@ -183,3 +196,29 @@
       .bell-item em { flex: 0 0 auto; font-style: normal; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--secondary); }
       .bell-item em.is-over { color: var(--danger); font-weight: 590; }
       .profile-pop a.bell-all { color: var(--vedel); border-top: 0.5px solid var(--hairline); border-radius: 0 0 8px 8px; }
+      .bell-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .bell-read {
+        margin: 2px 6px 0 0;
+        padding: 4px 8px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--vedel);
+        font: inherit;
+        font-size: 12px;
+        font-weight: 590;
+        cursor: pointer;
+      }
+      .bell-read:hover { background: rgba(0, 0, 0, 0.05); }
+      .bell-item small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .bell-item:not(.is-unread) b { font-weight: 510; color: var(--secondary); }
+      .profile-pop a.bell-item.is-unread { box-shadow: inset 3px 0 0 var(--vedel); }
+      [data-bell-list] { max-height: min(420px, 60vh); overflow: auto; }
+      [data-bell-maint] { border-top: 0.5px solid var(--hairline); padding-top: 4px; }
+
+      .notif-row { color: inherit; text-decoration: none; justify-content: flex-start; }
+      .notif-row > div { flex: 1 1 auto; min-width: 0; }
+      .notif-row time { flex: 0 0 auto; color: var(--secondary); font-size: 12px; font-variant-numeric: tabular-nums; }
+      .notif-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+      .notif-row.is-unread .notif-dot { background: var(--vedel); }
+      .notif-row:not(.is-unread) b { font-weight: 510; color: var(--secondary); }

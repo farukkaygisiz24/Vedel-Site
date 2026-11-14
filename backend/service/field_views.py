@@ -1,7 +1,9 @@
+import re
 from datetime import timedelta
 
 from django.core.paginator import Paginator
-from django.db.models import F, Q
+from django.db.models import F, Q, Value
+from django.db.models.functions import Replace
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -10,13 +12,14 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from accounts.http import crew_member_for, field_required, stock_scope
 from accounts.portal import _wants_json
+from accounts.search import q_search
 from accounts.toasts import queue_toast
 from accounts.weather import get_weather
 from stock.models import Product
 from stock.services import SERVICE_CATEGORY_SLUG, mount_material_filter
 from stock.views import _product_payload
 
-from .models import Job, JobSoldPack, JobSoldUnit
+from .models import Job, JobLine, JobSoldPack, JobSoldUnit
 from .services import (
     add_pack_photos,
     compact_job_number,
@@ -100,25 +103,88 @@ def _field_week(*, member, today):
             'past': day_key < today,
             'jobs': by_day.get(day_key, []),
         })
-    tomorrow = today + timedelta(days=1)
-    tomorrow_jobs = []
-    if member:
-        tomorrow_jobs = list(
-            Job.objects.filter(
-                field_visible_q(member),
-                date=tomorrow,
-                status=Job.STATUS_OPEN,
-            )
-            .select_related('party', 'assignee', 'sale')
-            .order_by('time', 'id')
-        )
     return {
         'week_rows': rows,
         'week_label': _fmt_week_label(week_from, week_to),
         'today_jobs': by_day.get(today, []),
-        'tomorrow': tomorrow,
-        'tomorrow_jobs': tomorrow_jobs,
     }
+
+
+UPCOMING_DAYS = 14
+UPCOMING_LIMIT = 8
+TR_DOW_LONG = ('Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar')
+TR_MONTHS = (
+    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
+)
+
+
+def relative_day(day, today) -> str:
+    """'Bugün', 'Yarın', '3 gün sonra', '2 gün geçti'."""
+    delta = (day - today).days
+    if delta == 0:
+        return 'Bugün'
+    if delta == 1:
+        return 'Yarın'
+    if delta > 1:
+        return f'{delta} gün sonra'
+    return f'{-delta} gün geçti'
+
+
+def long_day(day) -> str:
+    return f'{TR_DOW_LONG[day.weekday()]}, {day.day} {TR_MONTHS[day.month - 1]}'
+
+
+def _job_place(job) -> str:
+    sale = getattr(job, 'sale', None)
+    if sale is not None and sale.mount_place_summary:
+        return sale.mount_place_summary
+    party = job.party
+    loc = ' / '.join(p for p in ((party.district or '').strip(), (party.city or '').strip()) if p)
+    address = (party.address or '').strip()
+    return f'{loc} · {address}' if loc and address else (loc or address)
+
+
+def _job_phone(job) -> str:
+    sale = getattr(job, 'sale', None)
+    phone = (getattr(sale, 'mount_phone', '') or '').strip() if sale is not None else ''
+    return phone or (job.party.phone or '').strip()
+
+
+def field_card(job, today) -> dict:
+    """Everything a field job card shows (home list, upcoming list)."""
+    from urllib.parse import quote
+
+    place = _job_place(job)
+    summary = job.device_summary
+    return {
+        'job': job,
+        'kind': job.kind_label,
+        'kind_class': 'is-mount' if job.is_mount else 'is-service',
+        'device': '' if summary == '—' else summary,
+        'place': place,
+        'phone': _job_phone(job),
+        'maps_url': f'https://www.google.com/maps/dir/?api=1&destination={quote(place)}' if place else '',
+        'when': relative_day(job.date, today),
+        'dow': TR_DOW[job.date.weekday()],
+    }
+
+
+def _field_upcoming(member, today):
+    if not member:
+        return []
+    qs = (
+        Job.objects.filter(
+            field_visible_q(member),
+            date__gt=today,
+            date__lte=today + timedelta(days=UPCOMING_DAYS),
+            status=Job.STATUS_OPEN,
+        )
+        .select_related('party', 'assignee', 'sale', 'device')
+        .prefetch_related('sold_packs')
+        .order_by('date', 'time', 'id')[:UPCOMING_LIMIT]
+    )
+    return [field_card(job, today) for job in qs]
 
 
 def _recent_done_jobs(member):
@@ -139,12 +205,24 @@ def field_home(request: HttpRequest) -> HttpResponse:
     member = crew_member_for(request.user)
     today = timezone.localdate()
     pack = _field_week(member=member, today=today)
+    today_ids = [job.pk for job in pack['today_jobs']]
+    today_cards = [
+        field_card(job, today)
+        for job in Job.objects.filter(pk__in=today_ids)
+        .select_related('party', 'assignee', 'sale', 'device')
+        .prefetch_related('sold_packs')
+        .order_by('time', 'id')
+    ]
+    upcoming = _field_upcoming(member, today)
     return render(
         request,
         'portal/field_home.html',
         _ctx(
             member=member,
             today=today,
+            today_label=long_day(today),
+            today_cards=today_cards,
+            upcoming=upcoming,
             recent_done=_recent_done_jobs(member),
             **pack,
         ),
@@ -283,6 +361,8 @@ def field_job(request: HttpRequest, number: str) -> HttpResponse:
             photos=photos,
             from_sale=bool(job.sale_id),
             show_summary=show_summary,
+            card=field_card(job, timezone.localdate()),
+            day_label=long_day(job.date),
             **sold,
         ),
     )
@@ -319,7 +399,7 @@ def field_products(request: HttpRequest) -> JsonResponse:
     if mount:
         qs = qs.filter(mount_material_filter())
     elif service:
-        qs = qs.filter(category__is_klima=False).exclude(category__slug=SERVICE_CATEGORY_SLUG)
+        qs = qs.filter(mount_material_filter() | Q(category__slug=SERVICE_CATEGORY_SLUG))
     scope = stock_scope(request.user)
     if scope is not None and not service:
         qs = qs.filter(category__in=scope)
@@ -331,12 +411,13 @@ def field_products(request: HttpRequest) -> JsonResponse:
             | Q(category__name__icontains=token)
         )
     order = ('category__name', 'name') if service else ('name',)
-    paginator = Paginator(qs.order_by(*order), 20)
+    paginator = Paginator(qs.order_by(*order), 100)
     page_obj = paginator.get_page(page)
     results = []
     for item in page_obj.object_list:
         row = _product_payload(item)
         row['category'] = item.category.name if item.category_id else ''
+        row['is_service'] = bool(item.category_id and item.category.slug == SERVICE_CATEGORY_SLUG)
         row.pop('stock', None)
         row.pop('price', None)
         row.pop('buy', None)
@@ -349,4 +430,208 @@ def field_products(request: HttpRequest) -> JsonResponse:
             'pages': paginator.num_pages,
             'has_next': page_obj.has_next(),
         }
+    )
+
+
+CUSTOMER_PAGE_SIZE = 20
+
+
+CUSTOMER_PHONE_MIN_DIGITS = 4
+
+
+def _phone_digits(field: str):
+    expr = F(field)
+    for ch in (' ', '(', ')', '-', '+', '.'):
+        expr = Replace(expr, Value(ch), Value(''))
+    return expr
+
+
+def _query_phone_digits(query: str) -> str:
+    digits = re.sub(r'\D', '', query)
+    if len(digits) > 10 and digits.startswith('90'):
+        digits = digits[2:]
+    return digits.lstrip('0')
+
+
+def field_customer_q(query: str) -> Q:
+    q = Q()
+    for token in query.split():
+        q &= q_search(
+            token,
+            'party__first_name',
+            'party__last_name',
+            'party__company_name',
+            'mount_contact_name',
+            'service_job__sold_units__serial',
+            'service_job__sold_units__outdoor_serial',
+            'service_job__sold_packs__outdoor_serial',
+        )
+    return q
+
+
+def field_customer_sale_ids(query: str):
+    from sales.models import Sale
+
+    q = field_customer_q(query)
+    digits = _query_phone_digits(query)
+    if len(digits) >= CUSTOMER_PHONE_MIN_DIGITS:
+        q |= Q(party_phone_digits__contains=digits) | Q(mount_phone_digits__contains=digits)
+    return (
+        Sale.objects.annotate(
+            party_phone_digits=_phone_digits('party__phone'),
+            mount_phone_digits=_phone_digits('mount_phone'),
+        )
+        .filter(q)
+        .values('pk')
+    )
+
+
+def _sale_mount_job(sale):
+    try:
+        return sale.service_job
+    except Job.DoesNotExist:
+        return None
+
+
+def _device_lines(sale) -> list:
+    return [line for line in sale.lines.all() if line.product_id and line.product.is_device]
+
+
+def _customer_card(sale) -> dict:
+    party = sale.party
+    devices = _device_lines(sale)
+    summary = devices[0].product.display_name if devices else ''
+    if len(devices) > 1:
+        summary += f' +{len(devices) - 1}'
+    place = sale.mount_place_summary
+    if not place:
+        place = ' / '.join(p for p in ((party.district or '').strip(), (party.city or '').strip()) if p)
+    job = _sale_mount_job(sale)
+    return {
+        'sale': sale,
+        'party': party,
+        'place': place,
+        'devices': summary,
+        'mount_on': job.date if job else None,
+        'url': reverse('portal-field-customer', kwargs={'number': sale.number}),
+    }
+
+
+@field_required
+@require_GET
+def field_customers(request: HttpRequest) -> HttpResponse:
+    from django.db.models.functions import Coalesce
+
+    from sales.models import Sale
+
+    from .views import _page_nav
+
+    query = str(request.GET.get('q', '')).strip()
+    if not query:
+        return render(request, 'portal/field_customers.html', _ctx(query='', cards=[]))
+    qs = (
+        Sale.objects.filter(work_type=Sale.WORK_DEVICE, pk__in=field_customer_sale_ids(query))
+        .select_related('party', 'service_job')
+        .prefetch_related('lines__product')
+        .annotate(mount_on=Coalesce('service_job__date', 'date'))
+        .order_by('-mount_on', '-id')
+    )
+    paginator = Paginator(qs, CUSTOMER_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    ctx = _ctx(
+        query=query,
+        cards=[_customer_card(sale) for sale in page_obj.object_list],
+        **_page_nav(paginator, page_obj, {'q': query}),
+    )
+    return render(request, 'portal/field_customers.html', ctx)
+
+
+def _photo_param(request, key: str) -> str:
+    return str(request.GET.get(key, '')).strip()
+
+
+@field_required
+@require_GET
+def field_customer(request: HttpRequest, number: str) -> HttpResponse:
+    from sales.models import Sale
+
+    sale = get_object_or_404(Sale.objects.select_related('party'), number=number, work_type=Sale.WORK_DEVICE)
+    job = Job.objects.filter(sale=sale).select_related('assignee').first()
+    photo_id = _photo_param(request, 'photo')
+    if photo_id and _photo_param(request, 'job'):
+        raw = _photo_param(request, 'job')
+        other = Job.objects.filter(pk=int(raw), party=sale.party).first() if raw.isdigit() else None
+        if other is None:
+            raise Http404()
+        return job_photo_response(job=other, photo_id=photo_id)
+    if _photo_param(request, 'unit') or _photo_param(request, 'group'):
+        if job is None:
+            raise Http404()
+        return unit_photo_response(
+            job=job,
+            raw_id=_photo_param(request, 'unit'),
+            photo_id=photo_id,
+            group_id=_photo_param(request, 'group'),
+        )
+    if photo_id:
+        if job is None:
+            raise Http404()
+        return job_photo_response(job=job, photo_id=photo_id)
+
+    base = reverse('portal-field-customer', kwargs={'number': sale.number})
+    groups = []
+    job_shots = []
+    if job is not None:
+        packs = (
+            JobSoldPack.objects.filter(job=job)
+            .select_related('outdoor_product')
+            .prefetch_related('units', 'photos')
+            .order_by('sort', 'id')
+        )
+        for pack in packs:
+            units = list(pack.units.all())
+            if pack.kind == JobSoldPack.KIND_MULTI and not units:
+                continue
+            groups.append({
+                'pack': pack,
+                'units': units,
+                'shots': [f'{base}?group={pack.pk}&photo={shot.pk}' for shot in pack.photo_items if shot.image],
+            })
+        job_shots = [f'{base}?photo={shot.pk}' for shot in job.photos.all() if shot.image]
+
+    history = []
+    party_jobs = (
+        Job.objects.filter(party=sale.party)
+        .select_related('assignee')
+        .prefetch_related('lines__product', 'photos')
+        .order_by('-date', '-id')
+    )
+    for item in party_jobs:
+        works = [
+            line.description or (line.product.name if line.product_id else '')
+            for line in item.lines.all()
+            if line.kind == JobLine.KIND_LABOR
+        ]
+        history.append({
+            'job': item,
+            'works': [work for work in works if work],
+            'url': item.get_field_url() if field_can_view(job=item, user=request.user) else '',
+            'shots': [] if item.pk == getattr(job, 'pk', None) else [
+                f'{base}?job={item.pk}&photo={shot.pk}' for shot in item.photos.all() if shot.image
+            ],
+        })
+
+    return render(
+        request,
+        'portal/field_customer.html',
+        _ctx(
+            sale=sale,
+            party=sale.party,
+            mount_job=job,
+            groups=groups,
+            job_shots=job_shots,
+            device_lines=_device_lines(sale),
+            history=history,
+            card=_customer_card(sale),
+        ),
     )

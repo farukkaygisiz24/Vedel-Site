@@ -86,6 +86,12 @@ CHANNEL_LAYERS = {
 }
 APPEND_SLASH = False
 
+# Web push (field phones). Empty keys = push disabled; notifications still land in the bell.
+VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '').strip()
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '').strip()
+VAPID_SUBJECT = os.environ.get('VAPID_SUBJECT', 'mailto:servis@vedel.com.tr').strip()
+PUSH_ENABLED = bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY)
+
 _TEMPLATE_LOADERS = [
     'django.template.loaders.filesystem.Loader',
     'django.template.loaders.app_directories.Loader',
