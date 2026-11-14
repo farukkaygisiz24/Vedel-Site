@@ -13,6 +13,24 @@
           document.documentElement.classList.add('nav-rail');
         }
       } catch (err) {}
+      // Android Chrome (esp. installed app) can keep `height: 100%` at a stale, shorter viewport
+      // after the keyboard / app switch, leaving a dead band under the scrolling workspace.
+      (function () {
+        var root = document.documentElement;
+        var frame = 0;
+        function sync() {
+          frame = 0;
+          var h = window.innerHeight;
+          if (h > 0) root.style.setProperty('--app-h', h + 'px');
+        }
+        function queue() { if (!frame) frame = requestAnimationFrame(sync); }
+        sync();
+        window.addEventListener('resize', queue);
+        window.addEventListener('orientationchange', queue);
+        window.addEventListener('pageshow', queue);
+        document.addEventListener('visibilitychange', queue);
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', queue);
+      })();
     </script>
     <style>
       :root {
