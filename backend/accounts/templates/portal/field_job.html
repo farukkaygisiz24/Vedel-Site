@@ -12,8 +12,7 @@
 
 {% block content %}
 {% if show_summary %}
-  <h1>{{ job.number }}</h1>
-  <p class="lead">Montaj fişi · {{ job.party.display_name }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}{% if job.is_submitted %} · Teslim edildi{% else %} · Kontrol edin{% endif %}</p>
+  {% include 'portal/_field_job_hero.html' %}
   {% if error %}<p class="flash is-err" role="alert">{{ error }}</p>{% endif %}
 
   <section class="fis-letter">
@@ -86,7 +85,7 @@
             <div class="device-card-shots">
               {% for shot in pack.photo_items %}
               <div class="device-card-shot">
-                <a href="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" target="_blank" rel="noopener">
+                <a href="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" data-lightbox>
                   <img src="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" alt="" />
                 </a>
               </div>
@@ -143,8 +142,7 @@
     {% endif %}
   </div>
 {% else %}
-  <h1>{{ job.number }}</h1>
-  <p class="lead">{{ job.kind_label }} · {{ job.party.display_name }}{% if job.time %} · {{ job.time|time:'H:i' }}{% endif %}{% if job.is_submitted %} · Teslim edildi{% endif %}</p>
+  {% include 'portal/_field_job_hero.html' %}
   <p class="flash is-err" role="alert" data-field-flash {% if not error %}hidden{% endif %}>{{ error }}</p>
 
   <section class="fis-letter">
@@ -163,6 +161,12 @@
         <dd>{{ job.device.name }}{% if job.device.place %} · {{ job.device.place }}{% endif %}</dd>
       </div>
       {% endif %}
+      {% if job.notes %}
+      <div>
+        <dt>Not</dt>
+        <dd class="is-note">{{ job.notes }}</dd>
+      </div>
+      {% endif %}
     </dl>
   </section>
   {% include 'portal/_sale_mount_facts.html' with sale=job.sale %}
@@ -177,7 +181,7 @@
       <div class="device-album">
         {% for item in photos %}
         <div class="field-shot">
-          <a href="{{ item.file_url }}" target="_blank" rel="noopener">
+          <a href="{{ item.file_url }}" data-lightbox>
             <img class="device-album-shot" src="{{ item.file_url }}" alt="" />
           </a>
           {% if can_edit %}
@@ -301,7 +305,7 @@
               <div class="device-card-shots" data-shots>
                 {% for shot in pack.photo_items %}
                 <div class="device-card-shot" data-photo-id="{{ shot.pk }}">
-                  <a href="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" target="_blank" rel="noopener">
+                  <a href="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" data-lightbox>
                     <img src="{{ job.get_field_url }}?group={{ pack.pk }}&photo={{ shot.pk }}" alt="" />
                   </a>
                   {% if can_edit %}
@@ -344,7 +348,7 @@
     </section>
     <section class="fis-block">
       <p class="field-label">Kalemler</p>
-      <p class="hint">Kullanılan malzemeyi seçin, sonra birimine göre miktar yazın.</p>
+      <p class="hint">Kullanılan malzemeyi ve yapılan ek işi (gaz şarjı, kart değişimi…) seçin, sonra miktar yazın.</p>
       <input type="hidden" name="field_lines_present" value="1" />
       <div id="field-part-rows"></div>
       <p class="hint" id="field-mount-empty">Malzeme seçilmedi.</p>
@@ -357,7 +361,7 @@
     <section class="fis-block">
       <div class="group">
         <div class="row">
-          <input id="field_notes" name="notes" placeholder=" " value="{{ job.notes }}" {% if not can_edit %}readonly{% endif %} />
+          <textarea id="field_notes" name="notes" placeholder=" " rows="2" data-autosize {% if not can_edit %}readonly{% endif %}>{{ job.notes }}</textarea>
           <label for="field_notes">İşlem notu</label>
         </div>
       </div>
@@ -378,7 +382,7 @@
   {% if can_edit %}
   <div class="field-modal" id="field-mount-modal" hidden data-catalog="{% if sold_groups %}mount{% else %}service{% endif %}">
     <div class="field-modal-card" role="dialog" aria-modal="true" aria-labelledby="field-mount-title">
-      <p class="field-label">{% if sold_groups %}Klima Montaj Malzemesi{% else %}Depo{% endif %}</p>
+      <p class="field-label">{% if sold_groups %}Klima Montaj Malzemesi{% else %}Montaj malzemesi ve servis{% endif %}</p>
       <h2 id="field-mount-title">Malzeme seç</h2>
       <p class="hint">Birden fazla ürün işaretleyin, sonra ekleyin.</p>
       <div class="field-mount-search">
@@ -550,8 +554,7 @@
             slot.innerHTML = '';
             var link = document.createElement('a');
             link.href = photo.url;
-            link.target = '_blank';
-            link.rel = 'noopener';
+            link.setAttribute('data-lightbox', '');
             var img = document.createElement('img');
             img.src = photo.url;
             img.alt = '';
@@ -828,6 +831,7 @@
             if (e.key === 'Enter') e.preventDefault();
           });
           if (asJobLine) {
+            el.querySelector('[name=kind]').value = (data.is_service || data.kind === 'labor') ? 'labor' : 'part';
             el.querySelector('[name=product_id]').value = id;
             el.querySelector('[name=description]').value = label;
             el.querySelector('[name=vat_rate]').value = data.vat_rate || data.vat || '20';
@@ -926,8 +930,8 @@
         }
         if (asJobLine) {
           lineSeed.forEach(function (item) {
-            if ((item.kind || '') === 'labor') addLabor(item);
-            else if ((item.kind || '') === 'part') addMount(item, true);
+            if ((item.kind || '') === 'labor' && !item.field_added) addLabor(item);
+            else if (item.kind === 'part' || item.kind === 'labor') addMount(item, true);
           });
         } else {
           mountSeed.forEach(function (item) { addMount(item, true); });

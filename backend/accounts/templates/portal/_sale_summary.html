@@ -1,0 +1,38 @@
+{% load portal_fmt %}
+{% if summary %}
+<section class="sale-summary" aria-label="{{ summary.year }} özeti">
+  <div class="party-stats">
+    <div class="party-stat">
+      <span>Satılan sistem</span>
+      <b>{{ summary.systems }}</b>
+      <small>Split {{ summary.split_systems }} · Multi {{ summary.multi_systems }}</small>
+    </div>
+    <div class="party-stat">
+      <span>Ciro</span>
+      <b class="money">{{ summary.revenue|tr_money }} ₺</b>
+      <small>{{ summary.year }}, KDV dahil</small>
+    </div>
+    <div class="party-stat">
+      <span>Fiş</span>
+      <b>{{ summary.sale_count }}</b>
+      <small>{{ summary.year }}</small>
+    </div>
+    <div class="party-stat">
+      <span>Ortalama fiş</span>
+      <b class="money">{{ summary.average|tr_money }} ₺</b>
+      <small>Fiş başına</small>
+    </div>
+  </div>
+  {% if summary.top %}
+  <ol class="sale-top">
+    {% for item in summary.top %}
+    <li>
+      <span class="sale-top-name">{{ item.name }}</span>
+      <span class="sale-top-qty">{{ item.qty }} adet</span>
+      <span class="money">{{ item.total|tr_money }} ₺</span>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</section>
+{% endif %}

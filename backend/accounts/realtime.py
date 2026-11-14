@@ -25,8 +25,12 @@ KIND_GROUPS = {
 }
 
 
+def user_group(user_id) -> str:
+    return f'live.user.{user_id}'
+
+
 def groups_for(user) -> list[str]:
-    groups = []
+    groups = [user_group(user.pk)]
     if getattr(user, 'can_sales', False):
         groups.append(GROUP_SALES)
     if getattr(user, 'can_service_lead', False):
@@ -55,3 +59,26 @@ def broadcast(kind: str, *, actor_id=None, text: str = '', obj_id=None) -> None:
     """Queue a live event to send once the current transaction commits."""
     payload = {'actor': actor_id, 'text': text, 'id': obj_id}
     transaction.on_commit(lambda: _send(kind, payload))
+
+
+def _send_users(user_ids, message: dict) -> None:
+    from channels.layers import get_channel_layer
+
+    layer = get_channel_layer()
+    if layer is None:
+        return
+    for uid in user_ids:
+        try:
+            async_to_sync(layer.group_send)(user_group(uid), message)
+        except Exception:  # noqa: BLE001 — live updates are best-effort
+            log.warning('live user send failed: %s', uid, exc_info=True)
+            return
+
+
+def send_to_users(user_ids, kind: str, *, actor_id=None, text: str = '', obj_id=None, extra=None) -> None:
+    """Queue a live event for specific users (their own group) after commit."""
+    ids = sorted({uid for uid in user_ids if uid})
+    if not ids:
+        return
+    message = {'type': 'live.event', 'kind': kind, 'actor': actor_id, 'text': text, 'id': obj_id, **(extra or {})}
+    transaction.on_commit(lambda: _send_users(ids, message))

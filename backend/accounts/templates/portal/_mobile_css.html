@@ -224,7 +224,8 @@
         .sale-filter-kicker { flex-basis: 4.2em; }
         .sale-filter-opts { height: 36px; }
         .sale-filter-opts span { padding: 0 2px; }
-        .sale-filter-opts.is-four span { font-size: 12px; }
+        .sale-filter-opts.is-four span,
+        .sale-filter-opts.is-five span { font-size: 12px; }
 
         .party-stats { grid-template-columns: 1fr 1fr; }
         .party-stat + .party-stat { box-shadow: none; }
@@ -420,7 +421,8 @@
         #pay-modal .modal-card,
         #stock-in-modal .modal-card,
         #crew-edit-modal .modal-card,
-        #user-edit-modal .modal-card {
+        #user-edit-modal .modal-card,
+        #mount-modal .modal-card {
           width: 100%;
           height: 100%;
           max-height: none;
@@ -437,7 +439,8 @@
         #pay-modal.is-on .modal-card,
         #stock-in-modal.is-on .modal-card,
         #crew-edit-modal.is-on .modal-card,
-        #user-edit-modal.is-on .modal-card { transform: none; }
+        #user-edit-modal.is-on .modal-card,
+        #mount-modal.is-on .modal-card { transform: none; }
 
         /* Status and confirm-only cards (no body) stay compact at the bottom */
         .modal:has(.modal-card.is-status),
@@ -464,7 +467,8 @@
         .modal-card h2 { font-size: 22px; }
 
         .modal-body,
-        #pay-modal .modal-body {
+        #pay-modal .modal-body,
+        #mount-modal .modal-body {
           flex: 1 1 auto;
           min-height: 0;
           overflow: auto;
@@ -522,6 +526,33 @@
         .portal-toast { width: 100%; }
 
         .field-today { margin-bottom: 22px; }
+
+        /* Fixed action-column widths (--action-w) don't fit phones: stack and size to content. */
+        .fis-card.is-split {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 12px;
+        }
+        .fis-card.is-split > :first-child { padding-right: 0; }
+        .fis-card.is-split > form,
+        .fis-card.is-split > .btn,
+        .fis-card.is-split > form .btn {
+          flex: 0 0 auto;
+          width: 100%;
+          min-width: 0;
+        }
+        .fis-letter-head .btn,
+        .fis-card-head .btn,
+        .fis-card-foot .btn,
+        .fis-flag .btn,
+        .fis-delete .btn {
+          flex: 0 1 auto;
+          width: auto;
+          min-width: 0;
+        }
+        .fis-card-head,
+        .fis-card-foot,
+        .fis-letter-head { flex-wrap: wrap; gap: 10px; }
       }
 
       @media (max-width: 480px) {

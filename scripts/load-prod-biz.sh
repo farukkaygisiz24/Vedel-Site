@@ -92,9 +92,12 @@ dst.write_text(json.dumps(data, ensure_ascii=False))
 print("wrote", dst, "remapped", mapped, "nulled_crew_user", nulled_user)
 PY
 
-echo "==> Clear biz tables (users kept)"
+echo "==> Clear biz tables (users kept) + loaddata"
+docker compose cp "$SRC/vedel-biz.local.json" backend:/tmp/vedel-biz.local.json
+# One transaction: open portal tabs can re-seed default categories between a separate clear and load.
 docker compose exec -T backend python manage.py shell -c "
 from django.apps import apps
+from django.core.management import call_command
 from django.db import transaction
 order = [
  'service.JobSoldUnitMaterial','service.JobSoldUnitPhoto','service.JobSoldUnit','service.JobSoldPack',
@@ -108,11 +111,8 @@ with transaction.atomic():
     m = apps.get_model(label)
     n = m.objects.all().delete()
     print('cleared', label, n)
+  call_command('loaddata', '/tmp/vedel-biz.local.json')
 "
-
-echo "==> loaddata"
-docker compose cp "$SRC/vedel-biz.local.json" backend:/tmp/vedel-biz.local.json
-docker compose exec -T backend python manage.py loaddata /tmp/vedel-biz.local.json
 
 echo "==> media"
 mkdir -p "$ROOT/media" "$ROOT/backend/media"

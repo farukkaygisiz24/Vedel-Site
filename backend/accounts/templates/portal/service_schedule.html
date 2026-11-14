@@ -21,6 +21,41 @@
     </div>
   </div>
 
+  <div class="party-stats svc-stats{% if tech_mode %} is-2{% endif %}">
+    <div class="party-stat">
+      <span>Bugün</span>
+      <b>{{ today_open }} iş</b>
+    </div>
+    {% if tech_mode %}
+    <div class="party-stat">
+      <span>7 gün</span>
+      <b>{{ next7_open }} iş</b>
+    </div>
+    {% else %}
+    <div class="party-stat">
+      <span>Onay bekleyen</span>
+      <b>{{ waiting|length }}</b>
+    </div>
+    {% endif %}
+    {% if not tech_mode %}
+    <a class="party-stat" href="#svc-submitted">
+      <span>Teslim edilen</span>
+      <b{% if submitted %} class="is-up"{% endif %}>{{ submitted|length }}</b>
+    </a>
+    {% if missed %}
+    <a class="party-stat" href="#svc-missed">
+      <span>Gidilmeyen</span>
+      <b class="is-over">{{ missed|length }}</b>
+    </a>
+    {% else %}
+    <div class="party-stat">
+      <span>Gidilmeyen</span>
+      <b>0</b>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+
   {% if waiting %}
   <p class="field-label">Bekleyen</p>
   <div class="wait-list">
@@ -45,7 +80,7 @@
   {% include 'portal/_service_week_board.html' %}
 
   {% if not tech_mode %}
-  <p class="field-label">Teslim edilen işler</p>
+  <p class="field-label" id="svc-submitted">Teslim edilen işler</p>
   <div class="wait-list">
     {% for item in submitted %}
     <div class="wait-card">
@@ -68,7 +103,7 @@
   {% endif %}
 
   {% if missed %}
-  <p class="field-label">Gidilmeyen işler</p>
+  <p class="field-label" id="svc-missed">Gidilmeyen işler</p>
   <div class="wait-list">
     {% for item in missed %}
     <div class="wait-card">

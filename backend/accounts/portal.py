@@ -2,7 +2,7 @@ from pathlib import Path
 
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.http import FileResponse, HttpRequest, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods
@@ -17,8 +17,16 @@ def _wants_json(request: HttpRequest) -> bool:
     accept = request.headers.get('Accept', '')
     return 'application/json' in accept
 
-LOGO_PATH = Path(__file__).resolve().parent / 'static' / 'portal' / 'vedel-logo.png'
-FAVICON_PATH = Path(__file__).resolve().parent / 'static' / 'portal' / 'favicon.ico'
+STATIC_PORTAL = Path(__file__).resolve().parent / 'static' / 'portal'
+LOGO_PATH = STATIC_PORTAL / 'vedel-logo.png'
+FAVICON_PATH = STATIC_PORTAL / 'favicon-32.png'
+APP_ICONS = {
+    'apple-touch-icon': 'apple-touch-icon.png',
+    'icon-192': 'icon-192.png',
+    'icon-512': 'icon-512.png',
+    'icon-maskable-512': 'icon-maskable-512.png',
+}
+SERVICE_WORKER_PATH = STATIC_PORTAL / 'sw.js'
 
 
 @require_http_methods(['GET', 'POST'])
@@ -143,16 +151,22 @@ def portal_manifest(request: HttpRequest) -> JsonResponse:
             'background_color': '#eeecea',
             'icons': [
                 {
-                    'src': reverse('portal-logo'),
+                    'src': reverse('portal-icon', kwargs={'name': 'icon-192'}),
                     'type': 'image/png',
                     'sizes': '192x192',
                     'purpose': 'any',
                 },
                 {
-                    'src': reverse('portal-favicon'),
+                    'src': reverse('portal-icon', kwargs={'name': 'icon-512'}),
                     'type': 'image/png',
-                    'sizes': '32x32',
+                    'sizes': '512x512',
                     'purpose': 'any',
+                },
+                {
+                    'src': reverse('portal-icon', kwargs={'name': 'icon-maskable-512'}),
+                    'type': 'image/png',
+                    'sizes': '512x512',
+                    'purpose': 'maskable',
                 },
             ],
         }
@@ -169,3 +183,21 @@ def portal_logo(_request: HttpRequest) -> FileResponse:
 @require_GET
 def portal_favicon(_request: HttpRequest) -> FileResponse:
     return FileResponse(FAVICON_PATH.open('rb'), content_type='image/png')
+
+
+@require_GET
+def portal_icon(_request: HttpRequest, name: str) -> FileResponse:
+    filename = APP_ICONS.get(name)
+    if not filename:
+        raise Http404
+    response = FileResponse((STATIC_PORTAL / filename).open('rb'), content_type='image/png')
+    response['Cache-Control'] = 'public, max-age=86400'
+    return response
+
+
+@require_GET
+def portal_service_worker(_request: HttpRequest) -> HttpResponse:
+    response = HttpResponse(SERVICE_WORKER_PATH.read_bytes(), content_type='text/javascript')
+    response['Service-Worker-Allowed'] = '/'
+    response['Cache-Control'] = 'no-cache'
+    return response

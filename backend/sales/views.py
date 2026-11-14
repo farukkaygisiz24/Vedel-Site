@@ -44,6 +44,7 @@ from .services import (
     party_from_post,
     update_invoice,
 )
+from .stats import period_label, year_summary
 
 
 def _ctx(**extra):
@@ -272,6 +273,7 @@ def _sale_list_context(request: HttpRequest, *, archive=False):
         'has_archive': bool(archive_years),
         'current_year': current_year,
         'year_links': year_links,
+        'summary': year_summary(year) if year else None,
         'empty_copy': empty_copy,
         'has_filters': has_filters,
     }
@@ -514,6 +516,7 @@ def _party_list_context(request: HttpRequest):
         'work_total': totals['work_total'] or Decimal('0.00'),
         'paid_total': totals['paid_total'] or Decimal('0.00'),
         'due_count': totals['due_count'] or 0,
+        'period_label': period_label(date_from, date_to, today),
         'empty_copy': empty_copy,
         'has_filters': has_filters,
     }

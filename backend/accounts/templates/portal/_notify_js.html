@@ -1,0 +1,125 @@
+<script>
+  (function () {
+    if (window.portalNotify) return;
+    var READ_URL = '{% url "portal-notifications-read" %}';
+    var SUMMARY_URL = '{% url "portal-notifications-summary" %}';
+    var PUSH_URL = '{% url "portal-push-subscription" %}';
+    function csrf() {
+      var meta = document.querySelector('meta[name="csrf-token"]');
+      return meta ? meta.getAttribute('content') : '';
+    }
+    function markRead(ids) {
+      var body = new FormData();
+      body.append('ids', ids === 'all' ? 'all' : [].concat(ids).join(','));
+      return fetch(READ_URL, {
+        method: 'POST',
+        body: body,
+        keepalive: true,
+        credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrf(), 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+      }).then(function (res) { return res.ok ? res.json() : null; }).catch(function () { return null; });
+    }
+    function summary() {
+      return fetch(SUMMARY_URL, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      }).then(function (res) { return res.ok ? res.json() : null; }).catch(function () { return null; });
+    }
+    var listeners = [];
+    function changed() {
+      listeners.forEach(function (fn) { try { fn(); } catch (err) {} });
+    }
+
+    document.addEventListener('click', function (event) {
+      var row = event.target.closest && event.target.closest('[data-notif-id]');
+      if (row) {
+        if (row.classList.contains('is-unread')) {
+          row.classList.remove('is-unread');
+          markRead(row.getAttribute('data-notif-id')).then(changed);
+        }
+        if (row.getAttribute('href') === '#') event.preventDefault();
+        return;
+      }
+      var all = event.target.closest && event.target.closest('[data-notif-read-all]');
+      if (all) {
+        event.preventDefault();
+        all.disabled = true;
+        markRead('all').then(function () {
+          document.querySelectorAll('[data-notif-id].is-unread').forEach(function (el) { el.classList.remove('is-unread'); });
+          changed();
+          if (window.portalRefresh && document.querySelector('.notif-list')) window.portalRefresh();
+          else if (document.querySelector('.notif-list') && !window.portalRefresh) location.reload();
+        });
+      }
+    }, true);
+
+    // ---- Web push -------------------------------------------------------------
+    function b64ToBytes(value) {
+      var pad = '='.repeat((4 - (value.length % 4)) % 4);
+      var raw = atob((value + pad).replace(/-/g, '+').replace(/_/g, '/'));
+      var out = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i);
+      return out;
+    }
+    var pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    function registration() {
+      return navigator.serviceWorker.register('{% url "portal-service-worker" %}', { scope: '/' })
+        .then(function () { return navigator.serviceWorker.ready; });
+    }
+    function sendSub(method, sub) {
+      return fetch(PUSH_URL, {
+        method: method,
+        body: JSON.stringify(sub.toJSON ? sub.toJSON() : sub),
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+      }).then(function (res) { return res.ok; });
+    }
+    var push = {
+      supported: pushSupported,
+      state: function () {
+        if (!pushSupported) return Promise.resolve('unsupported');
+        if (Notification.permission === 'denied') return Promise.resolve('denied');
+        return registration()
+          .then(function (reg) { return reg.pushManager.getSubscription(); })
+          .then(function (sub) { return sub ? 'on' : 'off'; })
+          .catch(function () { return 'off'; });
+      },
+      enable: function () {
+        if (!pushSupported) return Promise.resolve('unsupported');
+        return summary().then(function (data) {
+          var key = data && data.push_key;
+          if (!key) return 'nokey';
+          return Notification.requestPermission().then(function (perm) {
+            if (perm !== 'granted') return 'denied';
+            return registration().then(function (reg) {
+              return reg.pushManager.getSubscription().then(function (sub) {
+                return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) });
+              });
+            }).then(function (sub) {
+              return sendSub('POST', sub).then(function (ok) { return ok ? 'on' : 'off'; });
+            });
+          });
+        }).catch(function () { return 'off'; });
+      },
+      disable: function () {
+        if (!pushSupported) return Promise.resolve('unsupported');
+        return registration()
+          .then(function (reg) { return reg.pushManager.getSubscription(); })
+          .then(function (sub) {
+            if (!sub) return 'off';
+            return sendSub('DELETE', sub).then(function () { return sub.unsubscribe(); }).then(function () { return 'off'; });
+          })
+          .catch(function () { return 'off'; });
+      },
+    };
+
+    window.portalNotify = {
+      markRead: markRead,
+      summary: summary,
+      onChange: function (fn) { listeners.push(fn); },
+      changed: changed,
+      push: push,
+    };
+  })();
+</script>

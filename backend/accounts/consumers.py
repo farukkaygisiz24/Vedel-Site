@@ -38,5 +38,7 @@ class PortalConsumer(AsyncJsonWebsocketConsumer):
                 'actor': event.get('actor'),
                 'text': event.get('text') or '',
                 'id': event.get('id'),
+                'unread': event.get('unread'),
+                'notification': event.get('notification'),
             }
         )

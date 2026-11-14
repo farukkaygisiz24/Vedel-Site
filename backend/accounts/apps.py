@@ -14,3 +14,7 @@ class AccountsConfig(AppConfig):
         from .signals import connect_live_signals
 
         connect_live_signals()
+
+        from .job_events import connect_job_events
+
+        connect_job_events()

@@ -1,0 +1,14 @@
+<div class="wait-list notif-list">
+  {% for item in items %}
+  <a class="wait-card notif-row{% if not item.read_at %} is-unread{% endif %}" href="{{ item.url|default:'#' }}" data-notif-id="{{ item.pk }}">
+    <span class="notif-dot" aria-hidden="true"></span>
+    <div>
+      <b>{{ item.title }}</b>
+      {% if item.body %}<small>{{ item.body }}</small>{% endif %}
+    </div>
+    <time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:'d.m H:i' }}</time>
+  </a>
+  {% empty %}
+  <p class="hint">{% if show == 'unread' %}Okunmamış bildirim yok.{% else %}Henüz bildirim yok.{% endif %}</p>
+  {% endfor %}
+</div>

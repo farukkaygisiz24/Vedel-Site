@@ -24,7 +24,7 @@
     <div class="sale-filters-bar">
       <div class="sale-filter">
         <span class="sale-filter-kicker">Durum</span>
-        <div class="sale-filter-opts">
+        <div class="sale-filter-opts {% if tech_mode %}is-four{% else %}is-five{% endif %}">
           <label>
             <input type="radio" name="status" value=""{% if not status %} checked{% endif %} />
             <span>Tümü</span>
@@ -87,10 +87,10 @@
         <tr class="sale-row">
           <td>{{ item.date|date:'d.m.Y' }}{% if item.time %} · {{ item.time|time:'H:i' }}{% endif %}</td>
           <td><a class="sale-row-go" href="{{ item.get_absolute_url }}">{{ item.display_number }}</a></td>
-          <td>{{ item.kind_label }}</td>
-          <td>{{ item.party.display_name }}</td>
+          <td><span class="kind-tag {{ item.kind_class }}">{{ item.kind_label }}</span></td>
+          <td>{{ item.party.display_name }}{% if item.area_label %}<small class="cell-sub">{{ item.area_label }}</small>{% endif %}</td>
           <td>{{ item.device_summary }}</td>
-          <td>{{ item.get_status_display }}</td>
+          <td><span class="status-tag is-{% if item.is_overdue %}overdue{% else %}{{ item.status }}{% endif %}">{% if item.is_overdue %}Gidilmedi{% else %}{{ item.get_status_display }}{% endif %}</span></td>
           {% if not tech_mode %}<td class="money">{{ item.grand_total|tr_money }} ₺</td>{% endif %}
         </tr>
         {% empty %}

@@ -4,19 +4,20 @@
       <path d="M4.5 7h15M4.5 12h15M4.5 17h15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
     </svg>
   </button>
-  <form class="search" role="search" action="#" method="get">
+  <form class="search" role="search" action="#" method="get"{% if user.is_authenticated %} data-global-search="{% url 'portal-search' %}"{% endif %}>
     <span class="search-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" fill="none">
         <circle cx="11" cy="11" r="6.2" stroke="currentColor" stroke-width="1.8"/>
         <path d="M16 16.5 20 20.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
       </svg>
     </span>
-    <input type="search" name="q" placeholder="Ara" autocomplete="off" />
+    <input type="search" name="q" placeholder="Müşteri, fiş, iş ara" autocomplete="off" aria-autocomplete="list" aria-controls="global-search-pop" aria-expanded="false" />
+    <div class="profile-pop search-pop" id="global-search-pop" role="listbox" hidden></div>
   </form>
   <div class="topbar-end">
-  {% if can_service_lead %}
-  <div class="bell" data-bell data-bell-url="{% url 'portal-service-reminders-summary' %}">
-    <button type="button" class="bell-btn" aria-expanded="false" aria-haspopup="true" aria-label="Bakım bildirimleri">
+  {% if user.is_authenticated %}
+  <div class="bell" data-bell>
+    <button type="button" class="bell-btn" aria-expanded="false" aria-haspopup="true" aria-label="Bildirimler">
       <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5l1.5-2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
         <path d="M10 21h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
@@ -24,9 +25,16 @@
       <span class="bell-count" data-bell-count hidden></span>
     </button>
     <div class="profile-pop bell-pop" hidden>
-      <p class="bell-title">Bakımlar</p>
+      <div class="bell-head">
+        <p class="bell-title">Bildirimler</p>
+        <button type="button" class="bell-read" data-notif-read-all hidden>Tümünü okundu yap</button>
+      </div>
       <div data-bell-list><p class="bell-empty">Yükleniyor…</p></div>
-      <a class="bell-all" href="{% url 'portal-service-reminders' %}">Tümünü gör</a>
+      <div data-bell-maint hidden>
+        <p class="bell-title">Bakımlar</p>
+        <div data-bell-maint-list></div>
+      </div>
+      <a class="bell-all" href="{% url 'portal-notifications' %}">Tümünü gör</a>
     </div>
   </div>
   {% endif %}
@@ -42,6 +50,7 @@
   </div>
   </div>
 </header>
+{% include 'portal/_notify_js.html' %}
 <script>
   (function () {
     var search = document.querySelector('.topbar .search');
@@ -50,30 +59,186 @@
         event.preventDefault();
       });
     }
+    var go = function (href) {
+      if (window.portalOpen) window.portalOpen(href);
+      else location.href = href;
+    };
+    if (search && search.hasAttribute('data-global-search')) (function () {
+      var endpoint = search.getAttribute('data-global-search');
+      var input = search.querySelector('input[name="q"]');
+      var pop = search.querySelector('.search-pop');
+      var timer = null;
+      var ctrl = null;
+      var lastQ = '';
+      var active = -1;
+      var escS = function (value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+      };
+      var rows = function () { return Array.prototype.slice.call(pop.querySelectorAll('a.bell-item')); };
+      var setActive = function (index) {
+        var list = rows();
+        if (!list.length) { active = -1; return; }
+        active = (index + list.length) % list.length;
+        list.forEach(function (row, i) {
+          row.classList.toggle('is-active', i === active);
+          row.setAttribute('aria-selected', i === active ? 'true' : 'false');
+        });
+        list[active].scrollIntoView({ block: 'nearest' });
+      };
+      var open = function (href) {
+        hide();
+        input.blur();
+        input.value = '';
+        lastQ = '';
+        pop.innerHTML = '';
+        go(href);
+      };
+      var hide = function () {
+        pop.hidden = true;
+        input.setAttribute('aria-expanded', 'false');
+        active = -1;
+      };
+      var show = function (html) {
+        pop.innerHTML = html;
+        pop.hidden = false;
+        input.setAttribute('aria-expanded', 'true');
+        active = -1;
+      };
+      var paintSearch = function (data) {
+        if (!data.groups || !data.groups.length) {
+          show('<p class="bell-empty">“' + escS(data.q) + '” için sonuç yok.</p>');
+          return;
+        }
+        show(data.groups.map(function (group) {
+          return '<p class="bell-title">' + escS(group.label) + '</p>' + group.items.map(function (item) {
+            return '<a class="bell-item" role="option" href="' + escS(item.url || '#') + '">' +
+              '<span><b>' + escS(item.title) + '</b>' + (item.sub ? '<small>' + escS(item.sub) + '</small>' : '') + '</span></a>';
+          }).join('');
+        }).join(''));
+        setActive(0);
+      };
+      var run = function () {
+        var q = input.value.trim();
+        if (q.length < 2) { lastQ = ''; hide(); return; }
+        if (q === lastQ && !pop.hidden) return;
+        lastQ = q;
+        if (ctrl) ctrl.abort();
+        ctrl = window.AbortController ? new AbortController() : null;
+        fetch(endpoint + '?q=' + encodeURIComponent(q), {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+          signal: ctrl ? ctrl.signal : undefined
+        })
+          .then(function (res) { return res.ok ? res.json() : null; })
+          .then(function (data) {
+            if (!data || !data.ok || input.value.trim() !== q) return;
+            paintSearch(data);
+          })
+          .catch(function () {});
+      };
+      input.addEventListener('input', function () {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(run, 250);
+      });
+      input.addEventListener('focus', function () {
+        if (pop.innerHTML && input.value.trim().length >= 2) {
+          pop.hidden = false;
+          input.setAttribute('aria-expanded', 'true');
+        }
+      });
+      input.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') {
+          if (!pop.hidden) { event.preventDefault(); hide(); }
+          else if (input.value) { input.value = ''; lastQ = ''; }
+          else input.blur();
+          return;
+        }
+        if (pop.hidden) {
+          if (event.key === 'ArrowDown' && input.value.trim().length >= 2) { event.preventDefault(); lastQ = ''; run(); }
+          return;
+        }
+        if (event.key === 'ArrowDown') { event.preventDefault(); setActive(active + 1); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); setActive(active - 1); }
+        else if (event.key === 'Enter') {
+          var row = rows()[active];
+          if (!row) return;
+          event.preventDefault();
+          open(row.getAttribute('href'));
+        }
+      });
+      pop.addEventListener('mousedown', function (event) {
+        if (event.target.closest('a')) event.preventDefault();
+      });
+      pop.addEventListener('click', function (event) {
+        var row = event.target.closest('a.bell-item');
+        event.stopPropagation();
+        if (!row || event.metaKey || event.ctrlKey || event.shiftKey) return;
+        event.preventDefault();
+        open(row.getAttribute('href'));
+      });
+      search.addEventListener('click', function (event) { event.stopPropagation(); });
+      document.addEventListener('click', hide);
+      document.addEventListener('keydown', function (event) {
+        if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+        var el = document.activeElement;
+        if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+        event.preventDefault();
+        input.focus();
+        input.select();
+      });
+    })();
     var bell = document.querySelector('[data-bell]');
     if (bell) {
       var bellBtn = bell.querySelector('.bell-btn');
       var bellPop = bell.querySelector('.bell-pop');
       var bellCount = bell.querySelector('[data-bell-count]');
       var bellList = bell.querySelector('[data-bell-list]');
+      var bellReadAll = bell.querySelector('[data-notif-read-all]');
+      var bellMaint = bell.querySelector('[data-bell-maint]');
+      var bellMaintList = bell.querySelector('[data-bell-maint-list]');
       var bellBusy = null;
       var esc = function (value) {
         return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
           return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
         });
       };
+      var ago = function (iso) {
+        var then = new Date(iso);
+        var mins = Math.round((Date.now() - then.getTime()) / 60000);
+        if (mins < 1) return 'şimdi';
+        if (mins < 60) return mins + ' dk';
+        if (mins < 60 * 24) return Math.round(mins / 60) + ' sa';
+        return then.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+      };
       var paint = function (data) {
-        var total = data.total || 0;
+        var unread = data.unread || 0;
+        var maint = data.maintenance;
+        var overdue = maint ? maint.overdue || 0 : 0;
+        var total = unread + overdue;
         bellCount.hidden = !total;
         bellCount.textContent = total > 99 ? '99+' : String(total);
-        bellCount.classList.toggle('is-over', !!data.overdue);
-        bellBtn.setAttribute('aria-label', 'Bakım bildirimleri: ' + (data.overdue || 0) + ' geciken, ' + (data.soon || 0) + ' yaklaşan');
+        bellCount.classList.toggle('is-over', !!overdue);
+        bellBtn.setAttribute('aria-label', 'Bildirimler: ' + unread + ' okunmamış' + (maint ? ', ' + overdue + ' geciken bakım' : ''));
+        bellReadAll.hidden = !unread;
+        bellReadAll.disabled = false;
         if (!data.items || !data.items.length) {
-          bellList.innerHTML = '<p class="bell-empty">Yaklaşan bakım yok.</p>';
+          bellList.innerHTML = '<p class="bell-empty">Henüz bildirim yok.</p>';
+        } else {
+          bellList.innerHTML = data.items.map(function (item) {
+            return '<a class="bell-item' + (item.read ? '' : ' is-unread') + '" href="' + esc(item.url || '#') + '" data-notif-id="' + item.id + '">' +
+              '<span><b>' + esc(item.title) + '</b>' + (item.body ? '<small>' + esc(item.body) + '</small>' : '') + '</span>' +
+              '<em>' + esc(ago(item.at)) + '</em></a>';
+          }).join('');
+        }
+        if (!maint || !maint.items || !maint.items.length) {
+          bellMaint.hidden = true;
           return;
         }
-        bellList.innerHTML = data.items.map(function (item) {
-          return '<a class="bell-item" href="' + esc(data.url) + '">' +
+        bellMaint.hidden = false;
+        bellMaintList.innerHTML = maint.items.map(function (item) {
+          return '<a class="bell-item" href="' + esc(maint.url) + '">' +
             '<span><b>' + esc(item.party) + '</b><small>' + esc(item.device) + ' · ' + esc(item.interval) + ' ay</small></span>' +
             '<em class="' + (item.overdue ? 'is-over' : '') + '">' + esc(item.due) + '</em></a>';
         }).join('');
@@ -83,17 +248,12 @@
         if (bellBusy) return bellBusy;
         if (!force && Date.now() - bellAt < 15000) return Promise.resolve();
         bellAt = Date.now();
-        bellBusy = fetch(bell.getAttribute('data-bell-url'), {
-          credentials: 'same-origin',
-          cache: 'no-store',
-          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        })
-          .then(function (response) { return response.ok ? response.json() : null; })
+        bellBusy = window.portalNotify.summary()
           .then(function (data) { if (data && data.ok) paint(data); })
-          .catch(function () {})
           .then(function () { bellBusy = null; });
         return bellBusy;
       };
+      window.portalNotify.onChange(function () { window.portalBellRefresh(true); });
       var closeBell = function () {
         bellPop.hidden = true;
         bellBtn.setAttribute('aria-expanded', 'false');
@@ -106,8 +266,13 @@
         if (open) window.portalBellRefresh(true);
       });
       bellPop.addEventListener('click', function (event) {
-        if (!event.target.closest('a')) event.stopPropagation();
-        else closeBell();
+        var link = event.target.closest('a');
+        if (!link) { event.stopPropagation(); return; }
+        closeBell();
+        var href = link.getAttribute('href');
+        if (!href || href === '#' || event.metaKey || event.ctrlKey || event.shiftKey) return;
+        event.preventDefault();
+        go(href);
       });
       document.addEventListener('click', closeBell);
       window.portalBellRefresh(true);

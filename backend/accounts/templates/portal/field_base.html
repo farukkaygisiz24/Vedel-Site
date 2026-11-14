@@ -87,7 +87,8 @@
         gap: 8px;
         height: 56px;
         padding: 0 var(--page-pad);
-        overflow: hidden;
+        position: relative;
+        z-index: 5;
         border-bottom: 0.5px solid var(--hairline);
       }
 
@@ -431,6 +432,30 @@
       .row input:disabled,
       .row input[readonly] { color: var(--secondary); }
 
+      .row textarea {
+        display: block;
+        width: 100%;
+        min-height: 56px;
+        border: 0;
+        background: transparent;
+        padding: 26px 14px 10px;
+        font-size: 17px;
+        line-height: 1.35;
+        letter-spacing: -0.022em;
+        color: var(--label);
+        outline: none;
+        font-family: inherit;
+        resize: none;
+        overflow: hidden;
+        field-sizing: content;
+      }
+      .row textarea + label { top: 8px; transform: none; font-size: 11px; color: #aeaeb2; }
+      .row textarea:placeholder-shown:not(:focus) + label { top: 18px; font-size: 17px; color: #c7c7cc; }
+      .row textarea:focus + label { color: var(--accent); }
+      .row textarea:focus { background: rgba(220, 38, 38, 0.05); }
+      .row textarea[readonly] { color: var(--secondary); }
+      .fis-facts dd.is-note { white-space: pre-line; }
+
       .hint {
         margin: 4px 0 0;
         font-size: 12px;
@@ -570,7 +595,7 @@
       .device-card {
         margin: 16px 0 0;
         padding: 14px;
-        border-radius: 12px;
+        border-radius: 4px;
         background: rgba(0, 0, 0, 0.03);
         box-shadow: 0 0 0 0.5px var(--hairline);
       }
@@ -706,7 +731,7 @@
         display: block;
         aspect-ratio: 1 / 1;
         overflow: hidden;
-        border-radius: 8px;
+        border-radius: 4px;
         background: rgba(0, 0, 0, 0.06);
         box-shadow: 0 0 0 0.5px var(--hairline);
       }
@@ -1158,7 +1183,7 @@
         bottom: var(--browser-bar);
         z-index: 9;
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: repeat(4, 1fr);
         width: min(100%, 480px);
         height: calc(var(--tab) + env(safe-area-inset-bottom));
         margin: 0 auto;
@@ -1168,17 +1193,18 @@
       }
 
       .app-tabs.has-office {
-        grid-template-columns: 1fr 1fr 1fr 1fr;
+        grid-template-columns: repeat(5, 1fr);
       }
 
       .app-tabs a {
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 8px;
-        min-height: 40px;
+        gap: 2px;
+        min-height: 44px;
         border-radius: 10px;
-        font-size: 15px;
+        font-size: 11.5px;
         font-weight: 510;
         letter-spacing: -0.02em;
         color: var(--label);
@@ -1189,8 +1215,8 @@
       }
 
       .app-tabs a svg {
-        width: 18px;
-        height: 18px;
+        width: 20px;
+        height: 20px;
         color: var(--secondary);
       }
 
@@ -1245,6 +1271,154 @@
         }
         .line-row [name=description] { grid-column: 1 / -1; }
       }
+
+      /* ---- Field home v2 (cards) ---------------------------------------------- */
+      .fh-head { display: flex; flex-direction: column; gap: 2px; margin: 0 0 14px; }
+      .fh-head h1 { font-size: 30px; font-weight: 650; }
+      .fh-date { color: var(--secondary); font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+      .fh-kick {
+        margin: 18px 4px 8px; color: var(--secondary); font-size: 12px; font-weight: 650;
+        letter-spacing: 0.08em; text-transform: uppercase;
+      }
+      .fh-list { display: flex; flex-direction: column; gap: 10px; }
+      .fh-empty {
+        margin: 0; padding: 16px; border-radius: 4px; background: rgba(0, 0, 0, 0.035);
+        color: var(--secondary); font-size: 14px;
+      }
+      .fj-card {
+        display: flex; flex-direction: column; gap: 12px; padding: 18px 16px;
+        border-radius: 4px; background: var(--field);
+        box-shadow: 0 0 0 0.5px var(--hairline);
+      }
+      .fj-main { display: flex; flex-direction: column; gap: 3px; }
+      .fj-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+      .fj-time { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+      .fj-kind {
+        display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 3px;
+        font-size: 12px; font-weight: 650;
+      }
+      .fj-kind.is-mount { background: rgba(31, 74, 68, 0.12); color: var(--vedel); }
+      .fj-kind.is-service { background: rgba(180, 83, 9, 0.12); color: #92400e; }
+      .fj-no { margin-left: auto; color: var(--secondary); font-size: 12px; font-weight: 600; }
+      .fj-party { font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
+      .fj-device { font-size: 14px; color: #3a3a3c; }
+      .fj-place { font-size: 13px; color: var(--secondary); line-height: 1.35; }
+      .fj-actions { display: flex; gap: 8px; }
+      .fj-act {
+        flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+        min-height: 44px; border-radius: 4px; background: #fff;
+        box-shadow: 0 0 0 0.5px var(--hairline); font-size: 14px; font-weight: 600;
+      }
+      .fj-act svg { width: 17px; height: 17px; }
+      .fj-act.is-primary { background: var(--vedel); color: #fff; box-shadow: none; }
+      .fj-act:active { transform: scale(0.98); }
+      .fj-row {
+        display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 4px;
+        background: var(--field); box-shadow: 0 0 0 0.5px var(--hairline);
+      }
+      .fj-row.is-done { opacity: 0.8; }
+      .fj-date { width: 44px; flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; }
+      .fj-date small { font-size: 11px; font-weight: 650; color: var(--secondary); text-transform: uppercase; }
+      .fj-date b { font-size: 20px; font-weight: 700; line-height: 1.1; }
+      .fj-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+      .fj-row-main b { font-size: 15px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .fj-row-main small { font-size: 13px; color: var(--secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .fj-hero { margin: 0 0 22px; }
+      .fc-search { display: flex; gap: 8px; margin: 0 0 14px; }
+      .fc-search input { flex: 1 1 auto; min-width: 0; border-radius: 4px; }
+      .fc-search .btn { flex: 0 0 auto; padding: 0 20px; border-radius: 4px; }
+      a.fj-card { color: inherit; text-decoration: none; }
+      a.fj-card .fj-top { margin-bottom: 0; }
+      .fc-facts { margin-top: 0; padding-top: 0; border-top: 0; }
+      .fc-shots { margin-top: 12px; }
+      .fc-history { align-items: flex-start; }
+      .fc-history .fj-row-main a { color: var(--vedel); text-decoration: none; }
+      .fc-history .fj-row-main small.fc-note { white-space: pre-line; overflow: visible; }
+      .fc-history .device-album { margin-top: 6px; }
+      .fj-hero .fj-when { margin-left: auto; }
+      .fj-hero-day { font-size: 13px; font-weight: 600; color: var(--secondary); }
+      .fj-hero-note { font-size: 13px; font-weight: 650; color: #92400e; }
+      .fj-when {
+        flex: 0 0 auto; height: 22px; padding: 0 8px; border-radius: 3px; display: inline-flex; align-items: center;
+        background: rgba(31, 74, 68, 0.12); color: var(--vedel); font-size: 12px; font-weight: 650;
+      }
+      .fj-when.is-done { background: rgba(0, 0, 0, 0.06); color: var(--secondary); }
+      .field-modal.is-compact { place-items: end center; }
+      @media (max-width: 860px) {
+        .field-modal.is-compact { place-items: end stretch; background: rgba(15, 15, 16, 0.4); box-shadow: none; }
+        .field-modal.is-compact .field-modal-card {
+          height: auto; padding-top: 18px; border-radius: 20px 20px 0 0;
+        }
+      }
+      .field-modal.is-compact .field-mount-menu { flex: none; min-height: 0; }
+      .field-modal.is-compact .btn-row { grid-template-columns: 1fr; }
+      a.field-mount-opt { align-items: center; justify-content: space-between; color: inherit; text-decoration: none; }
+      a.field-mount-opt::after { content: '›'; color: var(--secondary); font-size: 20px; }
+      a.field-mount-opt[hidden] { display: none; }
+      a.field-mount-opt[hidden] + a.field-mount-opt { border-top: 0; }
+      .field-bell-wrap { position: relative; margin-left: auto; }
+      .field-bell {
+        position: relative; display: grid; place-items: center; width: 40px; height: 40px;
+        padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--label); cursor: pointer;
+      }
+      .field-bell[aria-expanded="true"] { background: rgba(0, 0, 0, 0.05); }
+      .field-bell-pop {
+        position: absolute; right: -4px; top: calc(100% + 8px); z-index: 60;
+        width: min(340px, calc(100vw - 24px)); padding: 6px; border-radius: 14px; background: var(--field);
+        box-shadow: 0 0 0 0.5px var(--hairline), 0 14px 36px rgba(0, 0, 0, 0.14);
+      }
+      .field-bell-pop[hidden] { display: none; }
+      .field-bell-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .field-bell-title {
+        margin: 6px 10px 4px; color: var(--secondary);
+        font-size: 11px; font-weight: 590; letter-spacing: 0.08em; text-transform: uppercase;
+      }
+      .field-bell-read {
+        margin: 2px 4px 0 0; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent;
+        color: var(--vedel); font: inherit; font-size: 13px; font-weight: 590; cursor: pointer;
+      }
+      .field-bell-read[hidden] { display: none; }
+      .field-bell-list { max-height: min(420px, 62dvh); overflow: auto; }
+      .field-bell-empty { margin: 8px 10px 12px; color: var(--secondary); font-size: 14px; }
+      .field-bell-item {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        min-height: 52px; padding: 9px 10px; border-radius: 10px; color: var(--label); text-decoration: none;
+      }
+      .field-bell-item:active { background: rgba(0, 0, 0, 0.05); }
+      .field-bell-item.is-unread { box-shadow: inset 3px 0 0 var(--vedel); }
+      .field-bell-item span { min-width: 0; }
+      .field-bell-item b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; }
+      .field-bell-item:not(.is-unread) b { font-weight: 510; color: var(--secondary); }
+      .field-bell-item small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--secondary); font-size: 13px; }
+      .field-bell-item em { flex: 0 0 auto; font-style: normal; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--secondary); }
+      .field-bell svg { width: 22px; height: 22px; }
+      .field-bell-count {
+        position: absolute; top: 3px; right: 1px; min-width: 18px; height: 18px; padding: 0 5px;
+        border-radius: 980px; background: var(--accent); color: #fff;
+        font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+      }
+      .field-bell-count[hidden] { display: none; }
+      .app-card {
+        display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 16px;
+        border-radius: 16px; background: var(--field); box-shadow: 0 0 0 0.5px var(--hairline);
+      }
+      .app-card h2 { margin: 0; font-size: 17px; font-weight: 650; }
+      .app-card p { margin: 0; color: var(--secondary); font-size: 14px; line-height: 1.45; }
+      .app-card ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6; }
+      .app-card .fj-act { flex: none; width: 100%; border: 0; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+      .app-card [data-push-state] { font-size: 13px; font-weight: 600; color: var(--vedel); }
+      .lightbox {
+        position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+        padding: calc(env(safe-area-inset-top, 0px) + 56px) 12px calc(env(safe-area-inset-bottom, 0px) + 24px);
+        background: rgba(0, 0, 0, 0.92);
+      }
+      .lightbox[hidden] { display: none; }
+      .lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
+      .lightbox-close {
+        position: absolute; top: calc(env(safe-area-inset-top, 0px) + 10px); right: 12px;
+        min-height: 40px; padding: 0 16px; border: 0; border-radius: 980px;
+        background: rgba(255, 255, 255, 0.16); color: #fff; font: inherit; font-size: 15px; font-weight: 600;
+      }
     </style>
   </head>
   <body>
@@ -1253,10 +1427,41 @@
         {% block top %}
         <img src="{% url 'portal-logo' %}" alt="Vedel Klima" />
         {% endblock %}
+        <div class="field-bell-wrap" data-field-bell>
+          <button class="field-bell" type="button" aria-label="Bildirimler" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2H4.5l1.5-2Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+              <path d="M10 21h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+            <span class="field-bell-count" data-field-bell-count hidden></span>
+          </button>
+          <div class="field-bell-pop" hidden>
+            <div class="field-bell-head">
+              <p class="field-bell-title">Bildirimler</p>
+              <button class="field-bell-read" type="button" data-notif-read-all hidden>Tümünü okundu yap</button>
+            </div>
+            <div class="field-bell-list" data-field-bell-list><p class="field-bell-empty">Yükleniyor…</p></div>
+          </div>
+        </div>
       </header>
       <main class="workspace">
         {% block content %}{% endblock %}
       </main>
+    </div>
+    <div class="field-modal is-compact" id="directions-sheet" hidden>
+      <div class="field-modal-card" role="dialog" aria-modal="true" aria-labelledby="directions-title">
+        <p class="field-label">Yol tarifi</p>
+        <h2 id="directions-title">Hangi uygulamayla açılsın?</h2>
+        <p class="hint" data-directions-place></p>
+        <div class="field-mount-menu">
+          <a class="field-mount-opt" data-directions-app="apple" href="#"><span><b>Apple Haritalar</b><small>iPhone'un kendi haritası</small></span></a>
+          <a class="field-mount-opt" data-directions-app="google" href="#"><span><b>Google Haritalar</b><small>Yüklüyse uygulamada açılır</small></span></a>
+          <a class="field-mount-opt" data-directions-app="yandex" href="#"><span><b>Yandex Haritalar</b><small>Yüklüyse uygulamada açılır</small></span></a>
+        </div>
+        <div class="btn-row">
+          <button class="btn is-ghost" type="button" data-directions-close>Vazgeç</button>
+        </div>
+      </div>
     </div>
     <nav class="app-tabs{% if show_office_nav %} has-office{% endif %}" aria-label="Saha">
       <a class="{% if request.resolver_match.url_name == 'portal-field' or request.resolver_match.url_name == 'portal-field-job' or request.resolver_match.url_name == 'portal-field-print' %}is-on{% endif %}" href="{% url 'portal-field' %}">
@@ -1272,6 +1477,13 @@
           <path d="M8 4.5v3M16 4.5v3M4.5 10h15" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
         </svg>
         Hafta
+      </a>
+      <a class="{% if request.resolver_match.url_name == 'portal-field-customers' or request.resolver_match.url_name == 'portal-field-customer' %}is-on{% endif %}" href="{% url 'portal-field-customers' %}">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="5.5" stroke="currentColor" stroke-width="1.7"/>
+          <path d="m15 15 4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+        Müşteriler
       </a>
       <a class="{% if request.resolver_match.url_name == 'portal-settings' %}is-on{% endif %}" href="{% url 'portal-settings' %}">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -1292,6 +1504,50 @@
     </nav>
     {{ portal_toasts|json_script:"portal-toast-data" }}
     <div class="portal-toasts" id="portal-toasts" aria-live="polite"></div>
+    <div class="lightbox" id="field-lightbox" hidden>
+      <button class="lightbox-close" type="button" data-lightbox-close>Kapat</button>
+      <img alt="" />
+    </div>
+    <script>
+      (function () {
+        if (window.CSS && CSS.supports && CSS.supports('field-sizing', 'content')) return;
+        var fit = function (el) {
+          el.style.height = 'auto';
+          el.style.height = el.scrollHeight + 'px';
+        };
+        var fitAll = function () {
+          document.querySelectorAll('textarea[data-autosize]').forEach(fit);
+        };
+        document.addEventListener('input', function (event) {
+          if (event.target.matches && event.target.matches('textarea[data-autosize]')) fit(event.target);
+        });
+        new MutationObserver(fitAll).observe(document.body, { childList: true, subtree: true });
+        fitAll();
+      })();
+      (function () {
+        var box = document.getElementById('field-lightbox');
+        if (!box) return;
+        var img = box.querySelector('img');
+        function close() {
+          box.hidden = true;
+          img.removeAttribute('src');
+        }
+        document.addEventListener('click', function (event) {
+          var link = event.target.closest && event.target.closest('a[data-lightbox]');
+          if (link) {
+            if (event.metaKey || event.ctrlKey) return;
+            event.preventDefault();
+            img.src = link.href;
+            box.hidden = false;
+            return;
+          }
+          if (!box.hidden && (event.target === box || event.target.closest('[data-lightbox-close]'))) close();
+        });
+        document.addEventListener('keydown', function (event) {
+          if (event.key === 'Escape' && !box.hidden) close();
+        });
+      })();
+    </script>
     <script>
       (function () {
         var host = document.getElementById('portal-toasts');
@@ -1313,6 +1569,198 @@
           requestAnimationFrame(function () { el.classList.add('is-on'); });
           setTimeout(function () { el.classList.remove('is-on'); }, 3000);
         });
+      })();
+    </script>
+    {% include 'portal/_notify_js.html' %}
+    <script>
+      (function () {
+        var count = document.querySelector('[data-field-bell-count]');
+        function toast(title, text) {
+          var host = document.getElementById('portal-toasts');
+          if (!host || !text) return;
+          var el = document.createElement('div');
+          el.className = 'portal-toast';
+          var kicker = document.createElement('span');
+          kicker.className = 'fis-kicker';
+          kicker.textContent = title;
+          var copy = document.createElement('p');
+          copy.textContent = text;
+          el.appendChild(kicker);
+          el.appendChild(copy);
+          host.appendChild(el);
+          requestAnimationFrame(function () { el.classList.add('is-on'); });
+          setTimeout(function () { el.classList.remove('is-on'); setTimeout(function () { el.remove(); }, 400); }, 3500);
+        }
+        var bell = document.querySelector('[data-field-bell]');
+        var bellBtn = bell && bell.querySelector('.field-bell');
+        var bellPop = bell && bell.querySelector('.field-bell-pop');
+        var bellList = bell && bell.querySelector('[data-field-bell-list]');
+        var bellReadAll = bell && bell.querySelector('[data-notif-read-all]');
+        function esc(value) {
+          return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+          });
+        }
+        function ago(iso) {
+          var then = new Date(iso);
+          var mins = Math.round((Date.now() - then.getTime()) / 60000);
+          if (mins < 1) return 'şimdi';
+          if (mins < 60) return mins + ' dk';
+          if (mins < 60 * 24) return Math.round(mins / 60) + ' sa';
+          return then.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' });
+        }
+        function refreshCount() {
+          window.portalNotify.summary().then(function (data) {
+            if (!data || !count) return;
+            var unread = data.unread || 0;
+            count.hidden = !unread;
+            count.textContent = unread > 99 ? '99+' : String(unread);
+            if (!bell) return;
+            bellBtn.setAttribute('aria-label', 'Bildirimler: ' + unread + ' okunmamış');
+            bellReadAll.hidden = !unread;
+            bellReadAll.disabled = false;
+            if (!data.items || !data.items.length) {
+              bellList.innerHTML = '<p class="field-bell-empty">Henüz bildirim yok.</p>';
+              return;
+            }
+            bellList.innerHTML = data.items.map(function (item) {
+              return '<a class="field-bell-item' + (item.read ? '' : ' is-unread') + '" href="' + esc(item.url || '#') + '" data-notif-id="' + item.id + '">' +
+                '<span><b>' + esc(item.title) + '</b>' + (item.body ? '<small>' + esc(item.body) + '</small>' : '') + '</span>' +
+                '<em>' + esc(ago(item.at)) + '</em></a>';
+            }).join('');
+          });
+        }
+        window.portalNotify.onChange(refreshCount);
+        refreshCount();
+        if (bell) {
+          var closeBell = function () {
+            bellPop.hidden = true;
+            bellBtn.setAttribute('aria-expanded', 'false');
+          };
+          bellBtn.addEventListener('click', function (event) {
+            event.stopPropagation();
+            var open = bellPop.hidden;
+            bellPop.hidden = !open;
+            bellBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) refreshCount();
+          });
+          bellPop.addEventListener('click', function (event) {
+            if (!event.target.closest('a')) event.stopPropagation();
+            else closeBell();
+          });
+          document.addEventListener('click', closeBell);
+          document.addEventListener('keydown', function (event) { if (event.key === 'Escape') closeBell(); });
+        }
+
+        var sheet = document.getElementById('directions-sheet');
+        if (sheet) {
+          var isApple = /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent);
+          var isAndroid = /Android/i.test(navigator.userAgent);
+          var sheetTimer = null;
+          var appUrl = {
+            apple: function (q) { return 'https://maps.apple.com/?daddr=' + q; },
+            google: function (q) { return 'https://www.google.com/maps/dir/?api=1&destination=' + q; },
+            yandex: function (q) { return 'https://yandex.com.tr/maps/?text=' + q; },
+          };
+          var closeSheet = function () {
+            sheet.classList.remove('is-on');
+            document.body.classList.remove('has-modal');
+            clearTimeout(sheetTimer);
+            sheetTimer = setTimeout(function () { sheet.hidden = true; }, 300);
+          };
+          document.addEventListener('click', function (event) {
+            var link = event.target.closest && event.target.closest('[data-directions]');
+            if (!link || event.metaKey || event.ctrlKey) return;
+            var place = link.getAttribute('data-directions') || '';
+            if (!place) return;
+            event.preventDefault();
+            var q = encodeURIComponent(place.replace(/\s*[·\/]\s*/g, ', '));
+            if (isAndroid) {
+              location.href = 'geo:0,0?q=' + q;
+              return;
+            }
+            sheet.querySelector('[data-directions-place]').textContent = place;
+            sheet.querySelectorAll('[data-directions-app]').forEach(function (opt) {
+              var app = opt.getAttribute('data-directions-app');
+              opt.href = appUrl[app](q);
+              opt.hidden = app === 'apple' && !isApple;
+            });
+            clearTimeout(sheetTimer);
+            sheet.hidden = false;
+            document.body.classList.add('has-modal');
+            requestAnimationFrame(function () { sheet.classList.add('is-on'); });
+          });
+          sheet.addEventListener('click', function (event) {
+            if (event.target === sheet || event.target.closest('[data-directions-close]')) closeSheet();
+            else if (event.target.closest('[data-directions-app]')) setTimeout(closeSheet, 0);
+          });
+          document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && !sheet.hidden) closeSheet(); });
+        }
+
+        var LIVE_PATHS = ['/field/', '/field/schedule/'];
+        var pending = false;
+        function busy() {
+          if (document.visibilityState !== 'visible') return true;
+          if (document.querySelector('.lightbox:not([hidden]), .modal:not([hidden]), .field-modal:not([hidden]), .field-bell-pop:not([hidden])')) return true;
+          var el = document.activeElement;
+          return !!(el && el.matches && el.matches('input, textarea, select'));
+        }
+        function refreshList() {
+          if (LIVE_PATHS.indexOf(location.pathname) === -1) return;
+          if (busy()) { pending = true; return; }
+          pending = false;
+          fetch(location.pathname + location.search, { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.text() : ''; })
+            .then(function (html) {
+              if (!html) return;
+              var doc = new DOMParser().parseFromString(html, 'text/html');
+              var next = doc.querySelector('main.workspace');
+              var cur = document.querySelector('main.workspace');
+              if (next && cur) cur.innerHTML = next.innerHTML;
+            })
+            .catch(function () {});
+        }
+        if (!window.WebSocket) return;
+        var sock = null;
+        var retry = 1000;
+        var ping = null;
+        var timer = null;
+        function onEvent(msg) {
+          if (!msg || msg.type !== 'live') return;
+          if (msg.kind === 'notification') {
+            refreshCount();
+            toast('Bildirim', msg.text);
+          }
+          if (msg.kind === 'field' || msg.kind === 'notification') {
+            clearTimeout(timer);
+            timer = setTimeout(refreshList, 500);
+          }
+        }
+        function connect() {
+          var scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+          try { sock = new WebSocket(scheme + location.host + '/ws/portal/'); } catch (err) { return; }
+          sock.onopen = function () {
+            retry = 1000;
+            clearInterval(ping);
+            ping = setInterval(function () { if (sock && sock.readyState === 1) sock.send('{"type":"ping"}'); }, 25000);
+          };
+          sock.onmessage = function (event) { try { onEvent(JSON.parse(event.data)); } catch (err) {} };
+          sock.onclose = function (event) {
+            clearInterval(ping);
+            sock = null;
+            if (event.code === 4401 || event.code === 4403) return;
+            setTimeout(connect, retry);
+            retry = Math.min(retry * 2, 30000);
+          };
+        }
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState !== 'visible') return;
+          if (!sock) { retry = 1000; connect(); }
+          refreshCount();
+          if (pending) refreshList();
+        });
+        document.addEventListener('focusout', function () { if (pending) setTimeout(refreshList, 300); });
+        connect();
       })();
     </script>
     {% block scripts %}{% endblock %}

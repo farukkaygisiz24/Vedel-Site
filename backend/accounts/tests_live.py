@@ -10,7 +10,7 @@ from django.urls import path
 
 from accounts.consumers import PortalConsumer
 from accounts.models import Customer
-from accounts.realtime import GROUP_SALES, GROUP_SERVICE, GROUP_STOCK, groups_for
+from accounts.realtime import GROUP_SALES, GROUP_SERVICE, GROUP_STOCK, groups_for, user_group
 from sales.models import Party, Sale
 
 IN_MEMORY = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
@@ -33,8 +33,11 @@ class LiveSocketTests(TransactionTestCase):
         return comm
 
     def test_groups_by_role(self):
-        self.assertEqual(groups_for(self.lead), [GROUP_SALES, GROUP_SERVICE, GROUP_STOCK])
-        self.assertEqual(groups_for(self.sales), [GROUP_SALES, GROUP_STOCK])
+        self.assertEqual(
+            groups_for(self.lead),
+            [user_group(self.lead.pk), GROUP_SALES, GROUP_SERVICE, GROUP_STOCK],
+        )
+        self.assertEqual(groups_for(self.sales), [user_group(self.sales.pk), GROUP_SALES, GROUP_STOCK])
 
     async def test_anonymous_rejected(self):
         from django.contrib.auth.models import AnonymousUser
@@ -67,6 +70,11 @@ class LiveSocketTests(TransactionTestCase):
         self.assertEqual(msg['actor'], self.lead.pk)
         self.assertEqual(msg['text'], 'Yeni satış: SALLIVE01')
         self.assertEqual(msg['id'], sale.pk)
+
+        # The sales user also gets a notification-center entry on their own channel.
+        note = await comm.receive_json_from(timeout=2)
+        self.assertEqual(note['kind'], 'notification')
+        self.assertEqual(note['notification']['title'], 'Yeni satış fişi · SALLIVE01')
 
         # A maintenance event goes to the service group only.
         await get_channel_layer().group_send(GROUP_SERVICE, {'type': 'live.event', 'kind': 'maintenance'})

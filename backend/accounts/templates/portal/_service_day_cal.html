@@ -51,11 +51,14 @@
     </div>
     <div class="day-jobs-list" data-day-list>
       {% for item in jobs %}
-      <a class="day-job" href="{{ item.get_absolute_url }}">
+      <a class="day-job {{ item.kind_class }}" href="{{ item.get_absolute_url }}">
         {% if item.time %}<time>{{ item.time|time:'H:i' }}</time>{% endif %}
         <div>
           <b>{{ item.party.display_name }}</b>
-          <small>{{ item.kind_label }} · {{ item.display_number }}{% if item.assignee_label %} · {{ item.assignee_label }}{% endif %}</small>
+          <small><span class="kind-tag {{ item.kind_class }}">{{ item.kind_label }}</span>{{ item.display_number }}{% if item.assignee_label %} · {{ item.assignee_label }}{% endif %}</small>
+          {% with device=item.device_summary area=item.area_label %}
+          {% if device != '—' or area %}<small class="day-job-sub">{% if device != '—' %}{{ device }}{% endif %}{% if device != '—' and area %} · {% endif %}{{ area }}</small>{% endif %}
+          {% endwith %}
         </div>
       </a>
       {% empty %}

@@ -475,6 +475,29 @@ class FieldServiceMaterialTests(TestCase):
             stock_qty=Decimal('4.00'),
             created_by=self.user,
         )
+        mount_cat, _ = Category.objects.get_or_create(
+            slug='klima-montaj-malzemesi',
+            defaults={'name': 'Klima Montaj Malzemesi', 'sku_prefix': 'KMM', 'created_by': self.user},
+        )
+        service_cat, _ = Category.objects.get_or_create(
+            slug='klima-servis',
+            defaults={'name': 'Klima Servis', 'sku_prefix': 'KS', 'created_by': self.user},
+        )
+        self.bracket = Product.objects.create(
+            sku='KMM-0100',
+            name='Askı konsolu',
+            category=mount_cat,
+            stock_qty=Decimal('10.00'),
+            created_by=self.user,
+        )
+        self.gas = Product.objects.create(
+            sku='KS-0100',
+            name='Gaz şarjı',
+            category=service_cat,
+            unit='KG',
+            sale_price=Decimal('900.00'),
+            created_by=self.user,
+        )
         self.job = Job.objects.create(
             number='SRV20990003',
             date=date.today(),
@@ -491,24 +514,27 @@ class FieldServiceMaterialTests(TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertContains(page, 'Kalemler')
         self.assertContains(page, 'Malzeme ekle')
-        self.assertContains(page, 'Depo')
+        self.assertContains(page, 'Montaj malzemesi ve servis')
         self.assertNotContains(page, 'Parça ekle')
         self.assertNotContains(page, 'İşçilik ekle')
         products = self.client.get(reverse('portal-field-products'), {'service': '1'})
         self.assertEqual(products.status_code, 200)
         rows = products.json()['results']
         skus = {item['sku'] for item in rows}
-        self.assertEqual(skus, {'STK-0100', 'KDM-0001'})
-        hose = next(item for item in rows if item['sku'] == 'KDM-0001')
-        self.assertEqual(hose['unit'], 'AD')
+        self.assertEqual(skus, {'KMM-0100', 'KS-0100'})
+        gas = next(item for item in rows if item['sku'] == 'KS-0100')
+        self.assertEqual(gas['unit'], 'KG')
+        self.assertTrue(gas['is_service'])
+        bracket = next(item for item in rows if item['sku'] == 'KMM-0100')
+        self.assertFalse(bracket['is_service'])
         saved = self.client.post(
             reverse('portal-field-job', kwargs={'number': self.job.number}),
             {
                 'action': 'save',
                 'field_lines_present': '1',
                 'kind': ['part'],
-                'product_id': [str(self.part.pk)],
-                'description': ['Yedek parça'],
+                'product_id': [str(self.bracket.pk)],
+                'description': ['Askı konsolu'],
                 'qty': ['2'],
                 'unit_price': ['100'],
                 'cost_price': [''],
@@ -519,8 +545,49 @@ class FieldServiceMaterialTests(TestCase):
         lines = list(JobLine.objects.filter(job=self.job).order_by('id'))
         self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0].kind, JobLine.KIND_PART)
-        self.assertEqual(lines[0].product_id, self.part.pk)
+        self.assertEqual(lines[0].product_id, self.bracket.pk)
         self.assertEqual(lines[0].qty, Decimal('2.00'))
+
+    def _field_post(self, rows):
+        post = QueryDict(mutable=True)
+        post.update({'action': 'save', 'field_lines_present': '1'})
+        post.setlist('kind', [row[0] for row in rows])
+        post.setlist('product_id', [str(row[1].pk) for row in rows])
+        post.setlist('description', [row[1].display_name for row in rows])
+        post.setlist('qty', [row[2] for row in rows])
+        post.setlist('unit_price', ['' for _ in rows])
+        post.setlist('cost_price', ['' for _ in rows])
+        post.setlist('vat_rate', ['' for _ in rows])
+        return post
+
+    def test_field_adds_service_work_as_labor_and_keeps_office_work(self):
+        office = JobLine.objects.create(
+            job=self.job, kind=JobLine.KIND_LABOR, product=self.gas, description='Bakım',
+            qty=Decimal('1'), unit_price=Decimal('1500'), vat_rate=Decimal('0'),
+            line_net=Decimal('1500'), line_vat=Decimal('0'), line_total=Decimal('1500'),
+        )
+        save_field_job(user=self.user, job=self.job, post=self._field_post([
+            ('labor', self.gas, '1,5'),
+            ('part', self.bracket, '2'),
+        ]))
+        labor = list(self.job.lines.filter(kind=JobLine.KIND_LABOR).order_by('id'))
+        self.assertEqual([line.pk for line in labor][:1], [office.pk])
+        self.assertEqual(len(labor), 2)
+        added = labor[1]
+        self.assertTrue(added.field_added)
+        self.assertEqual(added.qty, Decimal('1.50'))
+        self.assertEqual(added.unit_price, Decimal('900.00'))
+        self.assertFalse(JobLine.objects.get(pk=office.pk).field_added)
+        save_field_job(user=self.user, job=self.job, post=self._field_post([('part', self.bracket, '2')]))
+        self.assertEqual(list(self.job.lines.filter(kind=JobLine.KIND_LABOR).values_list('pk', flat=True)), [office.pk])
+
+    def test_field_rejects_non_service_labor_and_merkez_parts(self):
+        with self.assertRaisesMessage(ValueError, 'Servis işi bulunamadı.'):
+            save_field_job(user=self.user, job=self.job, post=self._field_post([('labor', self.bracket, '1')]))
+        with self.assertRaisesMessage(ValueError, 'Servis malzemesi bulunamadı.'):
+            save_field_job(user=self.user, job=self.job, post=self._field_post([('part', self.part, '1')]))
+        with self.assertRaisesMessage(ValueError, 'Servis malzemesi bulunamadı.'):
+            save_field_job(user=self.user, job=self.job, post=self._field_post([('part', self.gas, '1')]))
 
     def test_field_service_rejects_klima_category_products(self):
         post = QueryDict(mutable=True)
@@ -607,7 +674,7 @@ class FieldHomeRecentDoneTests(TestCase):
         self.client.force_login(self.user)
         page = self.client.get(reverse('portal-field'))
         self.assertEqual(page.status_code, 200)
-        self.assertContains(page, 'Yarın açık iş yok.')
+        self.assertContains(page, 'Önümüzdeki 2 haftada açık iş yok.')
         self.assertContains(page, 'Son tamamlanan')
         body = page.content.decode()
         recent = body.split('Son tamamlanan', 1)[1]
@@ -617,6 +684,71 @@ class FieldHomeRecentDoneTests(TestCase):
         self.assertNotIn('SRV20991100', recent)
         self.assertNotIn('SRV20991199', recent)
         self.assertLess(recent.find('SRV20991110'), recent.find('SRV20991114'))
+
+
+class ServiceScheduleBoardTests(TestCase):
+    def setUp(self):
+        self.lead = Customer.objects.create_user(
+            username='board-lead',
+            password='pass-word',
+            is_staff=True,
+            role=Customer.ROLE_SERVICE_LEAD,
+        )
+        self.party = Party.objects.create(
+            kind=Party.KIND_REAL,
+            number='PBOARD1',
+            first_name='Ayşe',
+            last_name='Takvim',
+            phone='05550001199',
+            city='Bursa',
+            district='Nilüfer',
+            created_by=self.lead,
+        )
+        self.today = timezone.localdate()
+
+    def _job(self, number, offset):
+        return Job.objects.create(
+            number=number,
+            date=self.today + timedelta(days=offset),
+            time=time(10, 0),
+            party=self.party,
+            status=Job.STATUS_OPEN,
+            assign_all=True,
+            created_by=self.lead,
+            updated_by=self.lead,
+        )
+
+    def test_stats_and_cards_show_kind_and_area(self):
+        self._job('SRV20990001', 0)
+        later = self._job('SRV20990002', 3)
+        self._job('SRV20990003', 9)
+        self._job('SRV20990004', -2)
+        self.client.force_login(self.lead)
+        page = self.client.get(reverse('portal-service'))
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.context['today_open'], 1)
+        self.assertEqual(page.context['next7_open'], 2)
+        self.assertEqual(len(page.context['missed']), 1)
+        self.assertContains(page, 'kind-tag is-service')
+        self.assertContains(page, 'Nilüfer / Bursa')
+        panel = page.context['day_panel']['days'].get(later.date.isoformat())
+        if panel is not None:
+            self.assertEqual(panel['jobs'][0]['area'], 'Nilüfer / Bursa')
+            self.assertEqual(panel['jobs'][0]['kind_class'], 'is-service')
+
+    def test_area_uses_party_district_and_city(self):
+        job = self._job('SRV20990005', 1)
+        self.assertEqual(job.area_label, 'Nilüfer / Bursa')
+        self.party.district = ''
+        self.party.city = ''
+        self.assertEqual(job.area_label, '')
+
+    def test_job_list_tags_overdue(self):
+        self._job('SRV20990006', -1)
+        self.client.force_login(self.lead)
+        page = self.client.get(reverse('portal-service-jobs'))
+        self.assertContains(page, 'status-tag is-overdue')
+        self.assertContains(page, 'sale-filter-opts is-five')
 
 
 class AssignAllFieldTests(TestCase):
@@ -755,11 +887,9 @@ class OfficeJobOpenTests(TestCase):
             sku_prefix='KS',
             created_by=self.lead,
         )
-        spare = Category.objects.create(
-            name='Yedek',
-            slug='yedek-parca',
-            sku_prefix='STK',
-            created_by=self.lead,
+        spare, _ = Category.objects.get_or_create(
+            slug=MOUNT_CATEGORY_SLUG,
+            defaults={'name': 'Klima Montaj Malzemesi', 'sku_prefix': 'KMM', 'created_by': self.lead},
         )
         self.labor = Product.objects.create(
             sku=SERVICE_LABOR_SKU,
@@ -1047,11 +1177,12 @@ class OfficeJobOpenTests(TestCase):
         labor = next(row for row in page.context['line_rows'] if row['kind'] == JobLine.KIND_LABOR)
         self.assertEqual(labor['unit'], 'AD')
         self.assertEqual(labor['description'], 'Demontaj - Montaj')
+        self.assertFalse(labor['field_added'])
         self.assertContains(page, 'mount-qty')
         products = self.client.get(reverse('portal-field-products'), {'service': '1'})
         skus = {item['sku'] for item in products.json()['results']}
-        self.assertNotIn(SERVICE_LABOR_SKU, skus)
-        self.assertNotIn('KS-0001', skus)
+        self.assertIn(SERVICE_LABOR_SKU, skus)
+        self.assertIn('KS-0001', skus)
         self.assertIn('STK-0200', skus)
 
     def test_submitted_jobs_stay_on_week_and_inbox(self):
@@ -2348,9 +2479,191 @@ class MaintenanceBellTests(TestCase):
         self.client.force_login(self.sales)
         self.assertNotEqual(self.client.get(reverse('portal-service-reminders-summary')).status_code, 200)
         page = self.client.get(reverse('portal-dashboard'))
-        self.assertNotContains(page, 'class="bell"')
+        self.assertContains(page, 'class="bell"')
         self.assertNotContains(page, 'Bakımlar</a>')
+        summary = self.client.get(reverse('portal-notifications-summary')).json()
+        self.assertIsNone(summary['maintenance'])
         self.client.force_login(self.lead)
         page = self.client.get(reverse('portal-dashboard'))
         self.assertContains(page, 'class="bell"')
         self.assertContains(page, reverse('portal-service-reminders'))
+
+
+class FieldCustomerArchiveTests(TestCase):
+    PNG = (
+        b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01'
+        b'\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00'
+        b'\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00\x05\x18\xd8N'
+        b'\x00\x00\x00\x00IEND\xaeB`\x82'
+    )
+
+    def setUp(self):
+        self.lead = Customer.objects.create_user(
+            username='archive-lead', password='pass-word', is_staff=True, role=Customer.ROLE_SERVICE_LEAD,
+        )
+        self.tech = Customer.objects.create_user(
+            username='archive-tech', password='pass-word', is_staff=True, role=Customer.ROLE_SERVICE,
+        )
+        self.other_tech = Customer.objects.create_user(
+            username='archive-tech2', password='pass-word', is_staff=True, role=Customer.ROLE_SERVICE,
+        )
+        self.sales_user = Customer.objects.create_user(
+            username='archive-sales', password='pass-word', is_staff=True, role=Customer.ROLE_SALES,
+        )
+        self.member = CrewMember.objects.create(
+            number='CRWARC1', first_name='Mehmet', last_name='Usta', phone='05551112233',
+            user=self.tech, created_by=self.lead,
+        )
+        CrewMember.objects.create(
+            number='CRWARC2', first_name='Ali', last_name='Saha', phone='05551112234',
+            user=self.other_tech, created_by=self.lead,
+        )
+        self.party = Party.objects.create(
+            kind=Party.KIND_REAL, number='CUSTC9101', first_name='Işıl', last_name='Kısa',
+            phone='05363128285', city='BURSA', district='NİLÜFER', address='29 EKİM MAH.',
+            created_by=self.lead,
+        )
+        self.other_party = Party.objects.create(
+            kind=Party.KIND_REAL, number='CUSTC9102', first_name='Veli', last_name='Başka',
+            phone='05550000000', created_by=self.lead,
+        )
+        category = Category.objects.create(
+            name='Klima Test', slug='klima-archive-test', sku_prefix='KAT', is_klima=True, created_by=self.lead,
+        )
+        self.split = Product.objects.create(
+            sku='KAT-0001', brand='Mitsubishi Heavy Industries', name='SRK35ZTL-W', category=category,
+            is_device=True, device_kind=Product.KIND_SPLIT, outdoor_name='SRC35ZTL-W', created_by=self.lead,
+        )
+        self.sale = self._sale('SAL20990101', self.party, total='48750.00')
+        self.mount_job = Job.objects.create(
+            number=self.sale.number, date=date(2026, 11, 13), party=self.party, sale=self.sale,
+            status=Job.STATUS_CLOSED, assignee=self.member, created_by=self.lead, updated_by=self.lead,
+        )
+        ensure_sold_packs(self.mount_job)
+        self.unit = JobSoldUnit.objects.get(job=self.mount_job)
+        self.unit.room = 'SALON'
+        self.unit.serial = 'İN-7788'
+        self.unit.save()
+        self.pack = self.unit.pack
+        self.pack.outdoor_serial = 'OUT-5566'
+        self.pack.save()
+        self.photo = JobSoldUnitPhoto.objects.create(
+            pack=self.pack, image=SimpleUploadedFile('a.png', self.PNG, content_type='image/png'), sort=0,
+        )
+        self.legacy = self._sale('SAL20990102', self.other_party, total='12000.00')
+        self.legacy.mount_phone = '0 (542) 772 48 11'
+        self.legacy.save(update_fields=['mount_phone'])
+        foreign = self._sale('SAL20990104', self.other_party, total='9000.00')
+        other_job = Job.objects.create(
+            number=foreign.number, date=date(2026, 10, 1), party=self.other_party, sale=foreign,
+            status=Job.STATUS_OPEN, created_by=self.lead, updated_by=self.lead,
+        )
+        self.other_photo = JobSoldUnitPhoto.objects.create(
+            pack=ensure_sold_packs(other_job)[0],
+            image=SimpleUploadedFile('b.png', self.PNG, content_type='image/png'), sort=0,
+        )
+        self.service = Sale.objects.create(
+            number='SAL20990103', date=date.today(), party=self.party, work_type=Sale.WORK_SERVICE,
+            vat_mode=Sale.VAT_NONE, created_by=self.lead, updated_by=self.lead,
+        )
+        self.history = Job.objects.create(
+            number='SRV20990101', date=date(2026, 11, 14), party=self.party, status=Job.STATUS_SUBMITTED,
+            assignee=self.member, notes='Gaz kontrolü', created_by=self.lead, updated_by=self.lead,
+        )
+
+    def _sale(self, number, party, total):
+        sale = Sale.objects.create(
+            number=number, date=date(2026, 11, 13), party=party, work_type=Sale.WORK_DEVICE,
+            vat_mode=Sale.VAT_PLUS, grand_total=Decimal(total), subtotal=Decimal(total),
+            created_by=self.lead, updated_by=self.lead,
+        )
+        SaleLine.objects.create(
+            sale=sale, product=self.split, qty=Decimal('1'), unit_price=Decimal(total),
+            cost_price=Decimal('0.00'), vat_rate=Decimal('20.00'), line_net=Decimal(total),
+            line_vat=Decimal('0.00'), line_total=Decimal(total),
+        )
+        return sale
+
+    def _list(self, q='', **headers):
+        return self.client.get(reverse('portal-field-customers'), {'q': q} if q else {}, **headers)
+
+    def _detail(self, sale, **params):
+        return self.client.get(reverse('portal-field-customer', kwargs={'number': sale.number}), params)
+
+    def test_field_user_opens_list_and_detail_without_money(self):
+        self.client.force_login(self.other_tech)
+        page = self._list('ı')
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, 'Işıl Kısa')
+        self.assertContains(page, 'Veli Başka')
+        self.assertNotContains(page, 'SAL20990103')
+        detail = self._detail(self.sale)
+        self.assertEqual(detail.status_code, 200)
+        for text in ('Işıl Kısa', 'Müşteri', 'SALON', 'İN-7788',
+                     'OUT-5566', '13.11.2026', 'Mehmet Usta', 'SRK35ZTL-W', 'Servis geçmişi', 'Gaz kontrolü'):
+            self.assertContains(detail, text)
+        for page_ in (page, detail):
+            for money in ('48.750', '48750', '₺', 'Kalan', 'Tahsilat', 'Ödeme'):
+                self.assertNotContains(page_, money)
+
+    def test_legacy_sale_without_mount_record(self):
+        self.client.force_login(self.tech)
+        detail = self._detail(self.legacy)
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, 'Montaj kaydı yok')
+        self.assertContains(detail, 'SRK35ZTL-W')
+        self.assertNotContains(detail, '12.000')
+
+    def test_sales_only_user_is_redirected(self):
+        self.client.force_login(self.sales_user)
+        self.assertEqual(self._list().status_code, 302)
+        self.assertEqual(self._detail(self.sale).status_code, 302)
+
+    def test_search_by_serial_name_and_phone(self):
+        self.client.force_login(self.tech)
+        for q in ('in-7788', 'İN-7788', 'out-5566', 'ışıl', 'IŞIL', 'kısa ışıl',
+                  '05363128285', '0536 312 82 85', '5363128285', '+90 536 312 82 85'):
+            page = self._list(q)
+            self.assertContains(page, 'Işıl Kısa', msg_prefix=q)
+            self.assertNotContains(page, 'Veli Başka', msg_prefix=q)
+        mount_phone = self._list('542 772 48')
+        self.assertContains(mount_phone, 'Veli Başka')
+        self.assertNotContains(mount_phone, 'Işıl Kısa')
+
+    def test_search_ignores_model_address_and_number(self):
+        self.client.force_login(self.tech)
+        for q in ('SRK35', 'nilüfer', 'SAL20990101'):
+            self.assertNotContains(self._list(q), 'data-customer-card', msg_prefix=q)
+
+    def test_list_waits_for_search(self):
+        self.client.force_login(self.tech)
+        page = self._list()
+        self.assertEqual(page.status_code, 200)
+        self.assertNotContains(page, 'data-customer-card')
+        self.assertContains(page, '>Ara</button>')
+        self.assertContains(page, 'Seri no, isim veya telefon')
+
+    def test_photos_open_for_any_field_user_but_only_for_that_sale(self):
+        self.client.force_login(self.other_tech)
+        detail = self._detail(self.sale)
+        self.assertContains(detail, f'group={self.pack.pk}&amp;photo={self.photo.pk}')
+        shot = self._detail(self.sale, group=self.pack.pk, photo=self.photo.pk)
+        self.assertEqual(shot.status_code, 200)
+        b''.join(shot.streaming_content)
+        foreign = self._detail(self.sale, group=self.other_photo.pack_id, photo=self.other_photo.pk)
+        self.assertEqual(foreign.status_code, 404)
+
+    def test_history_links_only_visible_jobs(self):
+        self.client.force_login(self.other_tech)
+        detail = self._detail(self.sale).content.decode()
+        self.assertIn('Gaz kontrolü', detail)
+        self.assertNotIn(self.history.get_field_url(), detail)
+        self.client.force_login(self.tech)
+        detail = self._detail(self.sale).content.decode()
+        self.assertIn(self.history.get_field_url(), detail)
+
+    def test_tab_is_in_field_nav(self):
+        self.client.force_login(self.tech)
+        home = self.client.get(reverse('portal-field'))
+        self.assertContains(home, reverse('portal-field-customers'))
+        self.assertContains(self._list(), 'class="is-on" href="%s"' % reverse('portal-field-customers'))
