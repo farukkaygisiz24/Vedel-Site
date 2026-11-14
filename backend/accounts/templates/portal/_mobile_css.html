@@ -2,6 +2,13 @@
       @media (max-width: 860px) {
         :root { --page-pad-x: 16px; }
 
+        html,
+        body,
+        .stage {
+          height: var(--app-h, 100dvh);
+          min-height: var(--app-h, 100dvh);
+        }
+
         body {
           grid-template-columns: minmax(0, 1fr);
           padding-left: env(safe-area-inset-left);
