@@ -5987,7 +5987,7 @@
         var shownKey = location.pathname + location.search;
         var filterAbort = null;
         var monthAbort = null;
-        var filterTimers = new WeakMap();
+        var searchTimer = null;
 
         function pathOf(href) {
           try {
@@ -6145,11 +6145,19 @@
           };
         }
 
+        // The search box the user is typing in may have moved on since the fetch began.
+        function liveSearchValue() {
+          var el = workspace.querySelector('input[type="search"][name="q"]');
+          return el ? el.value : null;
+        }
+
         function restoreSearchFocus(snap) {
           if (!snap) return;
           var el = workspace.querySelector('input[type="search"][name="q"]');
           if (!el) return;
           try {
+            // Keep what the user typed while the request was in flight.
+            if (snap.value != null && el.value !== snap.value) el.value = snap.value;
             el.focus();
             var len = el.value.length;
             var start = snap.start == null ? len : Math.min(snap.start, len);
@@ -6188,6 +6196,7 @@
           if (histMode === 'push') history.pushState({ portal: true }, title, url);
           else if (histMode === 'replace') history.replaceState({ portal: true }, title, url);
           window.portalSwapDay = null;
+          if (focusSnap) focusSnap = captureSearchFocus() || focusSnap;
           workspace.innerHTML = html;
           runScripts(workspace);
           initPortalDatepickers(workspace);
@@ -6296,6 +6305,13 @@
             })
             .then(function (text) {
               if (signal.aborted) return;
+              if (focusSnap) {
+                // User kept typing: this result is stale and a newer search is already queued.
+                var live = liveSearchValue();
+                var asked = '';
+                try { asked = new URL(url, location.href).searchParams.get('q') || ''; } catch (err) {}
+                if (live != null && live.trim() !== asked.trim()) return;
+              }
               var doc = new DOMParser().parseFromString(text, 'text/html');
               var next = doc.querySelector('.workspace');
               if (!next) throw new Error('nav');
@@ -6488,12 +6504,15 @@
           if (input.type !== 'search' || input.name !== 'q') return;
           var form = input.closest('[data-sale-filters]');
           if (!form) return;
-          var prev = filterTimers.get(form);
-          if (prev) window.clearTimeout(prev);
-          filterTimers.set(form, window.setTimeout(function () {
-            var href = filterUrlFromForm(form);
+          // One timer per page, not per form node: the form is re-rendered after each swap.
+          if (searchTimer) window.clearTimeout(searchTimer);
+          searchTimer = window.setTimeout(function () {
+            searchTimer = null;
+            var target = form.isConnected ? form : workspace.querySelector('[data-sale-filters]');
+            if (!target) return;
+            var href = filterUrlFromForm(target);
             openPage(href, false, { quiet: true, replace: true, focusSearch: true });
-          }, 320));
+          }, 320);
         });
 
         // ---- Narrow (icon) sidebar ----------------------------------------------------
