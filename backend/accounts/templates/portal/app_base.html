@@ -2182,6 +2182,13 @@
 
       .mount-act-list { margin-bottom: 28px; }
 
+      .workspace:has(> .mount-act-list) { overflow-x: hidden; }
+
+      .mount-act-card {
+        content-visibility: auto;
+        contain-intrinsic-size: auto 260px;
+      }
+
       .mount-act-card {
         --fis-pad: 22px;
         display: flex;
@@ -2274,10 +2281,6 @@
         flex: 0 1 auto;
       }
 
-      .mount-act-foot .mount-act-care {
-        margin-right: auto;
-      }
-
       .mount-act-care .field-label,
       .mount-act-date .field-label {
         display: block;
@@ -2350,9 +2353,24 @@
         min-width: var(--action-w);
       }
 
-      .mount-act-foot .hint {
+      .fis-card-foot.mount-act-foot {
+        align-items: flex-end;
+      }
+
+      .mount-act-foot .mount-act-date .device-serial,
+      .mount-act-foot .seg.is-mini span,
+      .fis-card-foot.mount-act-foot .btn {
+        height: 40px;
+      }
+
+      .mount-act-foot .mount-act-date .device-serial {
+        border-radius: 10px;
+      }
+
+      .mount-act-error {
         flex: 1 0 100%;
         margin: 0;
+        font-size: 13px;
         text-align: right;
         color: var(--danger);
       }
