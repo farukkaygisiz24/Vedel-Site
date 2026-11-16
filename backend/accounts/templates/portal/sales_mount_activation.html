@@ -20,7 +20,7 @@
   <p class="empty">Aktive edilecek satış kalmadı.</p>
   {% else %}
   {% for day in days %}
-  <p class="field-label">{{ day.date|date:'d.m.Y' }} · <span data-mount-count>{{ day.sales|length }}</span> satış</p>
+  <p class="field-label" data-mount-day>{{ day.date|date:'d.m.Y' }} · <span data-mount-count>{{ day.sales|length }}</span> satış</p>
   <div class="wait-list mount-act-list">
     {% for item in day.sales %}
     {% with sale=item.sale %}
@@ -104,7 +104,7 @@
           </div>
         </div>
         <button class="btn" type="submit">Aktif et</button>
-        <p class="hint is-err" data-mount-error hidden></p>
+        <p class="mount-act-error" data-mount-error hidden></p>
       </div>
     </form>
     {% endwith %}
@@ -116,12 +116,86 @@
 
   <script>
     (function () {
-      if (window.__mountActivate) return;
-      window.__mountActivate = true;
-      document.addEventListener('submit', function (event) {
+      if (typeof window.__mountActivate === 'function') {
+        document.removeEventListener('submit', window.__mountActivate, true);
+      }
+      var EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
+      function still() {
+        return !Element.prototype.animate ||
+          (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      }
+
+      function dayLabel(form) {
+        var label = form.parentElement.previousElementSibling;
+        return label && label.hasAttribute('data-mount-day') ? label : null;
+      }
+
+      function slideOut(form) {
+        if (still()) return Promise.resolve();
+        var targets = [form];
+        var label = dayLabel(form);
+        if (label && form.parentElement.querySelectorAll('[data-mount-activate]').length === 1) targets.push(label);
+        form.style.pointerEvents = 'none';
+        return Promise.all(targets.map(function (el) {
+          return el.animate(
+            [{ transform: 'translateX(0)', opacity: 1 }, { transform: 'translateX(60%)', opacity: 0 }],
+            { duration: 280, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' }
+          ).finished.catch(function () {});
+        }));
+      }
+
+      // Only what sits below the removed card and ends up on screen can move.
+      function movers(form) {
+        var all = document.querySelectorAll('[data-mount-activate], [data-mount-day], [data-mount-empty]');
+        var out = [];
+        var bottom = window.innerHeight + form.getBoundingClientRect().height + 80;
+        for (var i = 0; i < all.length; i++) {
+          var el = all[i];
+          if (el === form || !(form.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+          var top = el.getBoundingClientRect().top;
+          if (top > bottom) break;
+          out.push([el, top]);
+        }
+        return out;
+      }
+
+      function dropCard(form) {
+        var list = form.parentElement;
+        var label = dayLabel(form);
+        var scroller = form.closest('.workspace') || document.scrollingElement;
+        var moving = still() ? [] : movers(form);
+        scroller.style.overflowAnchor = 'none';
+        setTimeout(function () { scroller.style.overflowAnchor = ''; }, 400);
+        form.remove();
+        if (!list.querySelector('[data-mount-activate]')) {
+          list.remove();
+          if (label) label.remove();
+        } else if (label) {
+          var count = label.querySelector('[data-mount-count]');
+          if (count) count.textContent = list.querySelectorAll('[data-mount-activate]').length;
+        }
+        if (!document.querySelector('[data-mount-activate]')) {
+          var empty = document.querySelector('[data-mount-empty]');
+          if (empty) empty.hidden = false;
+        }
+        moving.forEach(function (pair) {
+          var el = pair[0];
+          if (!el.isConnected) return;
+          var shift = pair[1] - el.getBoundingClientRect().top;
+          if (Math.abs(shift) < 1) return;
+          el.animate(
+            [{ transform: 'translateY(' + shift + 'px)' }, { transform: 'translateY(0)' }],
+            { duration: 360, easing: EASE }
+          );
+        });
+      }
+
+      window.__mountActivate = function (event) {
         var form = event.target;
         if (!form.matches || !form.matches('[data-mount-activate]')) return;
         event.preventDefault();
+        event.stopPropagation();
         if (form.dataset.busy) return;
         var button = form.querySelector('button[type="submit"]');
         var error = form.querySelector('[data-mount-error]');
@@ -141,21 +215,8 @@
           })
           .then(function (data) {
             if (!data.ok) throw new Error(data.error || 'Kaydedilemedi, tekrar deneyin.');
-            var list = form.parentElement;
-            var label = list.previousElementSibling;
-            form.remove();
-            if (!list.querySelector('[data-mount-activate]')) {
-              list.remove();
-              if (label) label.remove();
-            } else if (label) {
-              var count = label.querySelector('[data-mount-count]');
-              if (count) count.textContent = list.querySelectorAll('[data-mount-activate]').length;
-            }
-            if (!document.querySelector('[data-mount-activate]')) {
-              var empty = document.querySelector('[data-mount-empty]');
-              if (empty) empty.hidden = false;
-            }
             if (window.portalToast) window.portalToast(data.toast);
+            return slideOut(form).then(function () { dropCard(form); });
           })
           .catch(function (err) {
             error.textContent = err.message;
@@ -165,7 +226,8 @@
             delete form.dataset.busy;
             button.disabled = false;
           });
-      });
+      };
+      document.addEventListener('submit', window.__mountActivate, true);
     })();
   </script>
 {% endblock %}
