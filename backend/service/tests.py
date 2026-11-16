@@ -2136,6 +2136,41 @@ class MountActivationBackfillTests(TestCase):
 
         self.assertEqual(device.next_due, add_months(sale.date, 9))
 
+    def test_activate_with_typed_mount_date(self):
+        from service.services import add_months
+
+        sale = self._past_sale()
+        key = sale_mount_preview_rows(sale)[0]['source_key']
+        mounted = sale.date + timedelta(days=5)
+        post = {
+            'interval_months': '6',
+            'mount_date': mounted.strftime('%d.%m.%Y'),
+            f'serial_{key}': 'in-date-1',
+            f'outdoor_{key}': 'out-date-1',
+        }
+        job = activate_sale_mount(sale=sale, user=self.lead, post=post)
+        self.assertEqual(job.date, mounted)
+        pack = job.sold_packs.get()
+        self.assertEqual(pack.last_serviced_on, mounted)
+        self.assertEqual(pack.next_due, add_months(mounted, 6))
+        self.assertEqual(job.device.last_serviced_on, mounted)
+        self.assertEqual(job.device.next_due, add_months(mounted, 6))
+        sale.refresh_from_db()
+        self.assertEqual(sale.date, mounted - timedelta(days=5))
+
+    def test_activate_rejects_bad_or_future_mount_date(self):
+        sale = self._past_sale()
+        key = sale_mount_preview_rows(sale)[0]['source_key']
+        base = {'interval_months': '12', f'serial_{key}': 'in-x', f'outdoor_{key}': 'out-x'}
+        for raw, message in (
+            ('31.02.2025', 'Montaj tarihi geçersiz'),
+            ('14-07', 'Montaj tarihi geçersiz'),
+            ((date.today() + timedelta(days=1)).strftime('%d.%m.%Y'), 'Montaj tarihi ileri bir gün olamaz'),
+        ):
+            with self.subTest(raw=raw), self.assertRaisesMessage(ValueError, message):
+                activate_sale_mount(sale=sale, user=self.lead, post={**base, 'mount_date': raw})
+        self.assertFalse(Job.objects.filter(sale=sale).exists())
+
     def test_activate_twice_rejected(self):
         sale = self._past_sale()
         rows = sale_mount_preview_rows(sale)
@@ -2157,6 +2192,25 @@ class MountActivationBackfillTests(TestCase):
         self.assertContains(page, sale.number)
         self.assertContains(page, 'Bakım aralığı')
         self.assertContains(page, 'value="12" checked')
+        self.assertContains(page, 'name="mount_date"')
+        self.assertContains(page, f'value="{sale.date:%d.%m.%Y}"')
+
+    def test_mount_activation_post_activates_and_redirects(self):
+        sale = self._past_sale()
+        key = sale_mount_preview_rows(sale)[0]['source_key']
+        self.client.force_login(self.lead)
+        response = self.client.post('/sales/mount-activation/', {
+            'sale_id': str(sale.pk),
+            'interval_months': '12',
+            f'serial_{key}': 'in-post-1',
+            f'outdoor_{key}': 'out-post-1',
+        }, follow=True)
+        self.assertRedirects(response, '/sales/mount-activation/')
+        toasts = [str(item) for item in response.context['messages']]
+        self.assertTrue(any(text.startswith(f'{sale.number} montajı aktif') for text in toasts), toasts)
+        job = Job.objects.get(sale=sale)
+        self.assertEqual(job.status, Job.STATUS_CLOSED)
+        self.assertEqual(job.sold_packs.get().units.get().serial, 'İN-POST-1')
 
 
 class CopperMountSummaryTests(TestCase):
