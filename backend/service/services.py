@@ -1613,14 +1613,32 @@ def _auto_assign_multi_indoors(job: Job) -> None:
         unit.save(update_fields=['pack'])
 
 
+def _parse_mount_date(raw, default: date) -> date:
+    text = str(raw or '').strip()
+    if not text:
+        return default
+    match = re.fullmatch(r'(\d{1,2})[./-](\d{1,2})[./-](\d{4})', text)
+    try:
+        if match:
+            day, month, year = (int(part) for part in match.groups())
+            when = date(year, month, day)
+        else:
+            when = date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError('Montaj tarihi geçersiz. Örnek: 14.07.2025') from exc
+    if when > timezone.localdate():
+        raise ValueError('Montaj tarihi ileri bir gün olamaz.')
+    return when
+
+
 @transaction.atomic
 def activate_sale_mount(*, sale: Sale, user, post) -> Job:
-    """Temporary backfill: create/close mount job on sale.date with serials + care interval."""
+    """Temporary backfill: create/close mount job on the typed mount day (sale.date if blank)."""
     existing = Job.objects.filter(sale=sale).first()
     if existing and existing.status == Job.STATUS_CLOSED:
         raise ValueError('Bu satış zaten aktif edilmiş.')
 
-    when = sale.date
+    when = _parse_mount_date(post.get('mount_date'), sale.date)
     if existing:
         job = existing
         job.date = when

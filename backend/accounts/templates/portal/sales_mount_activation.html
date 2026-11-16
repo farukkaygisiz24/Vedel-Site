@@ -7,7 +7,7 @@
   <div class="toolbar">
     <div>
       <h1>Eksik montaj</h1>
-      <p class="lead">Montaj tarihi satış günü olarak kilitli. Seri no ve bakım aralığını girip aktif edin.</p>
+      <p class="lead">Montaj tarihi satış günüyle gelir, gerekirse değiştirin. Bakım bu tarihten itibaren sayılır.</p>
     </div>
     <div class="toolbar-actions">
       <a class="btn is-ghost" href="{% url 'portal-sales' %}">Satış listesi</a>
@@ -32,7 +32,7 @@
         <div>
           <p class="field-label">{{ sale.number }}</p>
           <div class="fis-name">{{ sale.party.display_name }}</div>
-          <p class="hint">Montaj {{ sale.date|date:'d.m.Y' }} · kilitli</p>
+          <p class="hint">Satış {{ sale.date|date:'d.m.Y' }}</p>
         </div>
         <a class="btn is-ghost" href="{{ sale.get_absolute_url }}">Fiş</a>
       </div>
@@ -77,6 +77,21 @@
       </div>
 
       <div class="fis-card-foot mount-act-foot">
+        <label class="mount-act-date">
+          <span class="field-label">Montaj tarihi</span>
+          <input
+            class="device-serial"
+            type="text"
+            name="mount_date"
+            value="{{ sale.date|date:'d.m.Y' }}"
+            placeholder="gg.aa.yyyy"
+            inputmode="numeric"
+            maxlength="10"
+            autocomplete="off"
+            data-mount-date
+            required
+          />
+        </label>
         <div class="mount-act-care">
           <p class="field-label">Bakım aralığı</p>
           <div class="seg is-mini" role="radiogroup" aria-label="Bakım aralığı">
@@ -96,4 +111,18 @@
   </div>
   {% endfor %}
   {% endif %}
+  <script>
+    (function () {
+      if (window.__mountDateMask) return;
+      window.__mountDateMask = true;
+      document.addEventListener('input', function (event) {
+        var input = event.target;
+        if (!input.matches || !input.matches('[data-mount-date]')) return;
+        if (event.inputType && event.inputType.indexOf('delete') === 0) return;
+        var digits = input.value.replace(/\D/g, '').slice(0, 8);
+        var parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean);
+        input.value = parts.join('.');
+      });
+    })();
+  </script>
 {% endblock %}

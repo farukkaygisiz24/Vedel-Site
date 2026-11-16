@@ -1046,7 +1046,7 @@ def mount_activation(request: HttpRequest) -> HttpResponse:
                 raise ValueError('Satış seçin.')
             sale = Sale.objects.select_related('party').get(pk=int(sale_id), work_type=Sale.WORK_DEVICE)
             job = activate_sale_mount(sale=sale, user=request.user, post=request.POST)
-            push_toast(request, f'{sale.number} montajı aktif · {job.device.name if job.device_id else "cihaz"}')
+            queue_toast(request, f'{sale.number} montajı aktif · {job.device.name if job.device_id else "cihaz"}')
             return redirect('portal-sales-mount-activation')
         except (ValueError, Sale.DoesNotExist) as exc:
             error = str(exc)
