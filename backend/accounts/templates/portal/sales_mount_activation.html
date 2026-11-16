@@ -1,5 +1,5 @@
 {% extends 'portal/app_base.html' %}
-{% load portal_fmt %}
+{% load portal_fmt static %}
 
 {% block title %}Montaj aktivasyon | Vedel Servis{% endblock %}
 
@@ -113,6 +113,14 @@
   {% endfor %}
   {% endif %}
   <p class="empty" data-mount-empty hidden>Aktive edilecek satış kalmadı.</p>
+  <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate.mp4' %}"></span>
+  <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-cat.mp4' %}"></span>
+  <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-man.mp4' %}"></span>
+  <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-dog.mp4' %}"></span>
+  <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip1.mp4' %}"></span>
+  <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip2.mp4' %}"></span>
+  <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip3.mp4' %}"></span>
+  <span hidden data-celebrate-media="photo" data-src="{% static 'portal/mount-celebrate.jpg' %}"></span>
 
   <script>
     (function () {
@@ -124,6 +132,119 @@
       function still() {
         return !Element.prototype.animate ||
           (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      }
+
+      // 20 activations per full reload get a random video/photo, never the same one twice in a row.
+      var CELEBRATE_TOTAL = 20;
+      var PHOTO_MS = 4000;
+      if (typeof window.__mountCelebrated !== 'number') window.__mountCelebrated = 0;
+
+      function celebratePop() {
+        var pop = document.getElementById('celebrate-pop');
+        if (pop && pop.querySelector('[data-celebrate-item]')) return pop;
+        if (pop) pop.remove();
+        var sources = document.querySelectorAll('[data-celebrate-media]');
+        if (!sources.length) return null;
+        pop = document.createElement('div');
+        pop.id = 'celebrate-pop';
+        pop.className = 'celebrate-pop';
+        pop.setAttribute('role', 'status');
+        pop.hidden = true;
+        pop.innerHTML = '<button type="button" aria-label="Kapat">×</button>' +
+          '<span class="fis-kicker">Tamamlandı</span><p></p>';
+        Array.prototype.forEach.call(sources, function (source) {
+          var media;
+          if (source.getAttribute('data-celebrate-media') === 'video') {
+            media = document.createElement('video');
+            media.playsInline = true;
+            media.preload = 'metadata';
+            media.addEventListener('ended', function () { hideCelebrate(pop); });
+          } else {
+            media = document.createElement('img');
+            media.alt = '';
+          }
+          media.src = source.getAttribute('data-src');
+          media.hidden = true;
+          media.setAttribute('data-celebrate-item', '');
+          pop.appendChild(media);
+        });
+        pop.querySelector('button').addEventListener('click', function () { hideCelebrate(pop); });
+        document.body.appendChild(pop);
+        return pop;
+      }
+
+      function stopVideos(pop) {
+        pop.querySelectorAll('video').forEach(function (video) { video.pause(); });
+      }
+
+      function hideCelebrate(pop) {
+        stopVideos(pop);
+        pop.classList.remove('is-on');
+        clearTimeout(pop._hide);
+        pop._hide = setTimeout(function () { pop.hidden = true; }, 300);
+      }
+
+      function celebrateItems(pop) {
+        return Array.prototype.slice.call(pop.querySelectorAll('[data-celebrate-item]'));
+      }
+
+      // The next pick is chosen ahead so only that one video is fully downloaded.
+      function queueNext(pop, current) {
+        var items = celebrateItems(pop);
+        var choices = items.filter(function (_, index) { return index !== current; });
+        if (!choices.length) choices = items;
+        var next = items.indexOf(choices[Math.floor(Math.random() * choices.length)]);
+        window.__mountCelebrateNext = next;
+        var media = items[next];
+        if (media.tagName === 'VIDEO' && media.preload !== 'auto') {
+          media.preload = 'auto';
+          media.load();
+        }
+      }
+
+      function pickMedia(pop) {
+        var items = celebrateItems(pop);
+        var index = window.__mountCelebrateNext;
+        if (typeof index !== 'number' || !items[index]) {
+          queueNext(pop, -1);
+          index = window.__mountCelebrateNext;
+        }
+        queueNext(pop, index);
+        return items[index];
+      }
+
+      function showCelebrate(text) {
+        if (window.__mountCelebrated >= CELEBRATE_TOTAL) return false;
+        var pop = celebratePop();
+        if (!pop) return false;
+        window.__mountCelebrated += 1;
+        clearTimeout(pop._hide);
+        stopVideos(pop);
+        pop.querySelector('p').textContent = text;
+        var items = celebrateItems(pop);
+        var media = pickMedia(pop);
+        items.forEach(function (item) { item.hidden = item !== media; });
+        pop.hidden = false;
+        if (media.tagName === 'VIDEO') {
+          media.currentTime = 0;
+          media.muted = false;
+          var playing = media.play();
+          if (playing && playing.catch) {
+            playing.catch(function () {
+              media.muted = true;
+              media.play().catch(function () {});
+            });
+          }
+        } else {
+          pop._hide = setTimeout(function () { hideCelebrate(pop); }, PHOTO_MS);
+        }
+        requestAnimationFrame(function () { pop.classList.add('is-on'); });
+        return true;
+      }
+
+      if (window.__mountCelebrated < CELEBRATE_TOTAL) {
+        var readyPop = celebratePop();
+        if (readyPop && typeof window.__mountCelebrateNext !== 'number') queueNext(readyPop, -1);
       }
 
       function dayLabel(form) {
@@ -215,7 +336,7 @@
           })
           .then(function (data) {
             if (!data.ok) throw new Error(data.error || 'Kaydedilemedi, tekrar deneyin.');
-            if (window.portalToast) window.portalToast(data.toast);
+            if (!showCelebrate(data.toast) && window.portalToast) window.portalToast(data.toast);
             return slideOut(form).then(function () { dropCard(form); });
           })
           .catch(function (err) {
