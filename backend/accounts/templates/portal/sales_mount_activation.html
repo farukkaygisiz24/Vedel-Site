@@ -121,6 +121,7 @@
   <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip2.mp4' %}"></span>
   <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip3.mp4' %}"></span>
   <span hidden data-celebrate-media="photo" data-src="{% static 'portal/mount-celebrate.jpg' %}"></span>
+  <span hidden data-mount-fly="{% static 'portal/mount-fly.webp' %}"></span>
 
   <script>
     (function () {
@@ -134,8 +135,8 @@
           (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       }
 
-      // 20 activations per full reload get a random video/photo, never the same one twice in a row.
-      var CELEBRATE_TOTAL = 20;
+      // 25 activations per full reload get a random video/photo, never the same one twice in a row.
+      var CELEBRATE_TOTAL = 25;
       var PHOTO_MS = 4000;
       if (typeof window.__mountCelebrated !== 'number') window.__mountCelebrated = 0;
 
@@ -178,6 +179,7 @@
       }
 
       function hideCelebrate(pop) {
+        flyHide(0);
         stopVideos(pop);
         pop.classList.remove('is-on');
         clearTimeout(pop._hide);
@@ -240,6 +242,46 @@
         }
         requestAnimationFrame(function () { pop.classList.add('is-on'); });
         return true;
+      }
+
+      // Every activation: the photo rises from the bottom-left to mid-screen and stays
+      // as long as the notification does, then slides up and out.
+      var TOAST_MS = 3000;
+      var flySource = document.querySelector('[data-mount-fly]');
+      var flySrc = flySource ? flySource.getAttribute('data-mount-fly') : '';
+      if (flySrc) new Image().src = flySrc;
+
+      function flyShow() {
+        if (!flySrc || still()) return;
+        clearTimeout(window.__mountFlyTimer);
+        var current = window.__mountFlyEl;
+        if (current && current.isConnected && !current._leaving) return;
+        var img = document.createElement('img');
+        img.className = 'mount-fly';
+        img.alt = '';
+        img.src = flySrc;
+        document.body.appendChild(img);
+        window.__mountFlyEl = img;
+        img.animate(
+          [{ transform: 'translate(-110%, 100%)' }, { transform: 'translate(0, 0)' }],
+          { duration: 840, easing: EASE, fill: 'forwards' }
+        );
+      }
+
+      function flyHide(delay) {
+        clearTimeout(window.__mountFlyTimer);
+        window.__mountFlyTimer = setTimeout(function () {
+          var img = window.__mountFlyEl;
+          if (!img || img._leaving) return;
+          img._leaving = true;
+          img.animate(
+            [{ transform: 'translate(0, 0)' }, { transform: 'translate(0, -105vh)' }],
+            { duration: 960, easing: 'cubic-bezier(0.55, 0, 0.75, 0.2)', fill: 'forwards' }
+          ).finished.catch(function () {}).then(function () {
+            img.remove();
+            if (window.__mountFlyEl === img) window.__mountFlyEl = null;
+          });
+        }, delay || 0);
       }
 
       if (window.__mountCelebrated < CELEBRATE_TOTAL) {
@@ -336,7 +378,11 @@
           })
           .then(function (data) {
             if (!data.ok) throw new Error(data.error || 'Kaydedilemedi, tekrar deneyin.');
-            if (!showCelebrate(data.toast) && window.portalToast) window.portalToast(data.toast);
+            flyShow();
+            if (!showCelebrate(data.toast)) {
+              if (window.portalToast) window.portalToast(data.toast);
+              flyHide(TOAST_MS);
+            }
             return slideOut(form).then(function () { dropCard(form); });
           })
           .catch(function (err) {
