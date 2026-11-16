@@ -1613,19 +1613,34 @@ def _auto_assign_multi_indoors(job: Job) -> None:
         unit.save(update_fields=['pack'])
 
 
-def _parse_mount_date(raw, default: date) -> date:
+def parse_typed_date(raw, *, label: str) -> date:
+    """gg.aa.yyyy as typed in the portal (also accepts ISO)."""
     text = str(raw or '').strip()
-    if not text:
-        return default
     match = re.fullmatch(r'(\d{1,2})[./-](\d{1,2})[./-](\d{4})', text)
     try:
         if match:
             day, month, year = (int(part) for part in match.groups())
-            when = date(year, month, day)
-        else:
-            when = date.fromisoformat(text)
+            return date(year, month, day)
+        return date.fromisoformat(text)
     except ValueError as exc:
-        raise ValueError('Montaj tarihi geçersiz. Örnek: 14.07.2025') from exc
+        raise ValueError(f'{label} geçersiz. Örnek: 14.07.2025') from exc
+
+
+def set_device_reminder(*, device: Device, raw, note='') -> Device:
+    """Next care reminder on a customer-requested day; the next closed job restarts the cycle."""
+    when = parse_typed_date(raw, label='Hatırlatma tarihi')
+    if when < timezone.localdate() and when != device.next_due:
+        raise ValueError('Hatırlatma tarihi geçmiş olamaz.')
+    device.next_due = when
+    device.reminder_note = str(note or '').strip()
+    device.save(update_fields=['next_due', 'reminder_note', 'updated_at'])
+    return device
+
+
+def _parse_mount_date(raw, default: date) -> date:
+    if not str(raw or '').strip():
+        return default
+    when = parse_typed_date(raw, label='Montaj tarihi')
     if when > timezone.localdate():
         raise ValueError('Montaj tarihi ileri bir gün olamaz.')
     return when
@@ -2164,9 +2179,12 @@ def missed_jobs(today: date | None = None):
 
 
 def due_maintenance(today: date | None = None, window: int = MAINTENANCE_WINDOW_DAYS):
-    """Devices whose next care date is overdue or within `window` days."""
-    from service.models import Device
+    """Devices whose next care date is overdue or within `window` days and have no unfinished job."""
+    from service.models import Device, Job
 
     today = today or timezone.localdate()
-    return Device.objects.filter(next_due__isnull=False, next_due__lte=today + timedelta(days=window))
+    busy = Job.objects.filter(device__isnull=False).exclude(status=Job.STATUS_CLOSED).values('device_id')
+    return Device.objects.filter(
+        next_due__isnull=False, next_due__lte=today + timedelta(days=window)
+    ).exclude(pk__in=busy)
 

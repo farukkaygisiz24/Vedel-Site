@@ -2285,6 +2285,62 @@
         min-width: 0;
       }
 
+      .reminder-actions {
+        display: inline-flex;
+        gap: 14px;
+      }
+
+      .reminder-form:not([hidden]) {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 6px;
+        min-width: 210px;
+        margin-top: 8px;
+      }
+
+      .reminder-form .device-serial {
+        width: 112px;
+      }
+
+      .reminder-form textarea.device-serial {
+        flex: 1 0 100%;
+        width: 100%;
+        height: auto;
+        min-height: 56px;
+        padding: 8px 10px;
+        resize: vertical;
+      }
+
+      .sale-sheet table.sheet th.reminder-note,
+      .sale-sheet table.sheet td.reminder-note {
+        text-align: left;
+      }
+
+      .reminder-actions {
+        white-space: nowrap;
+      }
+
+      .sheet td.reminder-note {
+        min-width: 160px;
+        max-width: 240px;
+        color: var(--secondary);
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .reminder-form .btn {
+        height: 36px;
+        padding: 0 14px;
+      }
+
+      .reminder-form .hint {
+        flex: 1 0 100%;
+        margin: 0;
+        text-align: right;
+        color: var(--danger);
+      }
+
       .mount-act-foot .btn {
         flex: 0 0 auto;
         min-width: var(--action-w);
@@ -5285,6 +5341,15 @@
           closePortalDatepickers();
         });
         initPortalDatepickers(document);
+
+        // Typed gg.aa.yyyy fields: digits only, dots added as you type.
+        document.addEventListener('input', function (event) {
+          var input = event.target;
+          if (!input.matches || !input.matches('[data-date-mask]')) return;
+          if (event.inputType && event.inputType.indexOf('delete') === 0) return;
+          var digits = input.value.replace(/\D/g, '').slice(0, 8);
+          input.value = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('.');
+        });
 
         function clearPickPopPlace(root, pop) {
           if (root) root.classList.remove('is-up');

@@ -44,6 +44,7 @@ from .services import (
     sale_line_is_device,
     save_field_job,
     save_job,
+    set_device_reminder,
     copper_mount_summary,
     sold_unit_groups,
     unassigned_sold_units,
@@ -960,8 +961,24 @@ def reminders_summary(request: HttpRequest) -> JsonResponse:
 
 
 @role_required(Customer.ROLE_SERVICE_LEAD)
+@require_http_methods(['GET', 'POST'])
 def reminders(request: HttpRequest) -> HttpResponse:
     today = timezone.localdate()
+    error = ''
+    error_device = None
+    if request.method == 'POST':
+        device_id = str(request.POST.get('device_id', '')).strip()
+        device = get_object_or_404(Device, pk=int(device_id) if device_id.isdigit() else 0)
+        try:
+            set_device_reminder(
+                device=device, raw=request.POST.get('next_due'), note=request.POST.get('reminder_note', '')
+            )
+        except ValueError as exc:
+            error = str(exc)
+            error_device = device.pk
+        else:
+            queue_toast(request, f'{device.name} · sonraki bakım {device.next_due:%d.%m.%Y}')
+            return redirect('portal-service-reminders')
     qs = (
         due_maintenance(today, REMINDER_WINDOW_DAYS)
         .select_related('party')
@@ -979,6 +996,10 @@ def reminders(request: HttpRequest) -> HttpResponse:
         _ctx(
             devices=page_obj.object_list,
             today=today,
+            error=error,
+            error_device=error_device,
+            posted_due=str(request.POST.get('next_due', '')).strip(),
+            posted_note=str(request.POST.get('reminder_note', '')).strip(),
             empty_copy='Yaklaşan bakım yok.' if not paginator.count else '',
             **_page_nav(paginator, page_obj, {}),
         ),
