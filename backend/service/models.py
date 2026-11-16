@@ -33,6 +33,7 @@ class Device(models.Model):
     )
     last_serviced_on = models.DateField('Son bakım', null=True, blank=True)
     next_due = models.DateField('Sonraki bakım', null=True, blank=True)
+    reminder_note = models.TextField('Hatırlatma notu', blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

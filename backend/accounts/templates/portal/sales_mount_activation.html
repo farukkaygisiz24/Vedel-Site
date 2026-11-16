@@ -88,7 +88,7 @@
             inputmode="numeric"
             maxlength="10"
             autocomplete="off"
-            data-mount-date
+            data-date-mask
             required
           />
         </label>
@@ -111,18 +111,4 @@
   </div>
   {% endfor %}
   {% endif %}
-  <script>
-    (function () {
-      if (window.__mountDateMask) return;
-      window.__mountDateMask = true;
-      document.addEventListener('input', function (event) {
-        var input = event.target;
-        if (!input.matches || !input.matches('[data-mount-date]')) return;
-        if (event.inputType && event.inputType.indexOf('delete') === 0) return;
-        var digits = input.value.replace(/\D/g, '').slice(0, 8);
-        var parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean);
-        input.value = parts.join('.');
-      });
-    })();
-  </script>
 {% endblock %}

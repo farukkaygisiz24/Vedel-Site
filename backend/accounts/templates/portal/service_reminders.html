@@ -6,7 +6,7 @@
   <div class="toolbar">
     <div>
       <h1>Bakımlar</h1>
-      <p class="lead">Vadesi gelen ve geçen cihazlar. 14 günlük pencere.</p>
+      <p class="lead">Vadesi gelen ve geçen cihazlar. 14 günlük pencere. Müşteri başka gün isterse Tarih / not ile hatırlatmayı taşıyın, verilen fiyatı not düşün.</p>
     </div>
     <div class="toolbar-actions">
       <a class="btn is-ghost" href="{% url 'portal-service' %}">Hafta</a>
@@ -23,6 +23,7 @@
           <th>Aralık</th>
           <th>Son bakım</th>
           <th>Sonraki</th>
+          <th class="reminder-note">Not</th>
           <th></th>
         </tr>
       </thead>
@@ -34,13 +35,61 @@
           <td>{{ item.get_interval_months_display }}</td>
           <td>{% if item.last_serviced_on %}{{ item.last_serviced_on|date:'d.m.Y' }}{% else %}—{% endif %}</td>
           <td class="money{% if item.next_due < today %} is-over{% endif %}">{{ item.next_due|date:'d.m.Y' }}</td>
-          <td class="num"><a class="sheet-edit" href="{% url 'portal-service-job-new' %}?party={{ item.party_id }}&device={{ item.pk }}">İş aç</a></td>
+          <td class="reminder-note">{% if item.reminder_note %}{{ item.reminder_note|linebreaksbr }}{% else %}—{% endif %}</td>
+          <td class="num">
+            <div class="reminder-actions">
+              <button class="sheet-edit" type="button" data-reminder-toggle aria-expanded="{% if error_device == item.pk %}true{% else %}false{% endif %}">Tarih / not</button>
+              <a class="sheet-edit" href="{% url 'portal-service-job-new' %}?party={{ item.party_id }}&device={{ item.pk }}">İş aç</a>
+            </div>
+            <form method="post" class="reminder-form" data-reminder-form{% if error_device != item.pk %} hidden{% endif %}>
+              {% csrf_token %}
+              <input type="hidden" name="device_id" value="{{ item.pk }}" />
+              <input
+                class="device-serial"
+                type="text"
+                name="next_due"
+                value="{% if error_device == item.pk %}{{ posted_due }}{% else %}{{ item.next_due|date:'d.m.Y' }}{% endif %}"
+                placeholder="gg.aa.yyyy"
+                aria-label="Yeni bakım tarihi"
+                inputmode="numeric"
+                maxlength="10"
+                autocomplete="off"
+                data-date-mask
+                required
+              />
+              <button class="btn" type="submit">Kaydet</button>
+              <textarea
+                class="device-serial"
+                name="reminder_note"
+                rows="2"
+                maxlength="500"
+                placeholder="Not: verilen fiyat, görüşme…"
+                aria-label="Hatırlatma notu"
+              >{% if error_device == item.pk %}{{ posted_note }}{% else %}{{ item.reminder_note }}{% endif %}</textarea>
+              {% if error_device == item.pk %}<p class="hint is-err" role="alert">{{ error }}</p>{% endif %}
+            </form>
+          </td>
         </tr>
         {% empty %}
-        <tr><td colspan="6" class="empty">{{ empty_copy }}</td></tr>
+        <tr><td colspan="7" class="empty">{{ empty_copy }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% include 'portal/_pager.html' %}
+  <script>
+    (function () {
+      if (window.__reminderToggle) return;
+      window.__reminderToggle = true;
+      document.addEventListener('click', function (event) {
+        var toggle = event.target.closest && event.target.closest('[data-reminder-toggle]');
+        if (!toggle) return;
+        var form = toggle.closest('td').querySelector('[data-reminder-form]');
+        if (!form) return;
+        form.hidden = !form.hidden;
+        toggle.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
+        if (!form.hidden) form.querySelector('[data-date-mask]').focus();
+      });
+    })();
+  </script>
 {% endblock %}

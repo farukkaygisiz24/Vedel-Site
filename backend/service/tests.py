@@ -2512,7 +2512,7 @@ class MaintenanceBellTests(TestCase):
             username='bell-sales', password='pass-word', is_staff=True, role=Customer.ROLE_SALES
         )
         party = Party.objects.create(
-            kind=Party.KIND_REAL, number='CUSTBELL1', first_name='Bell', last_name='Test',
+            kind=Party.KIND_REAL, number='CUSTC889901', first_name='Bell', last_name='Test',
             phone='05550009988', address='Test', created_by=self.lead,
         )
         today = timezone.localdate()
@@ -2529,6 +2529,23 @@ class MaintenanceBellTests(TestCase):
         self.assertEqual([item['device'] for item in data['items']], ['Geciken', 'Yakın'])
         self.assertTrue(data['items'][0]['overdue'])
 
+    def test_device_with_unfinished_job_leaves_reminders(self):
+        device = Device.objects.get(name='Geciken')
+        job = Job.objects.create(
+            number='SRV20990001', date=timezone.localdate(), party=device.party, device=device,
+            status=Job.STATUS_OPEN, created_by=self.lead, updated_by=self.lead,
+        )
+        self.client.force_login(self.lead)
+        for status in (Job.STATUS_PENDING, Job.STATUS_OPEN, Job.STATUS_SUBMITTED):
+            with self.subTest(status=status):
+                Job.objects.filter(pk=job.pk).update(status=status)
+                data = self.client.get(reverse('portal-service-reminders-summary')).json()
+                self.assertEqual([item['device'] for item in data['items']], ['Yakın'])
+                self.assertNotContains(self.client.get(reverse('portal-service-reminders')), '>Geciken<')
+        job.delete()
+        data = self.client.get(reverse('portal-service-reminders-summary')).json()
+        self.assertEqual([item['device'] for item in data['items']], ['Geciken', 'Yakın'])
+
     def test_summary_lead_only_and_bell_render(self):
         self.client.force_login(self.sales)
         self.assertNotEqual(self.client.get(reverse('portal-service-reminders-summary')).status_code, 200)
@@ -2541,6 +2558,77 @@ class MaintenanceBellTests(TestCase):
         page = self.client.get(reverse('portal-dashboard'))
         self.assertContains(page, 'class="bell"')
         self.assertContains(page, reverse('portal-service-reminders'))
+
+    def test_reminders_page_offers_new_date(self):
+        self.client.force_login(self.lead)
+        page = self.client.get(reverse('portal-service-reminders'))
+        self.assertContains(page, 'name="next_due"')
+        self.assertContains(page, 'name="reminder_note"')
+        self.assertContains(page, 'Tarih / not')
+
+    def test_reminder_note_saved_and_shown(self):
+        device = Device.objects.get(name='Yakın')
+        self.client.force_login(self.lead)
+        response = self.client.post(reverse('portal-service-reminders'), {
+            'device_id': str(device.pk),
+            'next_due': device.next_due.strftime('%d.%m.%Y'),
+            'reminder_note': '  Bakım + gaz için 4.500 ₺ fiyat verildi  ',
+        }, follow=True)
+        device.refresh_from_db()
+        self.assertEqual(device.reminder_note, 'Bakım + gaz için 4.500 ₺ fiyat verildi')
+        self.assertContains(response, 'Bakım + gaz için 4.500 ₺ fiyat verildi')
+
+    def test_overdue_note_only_edit_keeps_date(self):
+        device = Device.objects.get(name='Geciken')
+        due = device.next_due
+        self.client.force_login(self.lead)
+        self.client.post(reverse('portal-service-reminders'), {
+            'device_id': str(device.pk), 'next_due': due.strftime('%d.%m.%Y'), 'reminder_note': 'Aradım, açmadı',
+        })
+        device.refresh_from_db()
+        self.assertEqual((device.next_due, device.reminder_note), (due, 'Aradım, açmadı'))
+
+    def test_set_custom_reminder_date(self):
+        device = Device.objects.get(name='Geciken')
+        later = timezone.localdate() + timedelta(days=120)
+        self.client.force_login(self.lead)
+        response = self.client.post(reverse('portal-service-reminders'), {
+            'device_id': str(device.pk), 'next_due': later.strftime('%d.%m.%Y'),
+        }, follow=True)
+        self.assertRedirects(response, reverse('portal-service-reminders'))
+        device.refresh_from_db()
+        self.assertEqual(device.next_due, later)
+        self.assertEqual(device.interval_months, 6)
+        toasts = [str(item) for item in response.context['messages']]
+        self.assertIn(f'Geciken · sonraki bakım {later:%d.%m.%Y}', toasts)
+        self.assertNotContains(response, '>Geciken<')
+
+    def test_custom_reminder_rejects_past_and_bad_dates(self):
+        device = Device.objects.get(name='Yakın')
+        before = device.next_due
+        self.client.force_login(self.lead)
+        for raw, message in (
+            ((timezone.localdate() - timedelta(days=1)).strftime('%d.%m.%Y'), 'Hatırlatma tarihi geçmiş olamaz.'),
+            ('31.02.2027', 'Hatırlatma tarihi geçersiz'),
+        ):
+            with self.subTest(raw=raw):
+                page = self.client.post(reverse('portal-service-reminders'), {
+                    'device_id': str(device.pk), 'next_due': raw,
+                })
+                self.assertEqual(page.status_code, 200)
+                self.assertContains(page, message)
+        device.refresh_from_db()
+        self.assertEqual(device.next_due, before)
+
+    def test_custom_reminder_is_lead_only(self):
+        device = Device.objects.get(name='Yakın')
+        before = device.next_due
+        self.client.force_login(self.sales)
+        self.client.post(reverse('portal-service-reminders'), {
+            'device_id': str(device.pk), 'next_due': '01.04.2099',
+        })
+        device.refresh_from_db()
+        self.assertEqual(device.next_due, before)
 
 
 class FieldCustomerArchiveTests(TestCase):
