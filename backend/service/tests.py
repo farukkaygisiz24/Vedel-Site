@@ -2194,6 +2194,7 @@ class MountActivationBackfillTests(TestCase):
         self.assertContains(page, 'value="12" checked')
         self.assertContains(page, 'name="mount_date"')
         self.assertContains(page, f'value="{sale.date:%d.%m.%Y}"')
+        self.assertContains(page, 'data-celebrate-media="audio" data-src="/static/portal/sounds/')
 
     def test_mount_activation_post_activates_and_redirects(self):
         sale = self._past_sale()

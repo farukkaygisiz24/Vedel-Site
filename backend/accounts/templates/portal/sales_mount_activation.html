@@ -120,6 +120,10 @@
   <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip1.mp4' %}"></span>
   <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip2.mp4' %}"></span>
   <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip3.mp4' %}"></span>
+  <span hidden data-celebrate-media="video" data-src="{% static 'portal/mount-celebrate-clip4.mp4' %}"></span>
+  {% for sound in celebrate_sounds %}
+  <span hidden data-celebrate-media="audio" data-src="{% static sound %}"></span>
+  {% endfor %}
   <span hidden data-celebrate-media="photo" data-src="{% static 'portal/mount-celebrate.jpg' %}"></span>
   <span hidden data-mount-fly="{% static 'portal/mount-fly.webp' %}"></span>
 
@@ -135,16 +139,14 @@
           (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       }
 
-      // 25 activations per full reload get a random video/photo, never the same one twice in a row.
-      var CELEBRATE_TOTAL = 25;
+      // Every activation gets a random video/sound/photo, never the same one twice in a row.
       var PHOTO_MS = 4000;
-      if (typeof window.__mountCelebrated !== 'number') window.__mountCelebrated = 0;
 
       function celebratePop() {
         var pop = document.getElementById('celebrate-pop');
-        if (pop && pop.querySelector('[data-celebrate-item]')) return pop;
-        if (pop) pop.remove();
         var sources = document.querySelectorAll('[data-celebrate-media]');
+        if (pop && (!sources.length || pop.querySelectorAll('[data-celebrate-item]').length === sources.length)) return pop;
+        if (pop) pop.remove();
         if (!sources.length) return null;
         pop = document.createElement('div');
         pop.id = 'celebrate-pop';
@@ -155,11 +157,16 @@
           '<span class="fis-kicker">Tamamlandı</span><p></p>';
         Array.prototype.forEach.call(sources, function (source) {
           var media;
-          if (source.getAttribute('data-celebrate-media') === 'video') {
+          var kind = source.getAttribute('data-celebrate-media');
+          if (kind === 'video') {
             media = document.createElement('video');
             media.playsInline = true;
             media.preload = 'metadata';
             media.addEventListener('ended', function () { hideCelebrate(pop); });
+          } else if (kind === 'audio') {
+            media = document.createElement('audio');
+            media.preload = 'metadata';
+            media.addEventListener('ended', function () { hideAfterMinimum(pop); });
           } else {
             media = document.createElement('img');
             media.alt = '';
@@ -175,7 +182,15 @@
       }
 
       function stopVideos(pop) {
-        pop.querySelectorAll('video').forEach(function (video) { video.pause(); });
+        pop.querySelectorAll('video, audio').forEach(function (media) { media.pause(); });
+      }
+
+      // Short sounds keep the box up for at least TOAST_MS.
+      function hideAfterMinimum(pop) {
+        var left = TOAST_MS - (Date.now() - (pop._shownAt || 0));
+        clearTimeout(pop._hide);
+        if (left > 0) pop._hide = setTimeout(function () { hideCelebrate(pop); }, left);
+        else hideCelebrate(pop);
       }
 
       function hideCelebrate(pop) {
@@ -190,7 +205,7 @@
         return Array.prototype.slice.call(pop.querySelectorAll('[data-celebrate-item]'));
       }
 
-      // The next pick is chosen ahead so only that one video is fully downloaded.
+      // The next pick is chosen ahead so only that one file is fully downloaded.
       function queueNext(pop, current) {
         var items = celebrateItems(pop);
         var choices = items.filter(function (_, index) { return index !== current; });
@@ -198,7 +213,7 @@
         var next = items.indexOf(choices[Math.floor(Math.random() * choices.length)]);
         window.__mountCelebrateNext = next;
         var media = items[next];
-        if (media.tagName === 'VIDEO' && media.preload !== 'auto') {
+        if ((media.tagName === 'VIDEO' || media.tagName === 'AUDIO') && media.preload !== 'auto') {
           media.preload = 'auto';
           media.load();
         }
@@ -216,18 +231,22 @@
       }
 
       function showCelebrate(text) {
-        if (window.__mountCelebrated >= CELEBRATE_TOTAL) return false;
         var pop = celebratePop();
         if (!pop) return false;
-        window.__mountCelebrated += 1;
         clearTimeout(pop._hide);
         stopVideos(pop);
         pop.querySelector('p').textContent = text;
         var items = celebrateItems(pop);
         var media = pickMedia(pop);
-        items.forEach(function (item) { item.hidden = item !== media; });
+        var shown = media.tagName === 'AUDIO' ? pop.querySelector('img[data-celebrate-item]') : media;
+        items.forEach(function (item) { item.hidden = item !== shown; });
         pop.hidden = false;
-        if (media.tagName === 'VIDEO') {
+        pop._shownAt = Date.now();
+        if (media.tagName === 'AUDIO') {
+          media.currentTime = 0;
+          var sounding = media.play();
+          if (sounding && sounding.catch) sounding.catch(function () { hideAfterMinimum(pop); });
+        } else if (media.tagName === 'VIDEO') {
           media.currentTime = 0;
           media.muted = false;
           var playing = media.play();
@@ -284,10 +303,8 @@
         }, delay || 0);
       }
 
-      if (window.__mountCelebrated < CELEBRATE_TOTAL) {
-        var readyPop = celebratePop();
-        if (readyPop && typeof window.__mountCelebrateNext !== 'number') queueNext(readyPop, -1);
-      }
+      var readyPop = celebratePop();
+      if (readyPop && typeof window.__mountCelebrateNext !== 'number') queueNext(readyPop, -1);
 
       function dayLabel(form) {
         var label = form.parentElement.previousElementSibling;

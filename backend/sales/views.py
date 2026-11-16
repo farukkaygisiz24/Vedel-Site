@@ -12,7 +12,7 @@ from django.views.decorators.http import require_http_methods
 
 from accounts.http import role_required, stock_scope
 from accounts.models import Customer
-from accounts.portal import _wants_json
+from accounts.portal import STATIC_PORTAL, _wants_json
 from accounts.search import q_search
 from accounts.toasts import queue_toast
 from accounts.weather import get_weather
@@ -1061,6 +1061,7 @@ def mount_activation(request: HttpRequest) -> HttpResponse:
         _ctx(
             days=_missing_mount_days(),
             care_intervals=[(3, '3 ay'), (6, '6 ay'), (9, '9 ay'), (12, '12 ay')],
+            celebrate_sounds=[f'portal/sounds/{p.name}' for p in sorted((STATIC_PORTAL / 'sounds').glob('*.mp3'))],
             error=error,
         ),
     )
