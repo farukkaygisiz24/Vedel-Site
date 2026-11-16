@@ -20,11 +20,11 @@
   <p class="empty">Aktive edilecek satış kalmadı.</p>
   {% else %}
   {% for day in days %}
-  <p class="field-label">{{ day.date|date:'d.m.Y' }} · {{ day.sales|length }} satış</p>
+  <p class="field-label">{{ day.date|date:'d.m.Y' }} · <span data-mount-count>{{ day.sales|length }}</span> satış</p>
   <div class="wait-list mount-act-list">
     {% for item in day.sales %}
     {% with sale=item.sale %}
-    <form method="post" class="fis-card mount-act-card" autocomplete="off">
+    <form method="post" class="fis-card mount-act-card" autocomplete="off" data-mount-activate>
       {% csrf_token %}
       <input type="hidden" name="sale_id" value="{{ sale.pk }}" />
 
@@ -104,6 +104,7 @@
           </div>
         </div>
         <button class="btn" type="submit">Aktif et</button>
+        <p class="hint is-err" data-mount-error hidden></p>
       </div>
     </form>
     {% endwith %}
@@ -111,4 +112,60 @@
   </div>
   {% endfor %}
   {% endif %}
+  <p class="empty" data-mount-empty hidden>Aktive edilecek satış kalmadı.</p>
+
+  <script>
+    (function () {
+      if (window.__mountActivate) return;
+      window.__mountActivate = true;
+      document.addEventListener('submit', function (event) {
+        var form = event.target;
+        if (!form.matches || !form.matches('[data-mount-activate]')) return;
+        event.preventDefault();
+        if (form.dataset.busy) return;
+        var button = form.querySelector('button[type="submit"]');
+        var error = form.querySelector('[data-mount-error]');
+        form.dataset.busy = '1';
+        button.disabled = true;
+        error.hidden = true;
+        fetch(form.action || location.href, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin',
+        })
+          .then(function (response) {
+            return response.json().catch(function () {
+              return { ok: false, error: 'Kaydedilemedi, tekrar deneyin.' };
+            });
+          })
+          .then(function (data) {
+            if (!data.ok) throw new Error(data.error || 'Kaydedilemedi, tekrar deneyin.');
+            var list = form.parentElement;
+            var label = list.previousElementSibling;
+            form.remove();
+            if (!list.querySelector('[data-mount-activate]')) {
+              list.remove();
+              if (label) label.remove();
+            } else if (label) {
+              var count = label.querySelector('[data-mount-count]');
+              if (count) count.textContent = list.querySelectorAll('[data-mount-activate]').length;
+            }
+            if (!document.querySelector('[data-mount-activate]')) {
+              var empty = document.querySelector('[data-mount-empty]');
+              if (empty) empty.hidden = false;
+            }
+            if (window.portalToast) window.portalToast(data.toast);
+          })
+          .catch(function (err) {
+            error.textContent = err.message;
+            error.hidden = false;
+          })
+          .then(function () {
+            delete form.dataset.busy;
+            button.disabled = false;
+          });
+      });
+    })();
+  </script>
 {% endblock %}

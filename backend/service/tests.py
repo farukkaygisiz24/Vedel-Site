@@ -2212,6 +2212,28 @@ class MountActivationBackfillTests(TestCase):
         self.assertEqual(job.status, Job.STATUS_CLOSED)
         self.assertEqual(job.sold_packs.get().units.get().serial, 'İN-POST-1')
 
+    def test_mount_activation_json_stays_on_page(self):
+        sale = self._past_sale()
+        key = sale_mount_preview_rows(sale)[0]['source_key']
+        self.client.force_login(self.lead)
+        bad = self.client.post('/sales/mount-activation/', {
+            'sale_id': str(sale.pk), 'interval_months': '12', 'mount_date': '31.02.2025',
+            f'serial_{key}': 'in-json-1', f'outdoor_{key}': 'out-json-1',
+        }, HTTP_ACCEPT='application/json')
+        self.assertEqual(bad.status_code, 400)
+        self.assertIn('Montaj tarihi geçersiz', bad.json()['error'])
+        self.assertFalse(Job.objects.filter(sale=sale).exists())
+        ok = self.client.post('/sales/mount-activation/', {
+            'sale_id': str(sale.pk), 'interval_months': '12',
+            f'serial_{key}': 'in-json-1', f'outdoor_{key}': 'out-json-1',
+        }, HTTP_ACCEPT='application/json')
+        self.assertEqual(ok.status_code, 200)
+        self.assertTrue(ok.json()['toast'].startswith(f'{sale.number} montajı aktif'))
+        self.assertEqual(Job.objects.get(sale=sale).status, Job.STATUS_CLOSED)
+        page = self.client.get('/sales/mount-activation/')
+        self.assertNotContains(page, sale.number)
+        self.assertEqual(list(page.context['messages']), [])
+
 
 class CopperMountSummaryTests(TestCase):
     def setUp(self):
