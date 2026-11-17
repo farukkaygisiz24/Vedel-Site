@@ -239,8 +239,7 @@
         pop.querySelector('p').textContent = text;
         var items = celebrateItems(pop);
         var media = pickMedia(pop);
-        var shown = media.tagName === 'AUDIO' ? pop.querySelector('img[data-celebrate-item]') : media;
-        items.forEach(function (item) { item.hidden = item !== shown; });
+        items.forEach(function (item) { item.hidden = item !== media || item.tagName === 'AUDIO'; });
         pop.hidden = false;
         pop._shownAt = Date.now();
         if (media.tagName === 'AUDIO') {
